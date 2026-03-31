@@ -1,25 +1,42 @@
 import React from 'react';
 import { StyleSheet, View, ViewStyle } from 'react-native';
-import { colors, spacing } from '../../config/theme';
+import { colors, spacing, radius, shadows } from '../../config/theme';
 
 interface CardProps {
   children: React.ReactNode;
   style?: ViewStyle;
+  variant?: 'filled' | 'outlined';
 }
 
-export const Card: React.FC<CardProps> = ({ children, style }) => {
-  return <View style={[styles.card, style]}>{children}</View>;
+export const Card: React.FC<CardProps> = ({ children, style, variant = 'filled' }) => {
+  return (
+    <View
+      style={[
+        styles.card,
+        variant === 'outlined' ? styles.outlined : styles.filled,
+        style,
+      ]}
+    >
+      {children}
+    </View>
+  );
 };
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    padding: spacing.md,
-    shadowColor: colors.text,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+  },
+  filled: {
+    backgroundColor: colors.gray50,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+  },
+  outlined: {
+    backgroundColor: colors.white,
+    borderWidth: 1.5,
+    borderColor: colors.gray200,
+    ...shadows.sm,
   },
 });
+
