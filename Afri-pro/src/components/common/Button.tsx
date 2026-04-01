@@ -17,7 +17,15 @@ export const Button: React.FC<ButtonProps> = ({
   variant = 'primary',
   style,
 }) => {
-  const variants = {
+  const variants: Record<
+    'primary' | 'secondary' | 'danger' | 'outline',
+    {
+      backgroundColor: string;
+      textColor: string;
+      borderWidth?: number;
+      borderColor?: string;
+    }
+  > = {
     primary: {
       backgroundColor: colors.orange,
       textColor: colors.white,
