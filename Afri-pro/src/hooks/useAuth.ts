@@ -4,59 +4,62 @@ import { LoginPayload, RegisterPayload } from '../types/auth.types';
 import { getErrorMessage } from '../utils/errors';
 
 export const useAuth = () => {
-  const { user, token, isLoading, error, setUser, setToken, logout, setLoading, setError } =
-    useAuthStore();
+  const store = useAuthStore();
 
   const login = async (payload: LoginPayload) => {
-    setLoading(true);
-    setError(null);
+    store.setLoading(true);
+    store.setError(null);
     try {
       const response = await authService.login(payload);
-      setToken(response.token);
-      setUser(response.user);
+      store.setToken(response.token);
+      store.setUser(response.user);
+      return response.user;
     } catch (err) {
-      setError(getErrorMessage(err));
+      const errorMsg = getErrorMessage(err);
+      store.setError(errorMsg);
       throw err;
     } finally {
-      setLoading(false);
+      store.setLoading(false);
     }
   };
 
   const register = async (payload: RegisterPayload) => {
-    setLoading(true);
-    setError(null);
+    store.setLoading(true);
+    store.setError(null);
     try {
       const response = await authService.register(payload);
-      setToken(response.token);
-      setUser(response.user);
+      store.setToken(response.token);
+      store.setUser(response.user);
     } catch (err) {
-      setError(getErrorMessage(err));
+      const errorMsg = getErrorMessage(err);
+      store.setError(errorMsg);
       throw err;
     } finally {
-      setLoading(false);
+      store.setLoading(false);
     }
   };
 
   const handleLogout = async () => {
-    setLoading(true);
+    store.setLoading(true);
     try {
       await authService.logout();
     } catch (err) {
       console.error('Logout error:', err);
     } finally {
-      logout();
-      setLoading(false);
+      store.logout();
+      store.setLoading(false);
     }
   };
 
   return {
-    user,
-    token,
-    isLoading,
-    error,
+    user: store.user,
+    token: store.token,
+    isLoading: store.isLoading,
+    error: store.error,
     login,
     register,
     logout: handleLogout,
-    isAuthenticated: !!token,
+    isAuthenticated: !!store.token,
   };
 };
+

@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, spacing, typography } from '../../config/theme';
+import { colors, spacing, typography, radius } from '../../config/theme';
 
 interface HeaderProps {
   title: string;
@@ -18,16 +18,20 @@ export const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
+    backgroundColor: colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray200,
   },
   title: {
     ...typography.h2,
-    color: colors.text,
+    color: colors.violetDark,
   },
   subtitle: {
     ...typography.small,
-    color: colors.textSecondary,
+    color: colors.gray400,
     marginTop: spacing.sm,
   },
 });
+
