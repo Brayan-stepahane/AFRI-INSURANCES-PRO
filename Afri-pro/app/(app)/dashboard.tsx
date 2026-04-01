@@ -26,6 +26,23 @@ export default function DashboardScreen() {
       .slice(0, 2);
   };
 
+  const role = user?.role ?? 'commercial';
+  const capabilityMap: Record<string, string> = {
+    commercial: 'Saisir prospections, cotations et ventes · Voir uniquement ses propres données',
+    manager_adj: 'Voir et valider les saisies de son équipe',
+    manager: 'Tableau de bord de l’équipe · Suivi des objectifs',
+    chef: 'Vue globale de toute l’agence · Statistiques consolidées',
+    admin: 'Gestion complète : utilisateurs, paramètres, exports Excel',
+  };
+
+  const roleLabelMap: Record<string, string> = {
+    commercial: 'Commercial',
+    manager_adj: 'Manager adjoint',
+    manager: 'Manager',
+    chef: 'Chef d\'Agence',
+    admin: 'Administrateur',
+  };
+
   return (
     <ScrollView style={styles.container}>
       <Header
@@ -46,6 +63,12 @@ export default function DashboardScreen() {
               {user?.phone && <Text style={styles.profilePhone}>{user.phone}</Text>}
             </View>
           </View>
+        </Card>
+
+        {/* Role summary */}
+        <Card variant="outlined" style={styles.profileCard}>
+          <Text style={styles.roleTitle}>Rôle : {roleLabelMap[role] || 'Utilisateur'}</Text>
+          <Text style={styles.roleDescription}>{capabilityMap[role] || capabilityMap.commercial}</Text>
         </Card>
 
         {/* Quick Stats */}
@@ -145,6 +168,16 @@ const styles = StyleSheet.create({
   profilePhone: {
     ...typography.small,
     color: colors.gray600,
+  },
+  roleTitle: {
+    ...typography.smallBold,
+    color: colors.violetDark,
+    marginBottom: spacing.xs,
+  },
+  roleDescription: {
+    ...typography.small,
+    color: colors.gray600,
+    lineHeight: 18,
   },
   statsGrid: {
     flexDirection: 'row',

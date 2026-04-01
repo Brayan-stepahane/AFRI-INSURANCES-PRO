@@ -13,6 +13,7 @@ export const useAuth = () => {
       const response = await authService.login(payload);
       store.setToken(response.token);
       store.setUser(response.user);
+      return response.user;
     } catch (err) {
       const errorMsg = getErrorMessage(err);
       store.setError(errorMsg);
