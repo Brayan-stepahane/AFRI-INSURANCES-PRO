@@ -8,11 +8,11 @@ import { useAuth } from '../../src/hooks/useAuth';
 import { getProspectionsForUser, getClient, isOverdue, fmt } from '../../src/store/data';
 import { colors, spacing, radius } from '../../src/config/theme';
 import { Badge, EmptyState, ClientIdBadge } from '../../src/components/common/Button';
-import { AppWrapper } from '../../src/components/common/AppWrapper';
 import { Header } from '../../src/components/common/Header';
 import { STATUT_BADGE_COLORS } from '../../src/config/theme';
 import { STATUTS_PROSP } from '../../src/store/data';
 import { Prospection } from '../../src/types';
+import { NewProspectionModal } from '../../src/components/modals/NewProspectionModal';
 
 export default function ProspectionsScreen() {
   const { user } = useAuth();
@@ -20,6 +20,7 @@ export default function ProspectionsScreen() {
   const [search, setSearch]       = useState('');
   const [statut, setStatut]       = useState('Tous');
   const [refreshing, setRefreshing] = useState(false);
+  const [showNewProspectionModal, setShowNewProspectionModal] = useState(false);
 
   const name = user?.name ?? '';
   const role = user?.role ?? 'commercial';
@@ -84,10 +85,14 @@ export default function ProspectionsScreen() {
     );
   };
 
+  const handleNewProspectionSubmit = (data: any) => {
+    // TODO: Send form data to API
+    console.log('New prospection:', data);
+  };
+
   return (
-    <AppWrapper>
-      <View style={styles.container}>
-        <Header title="Prospections" subtitle={`${list.length} enregistrement(s)`} />
+    <View style={styles.container}>
+      <Header title="Prospections" subtitle={`${list.length} enregistrement(s)`} />
 
       {/* Search */}
       <View style={styles.searchBar}>
@@ -129,14 +134,20 @@ export default function ProspectionsScreen() {
         ListEmptyComponent={<EmptyState icon="📋" title="Aucune prospection trouvée" sub="Modifiez vos filtres ou ajoutez une prospection" />}
       />
 
-        {/* FAB */}
-        <TouchableOpacity style={styles.fab} onPress={() => router.push('/(app)/prospections/new' as any)}>
-          <Text style={styles.fabText}>+</Text>
-        </TouchableOpacity>
-      </View>
-    </AppWrapper>
+      {/* FAB */}
+      <TouchableOpacity style={styles.fab} onPress={() => setShowNewProspectionModal(true)}>
+        <Text style={styles.fabText}>+</Text>
+      </TouchableOpacity>
+
+      {/* Modal */}
+      <NewProspectionModal
+        visible={showNewProspectionModal}
+        onClose={() => setShowNewProspectionModal(false)}
+        onSubmit={handleNewProspectionSubmit}
+      />
+    </View>
   );
-}
+  }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.gray50 },

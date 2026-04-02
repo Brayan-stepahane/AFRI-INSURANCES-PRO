@@ -6,7 +6,6 @@ import { useAuth } from '../../src/hooks/useAuth';
 import { useObjective, useTeamObjectives } from '../../src/hooks/useDashboardStats';
 import { colors, spacing, radius } from '../../src/config/theme';
 import { ProgressBar } from '../../src/components/common/Button';
-import { AppWrapper } from '../../src/components/common/AppWrapper';
 import { Header } from '../../src/components/common/Header';
 import { fmt, fmtDate, prospections, ventes } from '../../src/store/data';
 
@@ -34,13 +33,12 @@ export default function ObjectifsScreen() {
   );
 
   return (
-    <AppWrapper>
-      <ScrollView
-        style={styles.container}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-      >
-        <Header title="Objectifs" subtitle={new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })} />
+    <ScrollView
+      style={styles.container}
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+    >
+      <Header title="Objectifs" subtitle={new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })} />
 
       <View style={styles.content}>
         {isCommercial ? (
@@ -161,8 +159,7 @@ export default function ObjectifsScreen() {
           </>
         )}
       </View>
-      </ScrollView>
-    </AppWrapper>
+    </ScrollView>
   );
 }
 

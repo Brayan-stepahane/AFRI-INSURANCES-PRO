@@ -7,7 +7,6 @@ import { useAuth } from '../../src/hooks/useAuth';
 import { getVentesForUser, getClient, fmt, fmtDate } from '../../src/store/data';
 import { colors, spacing, radius } from '../../src/config/theme';
 import { Badge, EmptyState, ClientIdBadge, StatCard } from '../../src/components/common/Button';
-import { AppWrapper } from '../../src/components/common/AppWrapper';
 import { Header } from '../../src/components/common/Header';
 import { Vente } from '../../src/types';
 
@@ -106,9 +105,8 @@ export default function VentesScreen() {
   };
 
   return (
-    <AppWrapper>
-      <View style={styles.container}>
-        <Header title="Ventes réalisées" subtitle={`${list.length} vente(s)`} />
+    <View style={styles.container}>
+      <Header title="Ventes réalisées" subtitle={`${list.length} vente(s)`} />
 
       {/* Stats strip */}
       <View style={styles.statsStrip}>
@@ -180,8 +178,7 @@ export default function VentesScreen() {
           <EmptyState icon="✅" title="Aucune vente trouvée" sub="Modifiez vos filtres" />
         }
       />
-      </View>
-    </AppWrapper>
+    </View>
   );
 }
 

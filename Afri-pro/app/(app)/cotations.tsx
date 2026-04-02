@@ -8,7 +8,6 @@ import { useAuth } from '../../src/hooks/useAuth';
 import { getCotationsForUser, getClient, fmt, fmtDate, cotations, prospections } from '../../src/store/data';
 import { colors, spacing, radius, STATUT_BADGE_COLORS } from '../../src/config/theme';
 import { Badge, EmptyState, ClientIdBadge, StatCard } from '../../src/components/common/Button';
-import { AppWrapper } from '../../src/components/common/AppWrapper';
 import { Header } from '../../src/components/common/Header';
 import { STATUTS_COT } from '../../src/store/data';
 import { Cotation } from '../../src/types';
@@ -127,9 +126,8 @@ export default function CotationsScreen() {
   };
 
   return (
-    <AppWrapper>
-      <View style={styles.container}>
-        <Header title="Cotations" subtitle={`${list.length} cotation(s)`} />
+    <View style={styles.container}>
+      <Header title="Cotations" subtitle={`${list.length} cotation(s)`} />
 
       {/* Stats strip */}
       <View style={styles.statsRow}>
@@ -174,9 +172,8 @@ export default function CotationsScreen() {
           <Text style={styles.fabText}>+</Text>
         </TouchableOpacity>
       </View>
-    </AppWrapper>
-  );
-}
+    );
+  }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.gray50 },

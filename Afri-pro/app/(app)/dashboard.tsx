@@ -4,8 +4,8 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/hooks/useAuth';
 import { useDashboardStats, useObjective } from '../../src/hooks/useDashboardStats';
 import { Button } from '../../src/components/common/Button';
-import { AppWrapper } from '../../src/components/common/AppWrapper';
 import { MetricCard, ObjectiveBox, Pipeline, UrgentFollowUps } from '../../src/components/dashboard/MetricCard';
+import { NewProspectionModal } from '../../src/components/modals/NewProspectionModal';
 import { colors, spacing, radius } from '../../src/config/theme';
 import { fmt, fmtDate, getClient, ventes as allVentes } from '../../src/store/data';
 
@@ -15,6 +15,12 @@ export default function DashboardScreen() {
   const stats    = useDashboardStats();
   const objective = useObjective();
   const [refreshing, setRefreshing] = React.useState(false);
+  const [showNewProspectionModal, setShowNewProspectionModal] = React.useState(false);
+
+  const handleNewProspectionSubmit = (data: any) => {
+    console.log('New prospection from dashboard:', data);
+    setShowNewProspectionModal(false);
+  };
 
   const onRefresh = async () => { setRefreshing(true); setTimeout(() => setRefreshing(false), 600); };
 
@@ -28,12 +34,11 @@ export default function DashboardScreen() {
   const handleLogout = async () => { await logout(); router.replace('/(auth)/login'); };
 
   return (
-    <AppWrapper>
-      <ScrollView
-        style={styles.container}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-      >
+    <ScrollView
+      style={styles.container}
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+    >
       {/* ── Top bar with title and buttons ── */}
       <View style={styles.topBar}>
         <View>
@@ -44,7 +49,7 @@ export default function DashboardScreen() {
           <TouchableOpacity style={styles.notificationBtn}>
             <Text style={styles.notificationIcon}>🔔</Text>
           </TouchableOpacity>
-          <Button title="+ Nouvelle prospection" onPress={() => router.push('/(app)/prospections/new')} style={styles.topButton} />
+          <Button title="+ Nouvelle prospection" onPress={() => setShowNewProspectionModal(true)} style={styles.topButton} />
         </View>
       </View>
 
@@ -89,8 +94,12 @@ export default function DashboardScreen() {
           </View>
         </View>
       </View>
-      </ScrollView>
-    </AppWrapper>
+      <NewProspectionModal
+        visible={showNewProspectionModal}
+        onClose={() => setShowNewProspectionModal(false)}
+        onSubmit={handleNewProspectionSubmit}
+      />
+    </ScrollView>
   );
 }
 

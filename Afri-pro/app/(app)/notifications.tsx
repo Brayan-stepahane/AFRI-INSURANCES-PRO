@@ -11,7 +11,6 @@ import {
 import { colors, spacing, radius } from '../../src/config/theme';
 import { Header } from '../../src/components/common/Header';
 import { EmptyState } from '../../src/components/common/Button';
-import { AppWrapper } from '../../src/components/common/AppWrapper';
 
 export default function NotificationsScreen() {
   const { user }  = useAuth();
@@ -33,13 +32,12 @@ export default function NotificationsScreen() {
   const total = relances.length + cotEnAttente.length;
 
   return (
-    <AppWrapper>
-      <ScrollView
-        style={styles.container}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); setTimeout(() => setRefreshing(false), 600); }} />}
-      >
-        <Header
+    <ScrollView
+      style={styles.container}
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); setTimeout(() => setRefreshing(false), 600); }} />}
+    >
+      <Header
         title="Notifications"
         subtitle={total > 0 ? `${total} alerte(s) active(s)` : 'Aucune alerte'}
       />
@@ -143,8 +141,7 @@ export default function NotificationsScreen() {
           </Text>
         </View>
       </View>
-      </ScrollView>
-    </AppWrapper>
+    </ScrollView>
   );
 }
 
