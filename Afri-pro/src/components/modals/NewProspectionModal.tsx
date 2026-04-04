@@ -1,18 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View, Text, Modal, StyleSheet, TextInput, TouchableOpacity,
-  ScrollView, Switch, Platform, Pressable,
+  ScrollView, Platform, Pressable,
 } from 'react-native';
 import { colors, spacing, radius } from '../../config/theme';
-import { Button } from '../common/Button';
 
 interface ProspectionFormData {
-  // Step 1: Client
   clientName: string;
   phone: string;
   clientType: string;
   activity: string;
-  // Step 2: Prospection
   prospectionDate: string;
   product: string;
   potentialCA: string;
@@ -25,12 +22,10 @@ interface ProspectionFormData {
   previousInsurer: string;
   previousContract: string;
   observations: string;
-  // Step 3: Quotation
   ratedRisk: string;
   quotationDate: string;
   quotationAmount: string;
   validationDate: string;
-  // Step 4: Sale
   saleDate: string;
   saleType: string;
   policyNumber: string;
@@ -48,130 +43,135 @@ interface NewProspectionModalProps {
   onSubmit?: (data: ProspectionFormData) => void;
 }
 
-const STEP_LABELS = ['Client', 'Prospection', 'Cotation', 'Vente'];
+const STEP_LABELS  = ['Client', 'Prospection', 'Cotation', 'Vente'];
 const CLIENT_TYPES = ['Particulier', 'PME', 'Entreprise', 'Autre'];
-const ACTIVITIES = ['Chef d\'entreprise', 'Salarié', 'Indépendant', 'Autre'];
-const PRODUCTS = [
-  'Afrilife étude',
-  'Afrilife retraite individuelle',
-  'Afrilife retraite plus',
-  'Afrilife libre retraite',
-  'Afrilife Pension',
-  'Afrilife prévoyance individuelle',
-  'Afrilife Prévoyance groupe',
-  'Afrilife retraite complémentaire',
-  'Afrilife Indemnité de fin de carrière',
-  'Assurance Santé Groupe',
-  'Assurance Maritime',
-  'Automobile',
-  'Flotte Automobile',
-  'Assurance Voyage',
-  'Caution de soumission',
-  'Individuelle Accident',
-  'Individuelle Accident Groupe',
-  'Multirisque Habitation',
-  'Responsabilité Civile Chef Entreprise',
-  'Transport Marchandise',
-  'Autre',
+const ACTIVITIES   = ['Chef d\'entreprise', 'Salarié', 'Indépendant', 'Autre'];
+const PRODUCTS     = [
+  'Afrilife étude', 'Afrilife retraite individuelle', 'Afrilife retraite plus',
+  'Afrilife libre retraite', 'Afrilife Pension', 'Afrilife prévoyance individuelle',
+  'Afrilife Prévoyance groupe', 'Afrilife retraite complémentaire',
+  'Afrilife Indemnité de fin de carrière', 'Assurance Santé Groupe',
+  'Assurance Maritime', 'Automobile', 'Flotte Automobile', 'Assurance Voyage',
+  'Caution de soumission', 'Individuelle Accident', 'Individuelle Accident Groupe',
+  'Multirisque Habitation', 'Responsabilité Civile Chef Entreprise',
+  'Transport Marchandise', 'Autre',
 ];
-
-const STATUSES = ['Premier contact', 'En discussion', 'Proposition envoyée', 'Négociation', 'Autre'];
+const STATUSES   = ['Premier contact', 'En discussion', 'Proposition envoyée', 'Négociation', 'Autre'];
 const SALE_TYPES = ['Nouvelle vente (NouVe)', 'Transfert', 'Augmentation', 'Autre'];
-const RISKS = ['— Non coté —', 'Standard', 'Surcoté', 'Refusé'];
+const RISKS      = ['— Non coté —', 'Standard', 'Surcoté', 'Refusé'];
 
+// ─── SelectField ─────────────────────────────────────────────────────────────
+function SelectField({
+  value, options, isOpen, onToggle, onSelect,
+}: {
+  value: string; options: string[]; isOpen: boolean;
+  onToggle: () => void; onSelect: (v: string) => void;
+}) {
+  return (
+    <View style={sf.wrapper}>
+      <TouchableOpacity
+        style={[sf.trigger, isOpen && sf.triggerOpen]}
+        onPress={onToggle}
+        activeOpacity={0.8}
+      >
+        <Text style={sf.triggerText} numberOfLines={1}>{value}</Text>
+        <Text style={sf.caret}>{isOpen ? '▲' : '▼'}</Text>
+      </TouchableOpacity>
+
+      {isOpen && (
+        <View style={sf.list}>
+          <ScrollView
+            nestedScrollEnabled
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {options.map(item => (
+              <TouchableOpacity
+                key={item}
+                style={[sf.item, item === value && sf.itemActive]}
+                onPress={() => { onSelect(item); onToggle(); }}
+                activeOpacity={0.7}
+              >
+                <Text style={[sf.itemText, item === value && sf.itemTextActive]}>{item}</Text>
+                {item === value && <Text style={sf.checkmark}>✓</Text>}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+    </View>
+  );
+}
+
+const sf = StyleSheet.create({
+  wrapper:         { position: 'relative', zIndex: 10 },
+  trigger: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderWidth: 1, borderColor: colors.gray200, borderRadius: radius.sm,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+    backgroundColor: colors.white, minHeight: 40,
+  },
+  triggerOpen:     { borderColor: colors.violet, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
+  triggerText:     { flex: 1, fontSize: 14, color: colors.gray800 },
+  caret:           { fontSize: 9, color: colors.gray400, marginLeft: 6 },
+  list: {
+    position: 'absolute', top: 40, left: 0, right: 0,
+    maxHeight: 160, backgroundColor: colors.white,
+    borderWidth: 1, borderTopWidth: 0, borderColor: colors.violet,
+    borderBottomLeftRadius: radius.sm, borderBottomRightRadius: radius.sm,
+    zIndex: 9999, elevation: 20,
+    shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 }, overflow: 'hidden',
+  },
+  item: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 10, paddingHorizontal: spacing.md,
+    borderBottomWidth: 1, borderBottomColor: colors.gray100,
+  },
+  itemActive:      { backgroundColor: colors.violetPale },
+  itemText:        { flex: 1, fontSize: 13, color: colors.gray800 },
+  itemTextActive:  { fontWeight: '600', color: colors.violet },
+  checkmark:       { fontSize: 12, color: colors.violet, fontWeight: '700' },
+});
+
+// ─── Main component ───────────────────────────────────────────────────────────
 export function NewProspectionModal({ visible, onClose, onSubmit }: NewProspectionModalProps) {
   const [step, setStep] = useState(1);
-  const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
-  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
-  const [isSaleTypeDropdownOpen, setIsSaleTypeDropdownOpen] = useState(false);
-  const [isRatedRiskDropdownOpen, setIsRatedRiskDropdownOpen] = useState(false);
-  const [isClientTypeDropdownOpen, setIsClientTypeDropdownOpen] = useState(false);
-  const [isActivityDropdownOpen, setIsActivityDropdownOpen] = useState(false);
-  const productDropdownScrollRef = React.useRef<ScrollView>(null);
-  const statusDropdownScrollRef = React.useRef<ScrollView>(null);
-  const saleTypeDropdownScrollRef = React.useRef<ScrollView>(null);
-  const ratedRiskDropdownScrollRef = React.useRef<ScrollView>(null);
-  const clientTypeDropdownScrollRef = React.useRef<ScrollView>(null);
-  const activityDropdownScrollRef = React.useRef<ScrollView>(null);
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const toggle = (name: string) => setOpenDropdown(prev => (prev === name ? null : name));
+
   const [form, setForm] = useState<ProspectionFormData>({
-    clientName: '',
-    phone: '',
-    clientType: 'Particulier',
+    clientName: '', phone: '', clientType: 'Particulier',
     activity: 'Chef d\'entreprise',
     prospectionDate: new Date().toISOString().split('T')[0],
-    product: 'Afrilife étude',
-    potentialCA: '',
-    status: 'Premier contact',
-    probability: 50,
-    visitDate1: '',
-    nextFollowUp: '',
-    visitDate2: '',
-    visitDate3: '',
-    previousInsurer: '',
-    previousContract: '',
-    observations: '',
-    ratedRisk: '— Non coté —',
-    quotationDate: '',
-    quotationAmount: '',
-    validationDate: '',
-    saleDate: '',
-    saleType: 'Nouvelle vente (NouVe)',
-    policyNumber: '',
-    attestationNumber: '',
-    netPremiums: '',
-    accessories: '',
-    effectDate: '',
-    expiryDate: '',
-    carRoseNumber: '',
+    product: 'Afrilife étude', potentialCA: '', status: 'Premier contact',
+    probability: 50, visitDate1: '', nextFollowUp: '', visitDate2: '',
+    visitDate3: '', previousInsurer: '', previousContract: '', observations: '',
+    ratedRisk: '— Non coté —', quotationDate: '', quotationAmount: '',
+    validationDate: '', saleDate: '', saleType: 'Nouvelle vente (NouVe)',
+    policyNumber: '', attestationNumber: '', netPremiums: '', accessories: '',
+    effectDate: '', expiryDate: '', carRoseNumber: '',
   });
 
-  const updateField = (field: keyof ProspectionFormData, value: any) => {
+  const upd = (field: keyof ProspectionFormData, value: any) =>
     setForm(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleNext = () => {
-    if (step < 4) setStep(step + 1);
-  };
-
-  const handlePrev = () => {
-    if (step > 1) setStep(step - 1);
-  };
-
-  const handleSubmit = () => {
-    if (onSubmit) onSubmit(form);
-    onClose();
-  };
 
   const renderStepIndicator = () => (
     <View style={styles.stepContainer}>
       {STEP_LABELS.map((label, idx) => {
-        const stepNum = idx + 1;
-        const isActive = step === stepNum;
-        const isCompleted = step > stepNum;
+        const n = idx + 1;
+        const isActive    = step === n;
+        const isCompleted = step > n;
         return (
           <TouchableOpacity
-            key={stepNum}
-            style={[
-              styles.stepBox,
-              isActive && styles.stepBoxActive,
-              isCompleted && styles.stepBoxCompleted,
-            ]}
-            onPress={() => setStep(stepNum)}
+            key={n}
+            style={[styles.stepBox, isActive && styles.stepBoxActive, isCompleted && styles.stepBoxCompleted]}
+            onPress={() => setStep(n)}
           >
-            <Text
-              style={[
-                styles.stepNumber,
-                (isActive || isCompleted) && styles.stepNumberActive,
-              ]}
-            >
-              {isCompleted ? '✓' : stepNum}
+            <Text style={[styles.stepNumber, (isActive || isCompleted) && styles.stepNumberActive]}>
+              {isCompleted ? '✓' : n}
             </Text>
-            <Text
-              style={[
-                styles.stepLabel,
-                (isActive || isCompleted) && styles.stepLabelActive,
-              ]}
-            >
+            <Text style={[styles.stepLabel, (isActive || isCompleted) && styles.stepLabelActive]}>
               {label}
             </Text>
           </TouchableOpacity>
@@ -181,7 +181,13 @@ export function NewProspectionModal({ visible, onClose, onSubmit }: NewProspecti
   );
 
   const renderStep1 = () => (
-    <ScrollView style={styles.formContainer} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.formScroll}
+      contentContainerStyle={styles.formContent}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      nestedScrollEnabled
+    >
       <Text style={styles.subtitle}>Identification du client</Text>
       <Text style={styles.hint}>Tapez le nom pour rechercher un client existant</Text>
 
@@ -190,7 +196,7 @@ export function NewProspectionModal({ visible, onClose, onSubmit }: NewProspecti
         style={styles.input}
         placeholder="Tapez pour rechercher ou créer..."
         value={form.clientName}
-        onChangeText={v => updateField('clientName', v)}
+        onChangeText={v => upd('clientName', v)}
         placeholderTextColor={colors.gray400}
       />
       <Text style={styles.helperText}>Le système cherche automatiquement dans la base clients</Text>
@@ -199,81 +205,77 @@ export function NewProspectionModal({ visible, onClose, onSubmit }: NewProspecti
         <View style={styles.half}>
           <Text style={styles.label}>Téléphone</Text>
           <TextInput
-            style={styles.input}
-            placeholder="6XX XXX XXX"
-            value={form.phone}
-            onChangeText={v => updateField('phone', v)}
-            placeholderTextColor={colors.gray400}
+            style={styles.input} placeholder="6XX XXX XXX" value={form.phone}
+            onChangeText={v => upd('phone', v)} placeholderTextColor={colors.gray400}
           />
         </View>
-        <View style={styles.half}>
+        <View style={[styles.half, openDropdown === 'clientType' && styles.elevated]}>
           <Text style={styles.label}>Type de client</Text>
-          <TouchableOpacity
-            style={styles.select}
-            onPress={() => setIsClientTypeDropdownOpen(prev => !prev)}
-            activeOpacity={0.8}
-          >
-            <Text style={{ color: colors.gray800 }}>{form.clientType}</Text>
-          </TouchableOpacity>
+          <SelectField
+            value={form.clientType} options={CLIENT_TYPES}
+            isOpen={openDropdown === 'clientType'}
+            onToggle={() => toggle('clientType')}
+            onSelect={v => upd('clientType', v)}
+          />
         </View>
       </View>
 
-      <Text style={styles.label}>Activité</Text>
-      <TouchableOpacity
-        style={styles.select}
-        onPress={() => setIsActivityDropdownOpen(prev => !prev)}
-        activeOpacity={0.8}
-      >
-        <Text style={{ color: colors.gray800 }}>{form.activity}</Text>
-      </TouchableOpacity>
+      <View style={openDropdown === 'activity' ? styles.elevated : undefined}>
+        <Text style={styles.label}>Activité</Text>
+        <SelectField
+          value={form.activity} options={ACTIVITIES}
+          isOpen={openDropdown === 'activity'}
+          onToggle={() => toggle('activity')}
+          onSelect={v => upd('activity', v)}
+        />
+      </View>
+
+      {/* Spacer so list has room when open */}
+      <View style={{ height: 180 }} />
     </ScrollView>
   );
 
   const renderStep2 = () => (
-    <ScrollView style={styles.formContainer} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.formScroll}
+      contentContainerStyle={styles.formContent}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      nestedScrollEnabled
+    >
       <Text style={styles.subtitle}>Détails de la prospection</Text>
 
       <View style={styles.row}>
-        <View style={styles.half}>
+        <View style={[styles.half, openDropdown === 'product' && styles.elevated]}>
           <Text style={styles.label}>Produit / Risque visé *</Text>
-          <View style={styles.dropdownWrapper}>
-            <TouchableOpacity
-              style={styles.select}
-              onPress={() => setIsProductDropdownOpen(prev => !prev)}
-              activeOpacity={0.8}
-            >
-              <Text style={{ color: colors.gray800 }}>{form.product}</Text>
-            </TouchableOpacity>
-          </View>
+          <SelectField
+            value={form.product} options={PRODUCTS}
+            isOpen={openDropdown === 'product'}
+            onToggle={() => toggle('product')}
+            onSelect={v => upd('product', v)}
+          />
         </View>
-        <View style={styles.half}>
+        <View style={[styles.half, openDropdown === 'status' && styles.elevated]}>
           <Text style={styles.label}>Statut *</Text>
-          <View style={styles.dropdownWrapper}>
-            <TouchableOpacity
-              style={styles.select}
-              onPress={() => setIsStatusDropdownOpen(prev => !prev)}
-              activeOpacity={0.8}
-            >
-              <Text style={{ color: colors.gray800 }}>{form.status}</Text>
-            </TouchableOpacity>
-          </View>
+          <SelectField
+            value={form.status} options={STATUSES}
+            isOpen={openDropdown === 'status'}
+            onToggle={() => toggle('status')}
+            onSelect={v => upd('status', v)}
+          />
         </View>
       </View>
-      
 
       <Text style={styles.label}>Chance de réalisation (%)</Text>
       <View style={styles.probabilityContainer}>
         <TextInput
-          style={styles.probabilityInput}
-          placeholder="0"
+          style={styles.probabilityInput} placeholder="0"
           value={String(form.probability)}
           onChangeText={(v: string) => {
             const num = parseInt(v) || 0;
-            updateField('probability', Math.min(Math.max(num, 0), 100));
+            upd('probability', Math.min(Math.max(num, 0), 100));
           }}
-          keyboardType="numeric"
-          maxLength={3}
-          placeholderTextColor={colors.gray400}
+          keyboardType="numeric" maxLength={3} placeholderTextColor={colors.gray400}
         />
         <View style={styles.probabilityBadge}>
           <Text style={styles.probabilityText}>{form.probability}%</Text>
@@ -281,85 +283,59 @@ export function NewProspectionModal({ visible, onClose, onSubmit }: NewProspecti
       </View>
 
       <Text style={styles.label}>Date visite 1</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="jj/mm/aaaa"
-        value={form.visitDate1}
-        onChangeText={v => updateField('visitDate1', v)}
-        placeholderTextColor={colors.gray400}
-      />
+      <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.visitDate1}
+        onChangeText={v => upd('visitDate1', v)} placeholderTextColor={colors.gray400} />
 
       <View style={styles.row}>
         <View style={styles.half}>
           <Text style={styles.label}>Prochaine relance</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="jj/mm/aaaa"
-            value={form.nextFollowUp}
-            onChangeText={v => updateField('nextFollowUp', v)}
-            placeholderTextColor={colors.gray400}
-          />
+          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.nextFollowUp}
+            onChangeText={v => upd('nextFollowUp', v)} placeholderTextColor={colors.gray400} />
           <Text style={styles.helperText}>Alerte automatique à cette date</Text>
         </View>
         <View style={styles.half}>
           <Text style={styles.label}>Date visite 2</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="jj/mm/aaaa"
-            value={form.visitDate2}
-            onChangeText={v => updateField('visitDate2', v)}
-            placeholderTextColor={colors.gray400}
-          />
+          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.visitDate2}
+            onChangeText={v => upd('visitDate2', v)} placeholderTextColor={colors.gray400} />
         </View>
       </View>
 
       <Text style={styles.label}>Date visite 3</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="jj/mm/aaaa"
-        value={form.visitDate3}
-        onChangeText={v => updateField('visitDate3', v)}
-        placeholderTextColor={colors.gray400}
-      />
+      <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.visitDate3}
+        onChangeText={v => upd('visitDate3', v)} placeholderTextColor={colors.gray400} />
 
       <View style={styles.row}>
         <View style={styles.half}>
           <Text style={styles.label}>Ancien assureur</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Nom compagnie"
-            value={form.previousInsurer}
-            onChangeText={v => updateField('previousInsurer', v)}
-            placeholderTextColor={colors.gray400}
-          />
+          <TextInput style={styles.input} placeholder="Nom compagnie" value={form.previousInsurer}
+            onChangeText={v => upd('previousInsurer', v)} placeholderTextColor={colors.gray400} />
         </View>
         <View style={styles.half}>
           <Text style={styles.label}>Échange ancien contrat</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="jj/mm/aaaa"
-            value={form.previousContract}
-            onChangeText={v => updateField('previousContract', v)}
-            placeholderTextColor={colors.gray400}
-          />
+          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.previousContract}
+            onChangeText={v => upd('previousContract', v)} placeholderTextColor={colors.gray400} />
         </View>
       </View>
 
       <Text style={styles.label}>Observations</Text>
       <TextInput
-        style={[styles.input, styles.textarea]}
-        placeholder="Notes supplémentaires..."
-        value={form.observations}
-        onChangeText={v => updateField('observations', v)}
-        placeholderTextColor={colors.gray400}
-        multiline
-        numberOfLines={3}
+        style={[styles.input, styles.textarea]} placeholder="Notes supplémentaires..."
+        value={form.observations} onChangeText={v => upd('observations', v)}
+        placeholderTextColor={colors.gray400} multiline numberOfLines={3}
       />
+
+      {(openDropdown === 'product' || openDropdown === 'status') && <View style={{ height: 160 }} />}
     </ScrollView>
   );
 
   const renderStep3 = () => (
-    <ScrollView style={styles.formContainer} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.formScroll}
+      contentContainerStyle={styles.formContent}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      nestedScrollEnabled
+    >
       <Text style={styles.subtitle}>Cotation (optionnel)</Text>
       <View style={styles.infoBox}>
         <Text style={styles.infoIcon}>📋</Text>
@@ -369,55 +345,47 @@ export function NewProspectionModal({ visible, onClose, onSubmit }: NewProspecti
       </View>
 
       <View style={styles.row}>
-        <View style={styles.half}>
+        <View style={[styles.half, openDropdown === 'ratedRisk' && styles.elevated]}>
           <Text style={styles.label}>Risque coté</Text>
-          <TouchableOpacity
-            style={styles.select}
-            onPress={() => setIsRatedRiskDropdownOpen(prev => !prev)}
-            activeOpacity={0.8}
-          >
-            <Text style={{ color: colors.gray800 }}>{form.ratedRisk}</Text>
-          </TouchableOpacity>
+          <SelectField
+            value={form.ratedRisk} options={RISKS}
+            isOpen={openDropdown === 'ratedRisk'}
+            onToggle={() => toggle('ratedRisk')}
+            onSelect={v => upd('ratedRisk', v)}
+          />
         </View>
         <View style={styles.half}>
           <Text style={styles.label}>Date de cotation</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="jj/mm/aaaa"
-            value={form.quotationDate}
-            onChangeText={v => updateField('quotationDate', v)}
-            placeholderTextColor={colors.gray400}
-          />
+          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.quotationDate}
+            onChangeText={v => upd('quotationDate', v)} placeholderTextColor={colors.gray400} />
         </View>
       </View>
 
       <View style={styles.row}>
         <View style={styles.half}>
           <Text style={styles.label}>Montant de la cotation (FCFA)</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ex: 105 000"
-            value={form.quotationAmount}
-            onChangeText={v => updateField('quotationAmount', v)}
-            placeholderTextColor={colors.gray400}
-          />
+          <TextInput style={styles.input} placeholder="Ex: 105 000" value={form.quotationAmount}
+            onChangeText={v => upd('quotationAmount', v)} placeholderTextColor={colors.gray400} />
         </View>
         <View style={styles.half}>
           <Text style={styles.label}>Date de validation</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="jj/mm/aaaa"
-            value={form.validationDate}
-            onChangeText={v => updateField('validationDate', v)}
-            placeholderTextColor={colors.gray400}
-          />
+          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.validationDate}
+            onChangeText={v => upd('validationDate', v)} placeholderTextColor={colors.gray400} />
         </View>
       </View>
+
+      {openDropdown === 'ratedRisk' && <View style={{ height: 160 }} />}
     </ScrollView>
   );
 
   const renderStep4 = () => (
-    <ScrollView style={styles.formContainer} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.formScroll}
+      contentContainerStyle={styles.formContent}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      nestedScrollEnabled
+    >
       <Text style={styles.subtitle}>Vente conclue (optionnel)</Text>
       <View style={[styles.infoBox, styles.successInfo]}>
         <Text style={styles.infoIcon}>✓</Text>
@@ -429,379 +397,107 @@ export function NewProspectionModal({ visible, onClose, onSubmit }: NewProspecti
       <View style={styles.row}>
         <View style={styles.half}>
           <Text style={styles.label}>Date de vente</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="dd/mm/yyyy"
-            value={form.saleDate}
-            onChangeText={v => updateField('saleDate', v)}
-            placeholderTextColor={colors.gray400}
-          />
+          <TextInput style={styles.input} placeholder="dd/mm/yyyy" value={form.saleDate}
+            onChangeText={v => upd('saleDate', v)} placeholderTextColor={colors.gray400} />
         </View>
-        <View style={styles.half}>
+        <View style={[styles.half, openDropdown === 'saleType' && styles.elevated]}>
           <Text style={styles.label}>Type de vente</Text>
-          <TouchableOpacity
-            style={styles.select}
-            onPress={() => setIsSaleTypeDropdownOpen(prev => !prev)}
-            activeOpacity={0.8}
-          >
-            <Text style={{ color: colors.gray800 }}>{form.saleType}</Text>
-          </TouchableOpacity>
+          <SelectField
+            value={form.saleType} options={SALE_TYPES}
+            isOpen={openDropdown === 'saleType'}
+            onToggle={() => toggle('saleType')}
+            onSelect={v => upd('saleType', v)}
+          />
         </View>
       </View>
 
       <View style={styles.row}>
         <View style={styles.half}>
           <Text style={styles.label}>N° Police EXCEL/ORASS</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Numéro de police"
-            value={form.policyNumber}
-            onChangeText={v => updateField('policyNumber', v)}
-            placeholderTextColor={colors.gray400}
-          />
+          <TextInput style={styles.input} placeholder="Numéro de police" value={form.policyNumber}
+            onChangeText={v => upd('policyNumber', v)} placeholderTextColor={colors.gray400} />
         </View>
         <View style={styles.half}>
           <Text style={styles.label}>N° Attestation</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Numéro attestation"
-            value={form.attestationNumber}
-            onChangeText={v => updateField('attestationNumber', v)}
-            placeholderTextColor={colors.gray400}
-          />
+          <TextInput style={styles.input} placeholder="Numéro attestation" value={form.attestationNumber}
+            onChangeText={v => upd('attestationNumber', v)} placeholderTextColor={colors.gray400} />
         </View>
       </View>
 
       <View style={styles.row}>
         <View style={styles.half}>
           <Text style={styles.label}>Primes nettes (FCFA)</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ex: 100 000"
-            value={form.netPremiums}
-            onChangeText={v => updateField('netPremiums', v)}
-            placeholderTextColor={colors.gray400}
-          />
+          <TextInput style={styles.input} placeholder="Ex: 100 000" value={form.netPremiums}
+            onChangeText={v => upd('netPremiums', v)} placeholderTextColor={colors.gray400} />
         </View>
         <View style={styles.half}>
           <Text style={styles.label}>Accessoires (FCFA)</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ex: 5 000"
-            value={form.accessories}
-            onChangeText={v => updateField('accessories', v)}
-            placeholderTextColor={colors.gray400}
-          />
+          <TextInput style={styles.input} placeholder="Ex: 5 000" value={form.accessories}
+            onChangeText={v => upd('accessories', v)} placeholderTextColor={colors.gray400} />
         </View>
       </View>
 
       <View style={styles.row}>
         <View style={styles.half}>
           <Text style={styles.label}>Date d'effet</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="jj/mm/aaaa"
-            value={form.effectDate}
-            onChangeText={v => updateField('effectDate', v)}
-            placeholderTextColor={colors.gray400}
-          />
+          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.effectDate}
+            onChangeText={v => upd('effectDate', v)} placeholderTextColor={colors.gray400} />
         </View>
         <View style={styles.half}>
           <Text style={styles.label}>Date d'échéance</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="jj/mm/aaaa"
-            value={form.expiryDate}
-            onChangeText={v => updateField('expiryDate', v)}
-            placeholderTextColor={colors.gray400}
-          />
+          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.expiryDate}
+            onChangeText={v => upd('expiryDate', v)} placeholderTextColor={colors.gray400} />
         </View>
       </View>
 
       <Text style={styles.label}>N° Carte rose (automobile)</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Numéro carte rose"
-        value={form.carRoseNumber}
-        onChangeText={v => updateField('carRoseNumber', v)}
-        placeholderTextColor={colors.gray400}
-      />
+      <TextInput style={styles.input} placeholder="Numéro carte rose" value={form.carRoseNumber}
+        onChangeText={v => upd('carRoseNumber', v)} placeholderTextColor={colors.gray400} />
+
+      {openDropdown === 'saleType' && <View style={{ height: 160 }} />}
     </ScrollView>
   );
 
-  // Dropdown overlay - rendered at modal level for proper z-indexing
-  const renderProductDropdown = () => {
-    if (!isProductDropdownOpen || step !== 2) return null;
-    return (
-      <View style={styles.dropdownOverlay}>
-        <ScrollView
-          style={styles.dropdownContent}
-          contentContainerStyle={{ paddingVertical: spacing.xs }}
-          ref={productDropdownScrollRef}
-          nestedScrollEnabled
-          showsVerticalScrollIndicator={false}
-        >
-          {PRODUCTS.map(item => (
-            <TouchableOpacity
-              key={item}
-              style={styles.dropdownItem}
-              onPress={() => {
-                updateField('product', item);
-                setIsProductDropdownOpen(false);
-              }}
-            >
-              <Text style={styles.dropdownItemText}>{item}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        <TouchableOpacity
-          style={styles.dropdownScrollButton}
-          onPress={() => productDropdownScrollRef.current?.scrollToEnd({ animated: true })}
-        >
-          <Text style={styles.dropdownScrollButtonText}>Défiler vers le bas ↓</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
-  const renderStatusDropdown = () => {
-    if (!isStatusDropdownOpen || step !== 2) return null;
-    return (
-      <View style={styles.dropdownOverlay}>
-        <ScrollView
-          style={styles.dropdownContent}
-          contentContainerStyle={{ paddingVertical: spacing.xs }}
-          ref={statusDropdownScrollRef}
-          nestedScrollEnabled
-          showsVerticalScrollIndicator={false}
-        >
-          {STATUSES.map(item => (
-            <TouchableOpacity
-              key={item}
-              style={styles.dropdownItem}
-              onPress={() => {
-                updateField('status', item);
-                setIsStatusDropdownOpen(false);
-              }}
-            >
-              <Text style={styles.dropdownItemText}>{item}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        <TouchableOpacity
-          style={styles.dropdownScrollButton}
-          onPress={() => statusDropdownScrollRef.current?.scrollToEnd({ animated: true })}
-        >
-          <Text style={styles.dropdownScrollButtonText}>Défiler vers le bas ↓</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
-  const renderRatedRiskDropdown = () => {
-    if (!isRatedRiskDropdownOpen || step !== 3) return null;
-    return (
-      <View style={styles.dropdownOverlay}>
-        <ScrollView
-          style={styles.dropdownContent}
-          contentContainerStyle={{ paddingVertical: spacing.xs }}
-          ref={ratedRiskDropdownScrollRef}
-          nestedScrollEnabled
-          showsVerticalScrollIndicator={false}
-        >
-          {RISKS.map(item => (
-            <TouchableOpacity
-              key={item}
-              style={styles.dropdownItem}
-              onPress={() => {
-                updateField('ratedRisk', item);
-                setIsRatedRiskDropdownOpen(false);
-              }}
-            >
-              <Text style={styles.dropdownItemText}>{item}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        <TouchableOpacity
-          style={styles.dropdownScrollButton}
-          onPress={() => ratedRiskDropdownScrollRef.current?.scrollToEnd({ animated: true })}
-        >
-          <Text style={styles.dropdownScrollButtonText}>Défiler vers le bas ↓</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
-  const renderSaleTypeDropdown = () => {
-    if (!isSaleTypeDropdownOpen || step !== 4) return null;
-    return (
-      <View style={styles.dropdownOverlay}>
-        <ScrollView
-          style={styles.dropdownContent}
-          contentContainerStyle={{ paddingVertical: spacing.xs }}
-          ref={saleTypeDropdownScrollRef}
-          nestedScrollEnabled
-          showsVerticalScrollIndicator={false}
-        >
-          {SALE_TYPES.map(item => (
-            <TouchableOpacity
-              key={item}
-              style={styles.dropdownItem}
-              onPress={() => {
-                updateField('saleType', item);
-                setIsSaleTypeDropdownOpen(false);
-              }}
-            >
-              <Text style={styles.dropdownItemText}>{item}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        <TouchableOpacity
-          style={styles.dropdownScrollButton}
-          onPress={() => saleTypeDropdownScrollRef.current?.scrollToEnd({ animated: true })}
-        >
-          <Text style={styles.dropdownScrollButtonText}>Défiler vers le bas ↓</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
-  const renderClientTypeDropdown = () => {
-    if (!isClientTypeDropdownOpen || step !== 1) return null;
-    return (
-      <View style={styles.dropdownOverlay}>
-        <ScrollView
-          style={styles.dropdownContent}
-          contentContainerStyle={{ paddingVertical: spacing.xs }}
-          ref={clientTypeDropdownScrollRef}
-          nestedScrollEnabled
-          showsVerticalScrollIndicator={false}
-        >
-          {CLIENT_TYPES.map(item => (
-            <TouchableOpacity
-              key={item}
-              style={styles.dropdownItem}
-              onPress={() => {
-                updateField('clientType', item);
-                setIsClientTypeDropdownOpen(false);
-              }}
-            >
-              <Text style={styles.dropdownItemText}>{item}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        <TouchableOpacity
-          style={styles.dropdownScrollButton}
-          onPress={() => clientTypeDropdownScrollRef.current?.scrollToEnd({ animated: true })}
-        >
-          <Text style={styles.dropdownScrollButtonText}>Défiler vers le bas ↓</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
-  const renderActivityDropdown = () => {
-    if (!isActivityDropdownOpen || step !== 1) return null;
-    return (
-      <View style={styles.dropdownOverlay}>
-        <ScrollView
-          style={styles.dropdownContent}
-          contentContainerStyle={{ paddingVertical: spacing.xs }}
-          ref={activityDropdownScrollRef}
-          nestedScrollEnabled
-          showsVerticalScrollIndicator={false}
-        >
-          {ACTIVITIES.map(item => (
-            <TouchableOpacity
-              key={item}
-              style={styles.dropdownItem}
-              onPress={() => {
-                updateField('activity', item);
-                setIsActivityDropdownOpen(false);
-              }}
-            >
-              <Text style={styles.dropdownItemText}>{item}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        <TouchableOpacity
-          style={styles.dropdownScrollButton}
-          onPress={() => activityDropdownScrollRef.current?.scrollToEnd({ animated: true })}
-        >
-          <Text style={styles.dropdownScrollButtonText}>Défiler vers le bas ↓</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
-  // Web-compatible modal content
   const modalContent = (
     <View style={styles.backdrop}>
       <Pressable style={styles.backdropPress} onPress={onClose} />
       <View style={styles.modal}>
-        {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Nouvelle prospection</Text>
-          <TouchableOpacity onPress={onClose}>
+          <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Text style={styles.closeButton}>✕</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Step Indicator */}
         {renderStepIndicator()}
 
-        {/* Form Content */}
-        {step === 1 && renderStep1()}
-        {step === 2 && renderStep2()}
-        {step === 3 && renderStep3()}
-        {step === 4 && renderStep4()}
+        <View style={styles.formArea}>
+          {step === 1 && renderStep1()}
+          {step === 2 && renderStep2()}
+          {step === 3 && renderStep3()}
+          {step === 4 && renderStep4()}
+        </View>
 
-        {/* Dropdown Overlays - Rendered on top */}
-        {renderProductDropdown()}
-        {renderStatusDropdown()}
-        {renderRatedRiskDropdown()}
-        {renderSaleTypeDropdown()}
-        {renderClientTypeDropdown()}
-        {renderActivityDropdown()}
-
-        {/* Footer */}
         <View style={styles.footer}>
-          <TouchableOpacity onPress={handlePrev} disabled={step === 1}>
+          <TouchableOpacity onPress={() => { if (step > 1) setStep(step - 1); }} disabled={step === 1}>
             <Text style={[styles.prevButton, step === 1 && styles.prevButtonDisabled]}>
               ← Précédent
             </Text>
           </TouchableOpacity>
-
           <TouchableOpacity
-            onPress={step === 4 ? handleSubmit : handleNext}
+            onPress={step === 4 ? () => { if (onSubmit) onSubmit(form); onClose(); } : () => setStep(step + 1)}
             style={[styles.nextButton, step === 4 && styles.submitButton]}
           >
-            <Text style={styles.nextButtonText}>
-              {step === 4 ? 'Enregistrer ✓' : 'Suivant →'}
-            </Text>
+            <Text style={styles.nextButtonText}>{step === 4 ? 'Enregistrer ✓' : 'Suivant →'}</Text>
           </TouchableOpacity>
         </View>
       </View>
     </View>
   );
 
-  // Use Platform-specific rendering
   if (Platform.OS === 'web') {
-    // Web version: use conditional rendering
-    return visible ? (
-      <View style={styles.webContainer}>
-        {modalContent}
-      </View>
-    ) : null;
+    return visible ? <View style={styles.webContainer}>{modalContent}</View> : null;
   }
-
-  // Native version: use Modal component
   return (
     <Modal visible={visible} transparent animationType="fade">
       {modalContent}
@@ -810,283 +506,46 @@ export function NewProspectionModal({ visible, onClose, onSubmit }: NewProspecti
 }
 
 const styles = StyleSheet.create({
-  webContainer: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 999,
-  },
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  backdropPress: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  modal: {
-    width: '90%',
-    maxWidth: 800,
-    maxHeight: '90%',
-    backgroundColor: colors.white,
-    borderRadius: radius.lg,
-    overflow: 'visible' as any,
-    flexDirection: 'column',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray100,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.violetDark,
-  },
-  closeButton: {
-    fontSize: 24,
-    color: colors.gray400,
-    padding: 8,
-  },
-  stepContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
-    gap: spacing.md,
-  },
-  stepBox: {
-    flex: 1,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.gray200,
-    backgroundColor: colors.white,
-    alignItems: 'center',
-  },
-  stepBoxActive: {
-    backgroundColor: colors.violet,
-    borderColor: colors.violet,
-  },
-  stepBoxCompleted: {
-    backgroundColor: colors.violetPale,
-    borderColor: colors.violetPale,
-  },
-  stepNumber: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.gray600,
-    marginBottom: 4,
-  },
-  stepNumberActive: {
-    color: colors.white,
-  },
-  stepLabel: {
-    fontSize: 12,
-    color: colors.gray600,
-    fontWeight: '500',
-  },
-  stepLabelActive: {
-    color: colors.white,
-  },
-  formContainer: {
-    flex: 1,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
-    overflow: 'visible' as any,
-  },
-  subtitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.violetDark,
-    marginBottom: spacing.sm,
-  },
-  hint: {
-    fontSize: 13,
-    color: colors.gray400,
-    marginBottom: spacing.lg,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.gray800,
-    marginBottom: spacing.sm,
-    marginTop: spacing.md,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.gray200,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    fontSize: 14,
-    color: colors.gray800,
-    backgroundColor: colors.white,
-  },
-  textarea: {
-    minHeight: 80,
-    paddingTop: spacing.sm,
-    textAlignVertical: 'top',
-  },
-  select: {
-    borderWidth: 1,
-    borderColor: colors.gray200,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.white,
-    justifyContent: 'center',
-  },
-  dropdownWrapper: {
-    position: 'relative',
-    zIndex: 9999,
-  },
-  dropdownOverlay: {
-    position: 'absolute',
-    top: 140,
-    left: spacing.xl,
-    right: spacing.xl,
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.gray200,
-    borderRadius: radius.sm,
-    maxHeight: 240,
-    elevation: 9999,
-    shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    zIndex: 9999,
-  },
-  dropdownContent: {
-    maxHeight: 180,
-  },
-  dropdownScrollButton: {
-    borderTopWidth: 1,
-    borderTopColor: colors.gray100,
-    paddingVertical: spacing.sm,
-    alignItems: 'center',
-    backgroundColor: colors.gray50,
-  },
-  dropdownScrollButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.violet,
-  },
-  dropdownItem: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray100,
-  },
-  dropdownItemText: {
-    fontSize: 13,
-    color: colors.gray800,
-  },
-  row: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginVertical: spacing.sm,
-  },
-  half: {
-    flex: 1,
-    overflow: 'visible' as any,
-  },
-  helperText: {
-    fontSize: 12,
-    color: colors.gray400,
-    marginTop: 4,
-  },
-  probabilityContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  probabilityInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.gray200,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    fontSize: 14,
-    color: colors.gray800,
-    backgroundColor: colors.white,
-  },
-  probabilityBadge: {
-    backgroundColor: colors.violet,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: 20,
-    minWidth: 60,
-    alignItems: 'center',
-  },
-  probabilityText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.white,
-  },
-  infoBox: {
-    flexDirection: 'row',
-    backgroundColor: colors.infoBg,
-    borderLeftWidth: 3,
-    borderLeftColor: colors.info,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    marginBottom: spacing.lg,
-    gap: spacing.md,
-  },
-  successInfo: {
-    backgroundColor: colors.successBg,
-    borderLeftColor: colors.success,
-  },
-  infoIcon: {
-    fontSize: 16,
-  },
-  infoText: {
-    flex: 1,
-    fontSize: 13,
-    color: colors.info,
-    lineHeight: 18,
-  },
-  successText: {
-    color: colors.success,
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: colors.gray100,
-  },
-  prevButton: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.gray400,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-  },
-  prevButtonDisabled: {
-    color: colors.gray200,
-  },
-  nextButton: {
-    backgroundColor: colors.orange,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    borderRadius: radius.sm,
-  },
-  submitButton: {
-    backgroundColor: colors.success,
-  },
-  nextButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.white,
-  },
+  webContainer:         { ...StyleSheet.absoluteFillObject, zIndex: 999 },
+  backdrop:             { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center' },
+  backdropPress:        { ...StyleSheet.absoluteFillObject },
+  modal:                { width: '90%', maxWidth: 800, maxHeight: '90%', backgroundColor: colors.white, borderRadius: radius.lg, flexDirection: 'column' },
+  header:               { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.gray100 },
+  title:                { fontSize: 18, fontWeight: '700', color: colors.violetDark },
+  closeButton:          { fontSize: 22, color: colors.gray400 },
+  stepContainer:        { flexDirection: 'row', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, gap: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.gray100 },
+  stepBox:              { flex: 1, paddingVertical: spacing.md, paddingHorizontal: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.gray200, backgroundColor: colors.white, alignItems: 'center' },
+  stepBoxActive:        { backgroundColor: colors.violet, borderColor: colors.violet },
+  stepBoxCompleted:     { backgroundColor: colors.violetPale, borderColor: colors.violetPale },
+  stepNumber:           { fontSize: 16, fontWeight: '700', color: colors.gray600, marginBottom: 2 },
+  stepNumberActive:     { color: colors.white },
+  stepLabel:            { fontSize: 12, color: colors.gray600, fontWeight: '500' },
+  stepLabelActive:      { color: colors.white },
+  formArea:             { flex: 1 },
+  formScroll:           { flex: 1 },
+  formContent:          { paddingHorizontal: spacing.xl, paddingVertical: spacing.lg },
+  subtitle:             { fontSize: 16, fontWeight: '700', color: colors.violetDark, marginBottom: spacing.sm },
+  hint:                 { fontSize: 13, color: colors.gray400, marginBottom: spacing.lg },
+  label:                { fontSize: 13, fontWeight: '600', color: colors.gray800, marginBottom: spacing.sm, marginTop: spacing.md },
+  input:                { borderWidth: 1, borderColor: colors.gray200, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: 14, color: colors.gray800, backgroundColor: colors.white, minHeight: 40 },
+  textarea:             { minHeight: 80, paddingTop: spacing.sm, textAlignVertical: 'top' },
+  helperText:           { fontSize: 12, color: colors.gray400, marginTop: 4 },
+  row:                  { flexDirection: 'row', gap: spacing.md, marginVertical: spacing.sm },
+  half:                 { flex: 1, zIndex: 1 },
+  elevated:             { zIndex: 100 },
+  probabilityContainer: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.lg },
+  probabilityInput:     { flex: 1, borderWidth: 1, borderColor: colors.gray200, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: 14, color: colors.gray800, backgroundColor: colors.white },
+  probabilityBadge:     { backgroundColor: colors.violet, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: 20, minWidth: 60, alignItems: 'center' },
+  probabilityText:      { fontSize: 12, fontWeight: '700', color: colors.white },
+  infoBox:              { flexDirection: 'row', backgroundColor: colors.infoBg, borderLeftWidth: 3, borderLeftColor: colors.info, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.md, marginBottom: spacing.lg, gap: spacing.md },
+  successInfo:          { backgroundColor: colors.successBg, borderLeftColor: colors.success },
+  infoIcon:             { fontSize: 16 },
+  infoText:             { flex: 1, fontSize: 13, color: colors.info, lineHeight: 18 },
+  successText:          { color: colors.success },
+  footer:               { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, borderTopWidth: 1, borderTopColor: colors.gray100 },
+  prevButton:           { fontSize: 14, fontWeight: '600', color: colors.gray400, paddingVertical: spacing.md, paddingHorizontal: spacing.lg },
+  prevButtonDisabled:   { color: colors.gray200 },
+  nextButton:           { backgroundColor: colors.orange, paddingHorizontal: spacing.xl, paddingVertical: spacing.md, borderRadius: radius.sm },
+  submitButton:         { backgroundColor: colors.success },
+  nextButtonText:       { fontSize: 14, fontWeight: '600', color: colors.white },
 });
