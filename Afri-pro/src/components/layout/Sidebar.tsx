@@ -30,14 +30,66 @@ export function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
 
-  const menuItems = [
-    { label: 'Tableau de bord', icon: '📊', route: '/(app)/dashboard' },
-    { label: 'Mes prospections', icon: '📋', route: '/(app)/prospections' },
-    { label: 'Mes cotations', icon: '💼', route: '/(app)/cotations' },
-    { label: 'Mes ventes', icon: '✅', route: '/(app)/ventes' },
-    { label: 'Mon objectif', icon: '🎯', route: '/(app)/objectifs' },
-    { label: 'Notifications', icon: '🔔', route: '/(app)/notifications' },
-  ];
+  type UserRole = 'commercial' | 'manager_adj' | 'manager' | 'chef' | 'admin';
+  const role = (user?.role || 'commercial') as UserRole;
+
+  const ROLE_LABELS: Record<UserRole, string> = {
+    commercial: 'Commercial',
+    manager_adj: 'Manager adjoint',
+    manager: 'Manager',
+    chef: "Chef d'agence",
+    admin: 'Administrateur',
+  };
+
+  const ROLE_MENUS: Record<UserRole, {label: string; icon: string; route: string}[]> = {
+    commercial: [
+      { label: 'Tableau de bord', icon: '🏠', route: '/(app)/dashboard' },
+      { label: 'Mes prospections', icon: '📋', route: '/(app)/prospections' },
+      { label: 'Mes cotations', icon: '💼', route: '/(app)/cotations' },
+      { label: 'Mes ventes', icon: '✅', route: '/(app)/ventes' },
+      { label: 'Mon objectif', icon: '🎯', route: '/(app)/objectifs' },
+      { label: 'Notifications', icon: '🔔', route: '/(app)/notifications' },
+    ],
+    manager_adj: [
+      { label: 'Tableau de bord', icon: '🏠', route: '/(app)/dashboard' },
+      { label: 'Prospections équipe', icon: '📋', route: '/(app)/prospections' },
+      { label: 'Cotations équipe', icon: '💼', route: '/(app)/cotations' },
+      { label: 'Ventes équipe', icon: '✅', route: '/(app)/ventes' },
+      { label: 'Objectifs', icon: '🎯', route: '/(app)/objectifs' },
+      { label: 'Mon équipe', icon: '👥', route: '/(app)/equipe' },
+    ],
+    manager: [
+      { label: 'Vue équipe', icon: '🏠', route: '/(app)/dashboard' },
+      { label: 'Toutes prospections', icon: '📋', route: '/(app)/prospections' },
+      { label: 'Toutes cotations', icon: '💼', route: '/(app)/cotations' },
+      { label: 'Toutes ventes', icon: '✅', route: '/(app)/ventes' },
+      { label: 'Objectifs', icon: '🎯', route: '/(app)/objectifs' },
+      { label: 'Mon équipe', icon: '👥', route: '/(app)/equipe' },
+      { label: 'Statistiques', icon: '📊', route: '/(app)/stats' },
+    ],
+    chef: [
+      { label: 'Vue globale', icon: '🏠', route: '/(app)/dashboard' },
+      { label: 'Toutes cotations', icon: '💼', route: '/(app)/cotations' },
+      { label: 'Toutes ventes', icon: '✅', route: '/(app)/ventes' },
+      { label: 'Objectifs agence', icon: '🎯', route: '/(app)/objectifs' },
+      { label: 'L équipe', icon: '👥', route: '/(app)/equipe' },
+      { label: 'Rapports', icon: '📊', route: '/(app)/stats' },
+      { label: 'Base clients', icon: '🆔', route: '/(app)/clients' },
+    ],
+    admin: [
+      { label: 'Vue d ensemble', icon: '🏠', route: '/(app)/dashboard' },
+      { label: 'Prospections', icon: '📋', route: '/(app)/prospections' },
+      { label: 'Cotations', icon: '💼', route: '/(app)/cotations' },
+      { label: 'Ventes', icon: '✅', route: '/(app)/ventes' },
+      { label: 'Objectifs', icon: '🎯', route: '/(app)/objectifs' },
+      { label: 'Base clients', icon: '🆔', route: '/(app)/clients' },
+      { label: 'Utilisateurs', icon: '⚙️', route: '/(app)/users' },
+      { label: 'Statistiques', icon: '📊', route: '/(app)/stats' },
+      { label: 'Notifications', icon: '🔔', route: '/(app)/notifications' },
+    ],
+  };
+
+  const menuItems = ROLE_MENUS[role] || ROLE_MENUS.commercial;
 
   const isActive = (route: string) => pathname?.includes(route.split('/').pop() || '');
 
@@ -51,7 +103,7 @@ export function Sidebar() {
 
       {/* Menu Section */}
       <View style={styles.menuSection}>
-         <Text style={styles.sectionLabel}>{user?.role}</Text>
+         <Text style={styles.sectionLabel}>{ROLE_LABELS[role] || role}</Text>
         
         <ScrollView showsVerticalScrollIndicator={false} style={styles.menuList}>
           {menuItems.map((item) => (

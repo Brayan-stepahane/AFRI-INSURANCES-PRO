@@ -24,6 +24,8 @@ export default function ProspectionsScreen() {
 
   const name = user?.name ?? '';
   const role = user?.role ?? 'commercial';
+  const canCreateProspection = ['commercial', 'manager_adj', 'manager', 'chef', 'admin'].includes(role);
+  const canValidateProspection = ['manager_adj', 'manager', 'chef', 'admin'].includes(role);
   let list = getProspectionsForUser(name, role);
 
   if (statut !== 'Tous') list = list.filter(p => p.statut === statut);
@@ -86,7 +88,6 @@ export default function ProspectionsScreen() {
   };
 
   const handleNewProspectionSubmit = (data: any) => {
-    // TODO: Send form data to API
     console.log('New prospection:', data);
   };
 
@@ -105,18 +106,24 @@ export default function ProspectionsScreen() {
         />
       </View>
 
-      {/* Filters */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow} contentContainerStyle={{ paddingHorizontal: spacing.xl, gap: spacing.md }}>
-        {filters.map(f => (
-          <TouchableOpacity
-            key={f}
-            style={[styles.chip, statut === f && styles.chipActive]}
-            onPress={() => setStatut(f)}
-          >
-            <Text style={[styles.chipText, statut === f && styles.chipTextActive]}>{f}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      {/* ✅ FIXED: outer View owns bg/border, ScrollView only scrolls */}
+      <View style={styles.filterWrapper}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterRow}
+        >
+          {filters.map(f => (
+            <TouchableOpacity
+              key={f}
+              style={[styles.chip, statut === f && styles.chipActive]}
+              onPress={() => setStatut(f)}
+            >
+              <Text style={[styles.chipText, statut === f && styles.chipTextActive]}>{f}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
 
       {/* Urgent alert */}
       {urgentCount > 0 && (
@@ -135,9 +142,15 @@ export default function ProspectionsScreen() {
       />
 
       {/* FAB */}
-      <TouchableOpacity style={styles.fab} onPress={() => setShowNewProspectionModal(true)}>
-        <Text style={styles.fabText}>+</Text>
-      </TouchableOpacity>
+      {canCreateProspection ? (
+        <TouchableOpacity style={styles.fab} onPress={() => setShowNewProspectionModal(true)}>
+          <Text style={styles.fabText}>+</Text>
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.noFabPlaceholder} />
+      )}
+
+      
 
       {/* Modal */}
       <NewProspectionModal
@@ -147,31 +160,40 @@ export default function ProspectionsScreen() {
       />
     </View>
   );
-  }
+}
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.gray50 },
-  searchBar: { backgroundColor: colors.white, padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: colors.gray100 },
-  searchInput: { backgroundColor: colors.gray50, borderRadius: radius.sm, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, color: colors.gray800 },
-  filterRow: { backgroundColor: colors.white, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.gray100, flexGrow: 0 },
-  chip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, borderColor: colors.gray200, backgroundColor: colors.white },
-  chipActive: { backgroundColor: colors.violet, borderColor: colors.violet },
-  chipText: { fontSize: 12, color: colors.gray600 },
-  chipTextActive: { color: colors.white, fontWeight: '600' },
-  alertBanner: { backgroundColor: colors.dangerBg, paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, borderBottomWidth: 1, borderBottomColor: '#f5c0c0' },
-  alertText: { fontSize: 13, color: colors.danger, fontWeight: '600' },
-  card: { backgroundColor: colors.white, borderRadius: radius.md, padding: spacing.xl, marginBottom: spacing.lg, elevation: 2, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8 },
-  cardUrgent: { borderLeftWidth: 3, borderLeftColor: colors.danger, backgroundColor: '#fff9f9' },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginBottom: spacing.md },
-  avatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.violetPale, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 15, fontWeight: '700', color: colors.violet },
-  nom: { fontSize: 14, fontWeight: '600', color: colors.gray800, marginBottom: 3 },
-  produit: { fontSize: 13, color: colors.gray600, marginBottom: spacing.md },
-  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: spacing.sm },
-  footerText: { fontSize: 11, color: colors.gray600 },
-  footerBold: { fontWeight: '700', color: colors.violetDark },
-  urgentText: { fontSize: 11, color: colors.danger, fontWeight: '600' },
-  relanceText: { fontSize: 11, color: colors.gray400, marginTop: spacing.sm },
-  fab: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.orange, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: colors.orange, shadowOpacity: 0.4, shadowRadius: 10 },
-  fabText: { fontSize: 28, color: colors.white, fontWeight: '300', lineHeight: 32 },
+  container:        { flex: 1, backgroundColor: colors.gray50 },
+  searchBar:        { backgroundColor: colors.white, padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: colors.gray100 },
+  searchInput:      { backgroundColor: colors.gray50, borderRadius: radius.sm, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, color: colors.gray800 },
+
+  // ✅ FIXED: wrapper View handles background, border — no overflow clipping
+  filterWrapper:    { backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.gray100 },
+
+  // ✅ FIXED: filterRow is contentContainerStyle only — padding & layout, no bg/border
+  filterRow:        { paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, gap: spacing.md, flexDirection: 'row', alignItems: 'center' },
+
+  chip:             { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, borderColor: colors.gray200, backgroundColor: colors.white },
+  chipActive:       { backgroundColor: colors.violet, borderColor: colors.violet },
+  chipText:         { fontSize: 12, color: colors.gray600 },
+  chipTextActive:   { color: colors.white, fontWeight: '600' },
+  alertBanner:      { backgroundColor: colors.dangerBg, paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, borderBottomWidth: 1, borderBottomColor: '#f5c0c0' },
+  alertText:        { fontSize: 13, color: colors.danger, fontWeight: '600' },
+  card:             { backgroundColor: colors.white, borderRadius: radius.md, padding: spacing.xl, marginBottom: spacing.lg, elevation: 2, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8 },
+  cardUrgent:       { borderLeftWidth: 3, borderLeftColor: colors.danger, backgroundColor: '#fff9f9' },
+  cardHeader:       { flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginBottom: spacing.md },
+  avatar:           { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.violetPale, alignItems: 'center', justifyContent: 'center' },
+  avatarText:       { fontSize: 15, fontWeight: '700', color: colors.violet },
+  nom:              { fontSize: 14, fontWeight: '600', color: colors.gray800, marginBottom: 3 },
+  produit:          { fontSize: 13, color: colors.gray600, marginBottom: spacing.md },
+  cardFooter:       { flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: spacing.sm },
+  footerText:       { fontSize: 11, color: colors.gray600 },
+  footerBold:       { fontWeight: '700', color: colors.violetDark },
+  urgentText:       { fontSize: 11, color: colors.danger, fontWeight: '600' },
+  relanceText:      { fontSize: 11, color: colors.gray400, marginTop: spacing.sm },
+  fab:              { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.orange, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: colors.orange, shadowOpacity: 0.4, shadowRadius: 10 },
+  fabText:          { fontSize: 28, color: colors.white, fontWeight: '300', lineHeight: 32 },
+  noFabPlaceholder: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56 },
+  validationBanner: { position: 'absolute', bottom: 94, right: 16, left: 16, backgroundColor: colors.violetPale, borderRadius: radius.sm, padding: spacing.sm, borderWidth: 1, borderColor: colors.violet },
+  validationText:   { fontSize: 12, color: colors.violetDark, fontWeight: '600', textAlign: 'center' },
 });

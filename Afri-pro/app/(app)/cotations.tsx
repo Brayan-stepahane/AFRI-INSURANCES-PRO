@@ -28,12 +28,17 @@ export default function CotationsScreen() {
     const q = search.toLowerCase();
     list = list.filter(c => {
       const cli = getClient(c.clientId);
-      return (cli?.nom || '').toLowerCase().includes(q) || c.risqueCote.toLowerCase().includes(q);
+      const riskField = c.risqueCote?.toLowerCase() || '';
+      return (cli?.nom || '').toLowerCase().includes(q) || riskField.includes(q);
     });
   }
 
-  const enAttente   = getCotationsForUser(name, role).filter(c => c.statut === 'En attente').length;
-  const converties  = getCotationsForUser(name, role).filter(c => c.statut === 'Convertie en vente').length;
+  const allCotations = getCotationsForUser(name, role);
+  const totalCount = allCotations.length;
+  const enAttente   = allCotations.filter(c => c.statut === 'En attente').length;
+  const validees    = allCotations.filter(c => c.statut === 'Validée').length;
+  const converties  = allCotations.filter(c => c.statut === 'Convertie en vente').length;
+  const refusees    = allCotations.filter(c => c.statut === 'Refusée').length;
 
   const filters = ['Tous', ...STATUTS_COT];
 
@@ -131,32 +136,67 @@ export default function CotationsScreen() {
 
       {/* Stats strip */}
       <View style={styles.statsRow}>
-        <StatCard label="Total" value={getCotationsForUser(name, role).length} valueColor={colors.teal} />
+        <StatCard label="Total" value={totalCount} valueColor={colors.teal} />
         <View style={{ width: spacing.md }} />
         <StatCard label="En attente" value={enAttente} subtext="à valider" valueColor={colors.warning} />
+        <View style={{ width: spacing.md }} />
+        <StatCard label="Validées" value={validees} valueColor={colors.success} />
         <View style={{ width: spacing.md }} />
         <StatCard label="Converties" value={converties} valueColor={colors.success} />
       </View>
 
       {/* Search */}
       <View style={styles.searchBar}>
-        <TextInput style={styles.searchInput} placeholder="Rechercher..." value={search} onChangeText={setSearch} placeholderTextColor={colors.gray400} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Rechercher..."
+          value={search}
+          onChangeText={setSearch}
+          placeholderTextColor={colors.gray400}
+        />
       </View>
 
-      {/* Filters */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow} contentContainerStyle={{ paddingHorizontal: spacing.xl, gap: spacing.md }}>
-        {filters.map(f => (
-          <TouchableOpacity key={f} style={[styles.chip, statut === f && styles.chipActive]} onPress={() => setStatut(f)}>
-            <Text style={[styles.chipText, statut === f && styles.chipTextActive]}>{f}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      {/* ✅ FIXED: Filters — outer View handles bg/border, ScrollView only scrolls */}
+      <View style={styles.filterWrapper}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterRow}
+        >
+          {filters.map(f => (
+            <TouchableOpacity
+              key={f}
+              style={[styles.chip, statut === f && styles.chipActive]}
+              onPress={() => setStatut(f)}
+            >
+              <Text style={[styles.chipText, statut === f && styles.chipTextActive]}>{f}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
 
-      {enAttente > 0 && (
-        <View style={styles.alertBanner}>
-          <Text style={styles.alertText}>💼  {enAttente} cotation(s) en attente de réponse du prospect</Text>
-        </View>
-      )}
+      {(() => {
+        let msg = '';
+        if (statut === 'Tous') {
+          msg = `${enAttente} cotation(s) en attente de réponse du prospect`;
+        } else if (statut === 'En attente') {
+          msg = `${enAttente} cotation(s) en attente de validation`;
+        } else if (statut === 'Validée') {
+          msg = `${validees} cotation(s) validée(s)`;
+        } else if (statut === 'Convertie en vente') {
+          msg = `${converties} cotation(s) convertie(s)`;
+        } else if (statut === 'Refusée') {
+          msg = `${refusees} cotation(s) refusée(s)`;
+        }
+
+        if (!msg) return null;
+
+        return (
+          <View style={styles.alertBanner}>
+            <Text style={styles.alertText}>💼  {msg}</Text>
+          </View>
+        );
+      })()}
 
       <FlatList
         data={list}
@@ -167,44 +207,51 @@ export default function CotationsScreen() {
         ListEmptyComponent={<EmptyState icon="💼" title="Aucune cotation trouvée" sub="Les cotations apparaissent ici une fois saisies" />}
       />
 
-        {/* FAB */}
-        <TouchableOpacity style={styles.fab} onPress={() => router.push('/(app)/cotations/new' as any)}>
-          <Text style={styles.fabText}>+</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+      {/* FAB */}
+      <TouchableOpacity style={styles.fab} onPress={() => router.push('/(app)/cotations/new' as any)}>
+        <Text style={styles.fabText}>+</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.gray50 },
-  statsRow: { flexDirection: 'row', padding: spacing.xl, backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.gray100 },
-  searchBar: { backgroundColor: colors.white, padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: colors.gray100 },
-  searchInput: { backgroundColor: colors.gray50, borderRadius: radius.sm, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, color: colors.gray800 },
-  filterRow: { backgroundColor: colors.white, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.gray100, flexGrow: 0 },
-  chip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, borderColor: colors.gray200 },
-  chipActive: { backgroundColor: colors.teal, borderColor: colors.teal },
-  chipText: { fontSize: 12, color: colors.gray600 },
+  container:      { flex: 1, backgroundColor: colors.gray50 },
+  statsRow:       { flexDirection: 'row', padding: spacing.xl, backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.gray100 },
+  searchBar:      { backgroundColor: colors.white, padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: colors.gray100 },
+  searchInput:    { backgroundColor: colors.gray50, borderRadius: radius.sm, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, color: colors.gray800 },
+
+  // ✅ FIXED: wrapper View owns the background, border, and visible overflow
+  filterWrapper:  { backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.gray100 },
+
+  // ✅ FIXED: filterRow is now contentContainerStyle — only padding & layout, no clipping
+  filterRow:      { paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, gap: spacing.md, flexDirection: 'row', alignItems: 'center' },
+
+  chip:           { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, borderColor: colors.gray200 },
+  chipActive:     { backgroundColor: colors.teal, borderColor: colors.teal },
+  chipText:       { fontSize: 12, color: colors.gray600 },
   chipTextActive: { color: colors.white, fontWeight: '600' },
-  alertBanner: { backgroundColor: colors.warningBg, paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, borderBottomWidth: 1, borderBottomColor: '#e8c97a' },
-  alertText: { fontSize: 13, color: colors.warning, fontWeight: '600' },
-  card: { backgroundColor: colors.white, borderRadius: radius.md, padding: spacing.xl, marginBottom: spacing.lg, elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6 },
-  cardPending: { borderLeftWidth: 3, borderLeftColor: colors.warning },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg },
-  noContainer: { backgroundColor: colors.tealBg, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.sm },
-  noCot: { fontSize: 12, fontWeight: '700', color: colors.teal, fontVariant: ['tabular-nums'] },
-  clientNom: { fontSize: 14, fontWeight: '600', color: colors.gray800, marginBottom: 3 },
-  detailsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.gray100 },
-  detailItem: { flex: 1 },
-  detailLabel: { fontSize: 10, color: colors.gray400, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 3 },
-  detailValue: { fontSize: 13, fontWeight: '500', color: colors.gray800 },
+
+  alertBanner:    { backgroundColor: colors.warningBg, paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, borderBottomWidth: 1, borderBottomColor: '#e8c97a' },
+  alertText:      { fontSize: 13, color: colors.warning, fontWeight: '600' },
+  card:           { backgroundColor: colors.white, borderRadius: radius.md, padding: spacing.xl, marginBottom: spacing.lg, elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6 },
+  cardPending:    { borderLeftWidth: 3, borderLeftColor: colors.warning },
+  cardHeader:     { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg },
+  noContainer:    { backgroundColor: colors.tealBg, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.sm },
+  noCot:          { fontSize: 12, fontWeight: '700', color: colors.teal, fontVariant: ['tabular-nums'] },
+  clientNom:      { fontSize: 14, fontWeight: '600', color: colors.gray800, marginBottom: 3 },
+  detailsRow:     { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.gray100 },
+  detailItem:     { flex: 1 },
+  detailLabel:    { fontSize: 10, color: colors.gray400, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 3 },
+  detailValue:    { fontSize: 13, fontWeight: '500', color: colors.gray800 },
   validationDate: { fontSize: 12, color: colors.success, marginBottom: spacing.md },
-  actions: { flexDirection: 'row', gap: spacing.md, flexWrap: 'wrap', marginTop: spacing.md },
-  actionBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.sm, borderWidth: 1 },
+  actions:        { flexDirection: 'row', gap: spacing.md, flexWrap: 'wrap', marginTop: spacing.md },
+  actionBtn:      { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.sm, borderWidth: 1 },
   actionValidate: { backgroundColor: colors.tealBg, borderColor: colors.teal },
-  actionRefuse: { backgroundColor: colors.dangerBg, borderColor: '#f5c0c0' },
-  actionConvert: { backgroundColor: colors.orange, borderColor: colors.orange, flex: 1 },
-  actionView: { backgroundColor: colors.violetPale, borderColor: colors.violetLight },
-  actionBtnText: { fontSize: 12, fontWeight: '600', color: colors.teal },
-  fab: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.teal, alignItems: 'center', justifyContent: 'center', elevation: 6 },
-  fabText: { fontSize: 28, color: colors.white, fontWeight: '300', lineHeight: 32 },
+  actionRefuse:   { backgroundColor: colors.dangerBg, borderColor: '#f5c0c0' },
+  actionConvert:  { backgroundColor: colors.orange, borderColor: colors.orange, flex: 1 },
+  actionView:     { backgroundColor: colors.violetPale, borderColor: colors.violetLight },
+  actionBtnText:  { fontSize: 12, fontWeight: '600', color: colors.teal },
+  fab:            { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.teal, alignItems: 'center', justifyContent: 'center', elevation: 6 },
+  fabText:        { fontSize: 28, color: colors.white, fontWeight: '300', lineHeight: 32 },
 });

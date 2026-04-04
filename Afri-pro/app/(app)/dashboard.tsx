@@ -46,7 +46,7 @@ export default function DashboardScreen() {
           <Text style={styles.pageSubtitle}>Vue d'ensemble</Text>
         </View>
         <View style={styles.topBarActions}>
-          <TouchableOpacity style={styles.notificationBtn}>
+          <TouchableOpacity style={styles.notificationBtn} onPress={() => router.push('/(app)/notifications' as any)}>
             <Text style={styles.notificationIcon}>🔔</Text>
           </TouchableOpacity>
           <Button title="+ Nouvelle prospection" onPress={() => setShowNewProspectionModal(true)} style={styles.topButton} />

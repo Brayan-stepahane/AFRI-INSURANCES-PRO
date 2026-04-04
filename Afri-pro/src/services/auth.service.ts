@@ -31,6 +31,43 @@ const createDemoResponse = (user: DemoUser): AuthResponse => ({
   },
 });
 
+export const userService = {
+  getUsers: (): User[] => {
+    return DEMO_USERS.map((u) => ({
+      id: u.id,
+      email: u.email,
+      name: u.name,
+      role: u.role,
+      phone: u.phone,
+      createdAt: new Date().toISOString(),
+    }));
+  },
+
+  createUser: (payload: { name: string; email: string; role: UserRole; phone?: string; password: string }): User => {
+    const exists = DEMO_USERS.some((u) => u.email.toLowerCase() === payload.email.toLowerCase());
+    if (exists) {
+      throw new Error('Un utilisateur existe déjà avec cet email.');
+    }
+    const newUser: DemoUser = {
+      id: `u${DEMO_USERS.length + 1}`,
+      name: payload.name.trim(),
+      email: payload.email.trim().toLowerCase(),
+      role: payload.role,
+      phone: payload.phone?.trim(),
+      password: payload.password,
+    };
+    DEMO_USERS.push(newUser);
+    return {
+      id: newUser.id,
+      name: newUser.name,
+      email: newUser.email,
+      role: newUser.role,
+      phone: newUser.phone,
+      createdAt: new Date().toISOString(),
+    };
+  },
+};
+
 export const authService = {
   login: async (payload: LoginPayload): Promise<AuthResponse> => {
     try {

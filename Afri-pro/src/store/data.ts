@@ -105,7 +105,7 @@ export const RISQUES_COTES = [
 
 export const STATUTS_PROSP = [
   'Premier contact','Relance 1','Relance 2',
-  'Cotation envoyée','En attente signature','Contrat conclu','Perdu',
+  'Cotation envoyée','En attente signature','Contrat conclu',
 ];
 
 export const STATUTS_COT = ['En attente','Validée','Refusée','Convertie en vente'];
@@ -147,15 +147,21 @@ export const caThisMois = (commercial: string): number => {
 
 export const getProspectionsForUser = (userName: string, role: string): Prospection[] => {
   if (role === 'commercial') return prospections.filter(p => p.commercial === userName);
-  return prospections;
+  if (role === 'manager_adj') return prospections; // Environnement simplifié: voir l'équipe entière
+  if (role === 'manager' || role === 'chef' || role === 'admin') return prospections;
+  return [];
 };
 
 export const getCotationsForUser = (userName: string, role: string): Cotation[] => {
   if (role === 'commercial') return cotations.filter(c => c.commercial === userName);
-  return cotations;
+  if (role === 'manager_adj') return cotations;
+  if (role === 'manager' || role === 'chef' || role === 'admin') return cotations;
+  return [];
 };
 
 export const getVentesForUser = (userName: string, role: string): Vente[] => {
   if (role === 'commercial') return ventes.filter(v => v.commercial === userName);
-  return ventes;
+  if (role === 'manager_adj') return ventes;
+  if (role === 'manager' || role === 'chef' || role === 'admin') return ventes;
+  return [];
 };

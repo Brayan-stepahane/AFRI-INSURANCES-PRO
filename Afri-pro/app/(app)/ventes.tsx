@@ -145,23 +145,7 @@ export default function VentesScreen() {
         />
       </View>
 
-      {/* Month filter */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.filterRow}
-        contentContainerStyle={{ paddingHorizontal: spacing.xl, gap: spacing.md }}
-      >
-        {mois.map(m => (
-          <TouchableOpacity
-            key={m}
-            style={[styles.chip, filterMois === m && styles.chipActive]}
-            onPress={() => setFilterMois(m)}
-          >
-            <Text style={[styles.chipText, filterMois === m && styles.chipTextActive]}>{m}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      
 
       <FlatList
         data={list}
@@ -194,8 +178,8 @@ const styles = StyleSheet.create({
   statsDivider: { width: 1, backgroundColor: colors.gray200, marginHorizontal: spacing.md },
   searchBar:   { backgroundColor: colors.white, padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: colors.gray100 },
   searchInput: { backgroundColor: colors.gray50, borderRadius: radius.sm, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, color: colors.gray800 },
-  filterRow:   { backgroundColor: colors.white, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.gray100, flexGrow: 0 },
-  chip:        { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, borderColor: colors.gray200, backgroundColor: colors.white },
+  filterRow:   { backgroundColor: colors.white, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.gray100, flexGrow: 0, marginTop: spacing.lg },
+  chip:        { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, borderColor: colors.gray200, backgroundColor: colors.white, marginRight: spacing.sm },
   chipActive:  { backgroundColor: colors.violet, borderColor: colors.violet },
   chipText:    { fontSize: 12, color: colors.gray600 },
   chipTextActive: { color: colors.white, fontWeight: '600' },
