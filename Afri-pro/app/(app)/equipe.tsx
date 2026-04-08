@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList } from 'react-native';
 import { useAuth } from '../../src/hooks/useAuth';
 import { userService } from '../../src/services/auth.service';
@@ -9,8 +9,21 @@ const TEAM_ROLES = ['manager', 'manager_adj', 'chef', 'admin'];
 
 export default function EquipeScreen() {
   const { user } = useAuth();
-  const users = userService.getUsers();
+  const [users, setUsers] = useState<User[]>([]);
   const role = user?.role ?? 'commercial';
+
+  React.useEffect(() => {
+    const loadUsers = async () => {
+      try {
+        const allUsers = await userService.getUsers();
+        setUsers(allUsers);
+      } catch (err) {
+        console.error('Failed to load team members:', err);
+      }
+    };
+
+    loadUsers();
+  }, []);
 
   if (!TEAM_ROLES.includes(role)) {
     return (

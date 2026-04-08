@@ -1,88 +1,200 @@
+import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
-import {
-  getProspectionsForUser, getCotationsForUser, getVentesForUser,
-  caThisMois, objectifs, getClient, isOverdue, ventes,
-} from '../store/data';
+import { api } from '../services/api/api';
+import { API_ENDPOINTS } from '../services/api/endpoints';
 import { Prospection } from '../types';
+import { caThisMois, objectifs } from '../store/data';
 
-export function useDashboardStats() {
-  const { user } = useAuth();
-  const name = user?.name ?? '';
-  const role = user?.role ?? 'commercial';
-
-  const myProspections = getProspectionsForUser(name, role);
-  const myCotations = getCotationsForUser(name, role);
-  const myVentes = getVentesForUser(name, role);
-
-  const enCours = myProspections.filter(
-    p => !['Contrat conclu', 'Perdu'].includes(p.statut)
-  );
-  const ventes = myProspections.filter(p => p.statut === 'Contrat conclu');
-  const pendingCotations = myCotations.filter(c => c.statut === 'En attente').length;
-  const totalRevenue = myVentes.reduce(
-    (s, v) => s + (v.primeNette || 0) + (v.accessoires || 0), 0
-  );
-  const urgentFollowUps: Prospection[] = enCours.filter(
-    p => p.dateRelance && isOverdue(p.dateRelance)
-  );
-
-  return {
-    activeProspects: enCours.length,
-    quotations: myCotations.length,
-    pendingCotations,
-    completedSales: myVentes.length,
-    totalRevenue,
-    urgentFollowUps,
-    pipelineData: {
-      prospects: myProspections.length,
-      quotations: myCotations.length,
-      sales: myVentes.length,
-    },
-    recentSales: myVentes.slice(-4).reverse(),
+interface DashboardStats {
+  activeProspects: number;
+  quotations: number;
+  pendingCotations: number;
+  completedSales: number;
+  totalRevenue: number;
+  urgentFollowUps: Prospection[];
+  pipelineData: {
+    prospects: number;
+    quotations: number;
+    sales: number;
   };
+  recentSales: any[];
+  loading: boolean;
+  error: string | null;
 }
 
-export function useObjective() {
-  const { user } = useAuth();
-  const name = user?.name ?? '';
-  const obj = objectifs[name] ?? { mensuel: 500000, reporte: 0 };
-  const ca = caThisMois(name);
-  const total = obj.mensuel + obj.reporte;
-  const pct = total > 0 ? Math.min(100, Math.round((ca / total) * 100)) : 0;
-  const reste = Math.max(0, total - ca);
+export function useDashboardStats(refreshKey = 0): DashboardStats {
+  const { user, token } = useAuth();
+  const [stats, setStats] = useState<DashboardStats>({
+    activeProspects: 0,
+    quotations: 0,
+    pendingCotations: 0,
+    completedSales: 0,
+    totalRevenue: 0,
+    urgentFollowUps: [],
+    pipelineData: { prospects: 0, quotations: 0, sales: 0 },
+    recentSales: [],
+    loading: true,
+    error: null,
+  });
 
-  // Contract metrics
-  const now = new Date();
-  const contractsCompletedThisMonth = ventes.filter(v => {
-    if (v.commercial !== name) return false;
-    if (!v.dateVente) return false;
-    const d = new Date(v.dateVente);
-    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-  }).length;
+  useEffect(() => {
+    if (!token || !user) {
+      setStats(prev => ({ ...prev, loading: false }));
+      return;
+    }
 
-  // Calculate average deal value to estimate contract target
-  const allSales = ventes.filter(v => v.commercial === name);
-  const avgDealValue = allSales.length > 0
-    ? allSales.reduce((s, v) => s + (v.primeNette || 0) + (v.accessoires || 0), 0) / allSales.length
-    : 50000; // fallback average
+    const fetchStats = async () => {
+      try {
+        setStats(prev => ({ ...prev, loading: true, error: null }));
 
-  const estimatedContractTarget = total > 0 ? Math.round(total / avgDealValue) : 12; // 12 as default
-  const contractsRemaining = Math.max(0, estimatedContractTarget - contractsCompletedThisMonth);
-  const contractsReported = obj.reporte > 0 ? Math.round(obj.reporte / avgDealValue) : 0;
-  const contractsNew = estimatedContractTarget - contractsReported;
+        // Fetch data from multiple APIs
+        const [dashboardData, cotations, ventes, prospections] = await Promise.all([
+          api.get(API_ENDPOINTS.DASHBOARD.STATS, token),
+          api.get(API_ENDPOINTS.COTATIONS.LIST, token),
+          api.get(API_ENDPOINTS.VENTES.LIST, token),
+          api.get(API_ENDPOINTS.PROSPECTIONS.LIST, token),
+        ]);
 
-  return {
-    ...obj,
-    ca,
-    total,
-    pct,
-    reste,
-    contractsCompletedThisMonth,
-    estimatedContractTarget,
-    contractsRemaining,
-    contractsReported,
-    contractsNew,
-  };
+        // Calculate stats from API data
+        const activeProspects = prospections.filter(
+          (p: any) => !['Contrat conclu', 'Perdu'].includes(p.statut)
+        ).length;
+
+        const quotations = cotations.length;
+        const pendingCotations = cotations.filter((c: any) => c.statut === 'En attente').length;
+        const completedSales = ventes.length;
+        const totalRevenue = ventes.reduce(
+          (sum: number, v: any) => sum + (v.prime_nette || 0) + (v.accessoires || 0), 0
+        );
+
+        const urgentFollowUps = prospections.filter((p: any) => {
+          if (!p.date_relance) return false;
+          const relanceDate = new Date(p.date_relance);
+          return relanceDate < new Date();
+        });
+
+        const recentSales = ventes.slice(-4).reverse();
+
+        setStats({
+          activeProspects,
+          quotations,
+          pendingCotations,
+          completedSales,
+          totalRevenue,
+          urgentFollowUps,
+          pipelineData: {
+            prospects: prospections.length,
+            quotations,
+            sales: completedSales,
+          },
+          recentSales,
+          loading: false,
+          error: null,
+        });
+      } catch (error) {
+        console.error('Error fetching dashboard stats:', error);
+        setStats(prev => ({
+          ...prev,
+          loading: false,
+          error: error instanceof Error ? error.message : 'Failed to load dashboard data',
+        }));
+      }
+    };
+
+    fetchStats();
+  }, [token, user, refreshKey]);
+
+  return stats;
+}
+
+export function useObjective(refreshKey = 0) {
+  const { user, token } = useAuth();
+  const [objective, setObjective] = useState({
+    mensuel: 500000,
+    reporte: 0,
+    ca: 0,
+    total: 500000,
+    pct: 0,
+    reste: 500000,
+    contractsCompletedThisMonth: 0,
+    estimatedContractTarget: 12,
+    contractsRemaining: 12,
+    contractsReported: 0,
+    contractsNew: 12,
+    loading: true,
+    error: null as string | null,
+  });
+
+  useEffect(() => {
+    if (!token || !user) {
+      setObjective(prev => ({ ...prev, loading: false }));
+      return;
+    }
+
+    const fetchObjective = async () => {
+      try {
+        setObjective(prev => ({ ...prev, loading: true, error: null }));
+
+        const dashboardData = await api.get(API_ENDPOINTS.DASHBOARD.STATS, token);
+        const ventes = await api.get(API_ENDPOINTS.VENTES.LIST, token);
+
+        // Get objective data from dashboard API
+        const objData = dashboardData.objectifs?.[0] || { objectif_mensuel: 500000, reporte: 0, ca_realise: 0 };
+
+        const mensuel = objData.objectif_mensuel || 500000;
+        const reporte = objData.reporte || 0;
+        const ca = objData.ca_realise || 0;
+        const total = mensuel + reporte;
+        const pct = total > 0 ? Math.min(100, Math.round((ca / total) * 100)) : 0;
+        const reste = Math.max(0, total - ca);
+
+        // Contract metrics
+        const now = new Date();
+        const contractsCompletedThisMonth = ventes.filter((v: any) => {
+          if (!v.date_vente) return false;
+          const d = new Date(v.date_vente);
+          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        }).length;
+
+        // Calculate average deal value to estimate contract target
+        const avgDealValue = ventes.length > 0
+          ? ventes.reduce((s: number, v: any) => s + (v.prime_nette || 0) + (v.accessoires || 0), 0) / ventes.length
+          : 50000; // fallback average
+
+        const estimatedContractTarget = total > 0 ? Math.round(total / avgDealValue) : 12; // 12 as default
+        const contractsRemaining = Math.max(0, estimatedContractTarget - contractsCompletedThisMonth);
+        const contractsReported = reporte > 0 ? Math.round(reporte / avgDealValue) : 0;
+        const contractsNew = estimatedContractTarget - contractsReported;
+
+        setObjective({
+          mensuel,
+          reporte,
+          ca,
+          total,
+          pct,
+          reste,
+          contractsCompletedThisMonth,
+          estimatedContractTarget,
+          contractsRemaining,
+          contractsReported,
+          contractsNew,
+          loading: false,
+          error: null,
+        });
+      } catch (error) {
+        console.error('Error fetching objective:', error);
+        setObjective(prev => ({
+          ...prev,
+          loading: false,
+          error: error instanceof Error ? error.message : 'Failed to load objective data',
+        }));
+      }
+    };
+
+    fetchObjective();
+  }, [token, user, refreshKey]);
+
+  return objective;
 }
 
 export function useTeamObjectives() {

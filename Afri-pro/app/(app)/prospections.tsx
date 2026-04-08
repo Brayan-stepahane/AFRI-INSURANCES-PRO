@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import {
   View, Text, FlatList, StyleSheet, TextInput,
   TouchableOpacity, RefreshControl, ScrollView,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/hooks/useAuth';
-import { getProspectionsForUser, getClient, isOverdue, fmt } from '../../src/store/data';
+import { getProspectionsForUser, getClient, isOverdue, fmt, prospections } from '../../src/store/data';
 import { colors, spacing, radius } from '../../src/config/theme';
 import { Badge, EmptyState, ClientIdBadge } from '../../src/components/common/Button';
 import { Header } from '../../src/components/common/Header';
@@ -13,6 +14,8 @@ import { STATUT_BADGE_COLORS } from '../../src/config/theme';
 import { STATUTS_PROSP } from '../../src/store/data';
 import { Prospection } from '../../src/types';
 import { NewProspectionModal } from '../../src/components/modals/NewProspectionModal';
+import apiClient from '../../src/services/api/client';
+import { API_ENDPOINTS } from '../../src/services/api/endpoints';
 
 export default function ProspectionsScreen() {
   const { user } = useAuth();
@@ -21,6 +24,7 @@ export default function ProspectionsScreen() {
   const [statut, setStatut]       = useState('Tous');
   const [refreshing, setRefreshing] = useState(false);
   const [showNewProspectionModal, setShowNewProspectionModal] = useState(false);
+  const [editingProspection, setEditingProspection] = useState<Prospection | null>(null);
 
   const name = user?.name ?? '';
   const role = user?.role ?? 'commercial';
@@ -83,12 +87,68 @@ export default function ProspectionsScreen() {
             {urgent ? ' ⚠️' : ''}
           </Text>
         ) : null}
+
+        {/* Actions */}
+        <View style={styles.actions}>
+          <TouchableOpacity style={[styles.actionBtn, styles.actionEdit]} onPress={() => setEditingProspection(p)}>
+            <Text style={styles.actionBtnText}>✏️ Modifier</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.actionBtn, styles.actionDelete]} onPress={() => deleteProspection(p)}>
+            <Text style={[styles.actionBtnText, { color: colors.danger }]}>🗑️ Supprimer</Text>
+          </TouchableOpacity>
+        </View>
       </TouchableOpacity>
     );
   };
 
-  const handleNewProspectionSubmit = (data: any) => {
-    console.log('New prospection:', data);
+  const handleNewProspectionSubmit = async (data: any, isEdit?: boolean, prospectionId?: number) => {
+    try {
+      if (isEdit && prospectionId) {
+        // Update existing prospection - call PUT API
+        const response = await apiClient.put(`${API_ENDPOINTS.PROSPECTIONS.LIST}/${prospectionId}`, data);
+        if (response?.data) {
+          const idx = prospections.findIndex(p => p.id === prospectionId);
+          if (idx >= 0) {
+            prospections[idx] = { ...prospections[idx], ...data, ...response.data } as any;
+          }
+        }
+      } else {
+        // Create new prospection - call POST API
+        const response = await apiClient.post(API_ENDPOINTS.PROSPECTIONS.CREATE, data);
+        console.log('Created prospection:', response.data);
+        if (response?.data && response.data.id) {
+          prospections.unshift(response.data);
+        }
+      }
+      setRefreshing(true);
+      setTimeout(() => setRefreshing(false), 100);
+    } catch (error) {
+      console.error('Error submitting prospection:', error);
+      Alert.alert('Erreur', 'Une erreur est survenue lors de l\'enregistrement');
+    }
+  };
+
+  const deleteProspection = (prospection: Prospection) => {
+    Alert.alert(
+      'Supprimer la prospection',
+      `Êtes-vous sûr de vouloir supprimer la prospection de ${getClient(prospection.clientId)?.nom || prospection.clientId} ?`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: () => {
+            const idx = prospections.findIndex(p => p.id === prospection.id);
+            if (idx >= 0) {
+              prospections.splice(idx, 1);
+              // Refresh the list
+              setRefreshing(true);
+              setTimeout(() => setRefreshing(false), 100);
+            }
+          }
+        }
+      ]
+    );
   };
 
   return (
@@ -152,11 +212,14 @@ export default function ProspectionsScreen() {
 
       
 
-      {/* Modal */}
       <NewProspectionModal
-        visible={showNewProspectionModal}
-        onClose={() => setShowNewProspectionModal(false)}
+        visible={showNewProspectionModal || !!editingProspection}
+        onClose={() => {
+          setShowNewProspectionModal(false);
+          setEditingProspection(null);
+        }}
         onSubmit={handleNewProspectionSubmit}
+        editProspection={editingProspection}
       />
     </View>
   );
@@ -191,6 +254,11 @@ const styles = StyleSheet.create({
   footerBold:       { fontWeight: '700', color: colors.violetDark },
   urgentText:       { fontSize: 11, color: colors.danger, fontWeight: '600' },
   relanceText:      { fontSize: 11, color: colors.gray400, marginTop: spacing.sm },
+  actions:          { flexDirection: 'row', gap: spacing.md, flexWrap: 'wrap', marginTop: spacing.md },
+  actionBtn:        { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.sm, borderWidth: 1 },
+  actionEdit:       { backgroundColor: colors.violetPale, borderColor: colors.violetLight },
+  actionDelete:     { backgroundColor: colors.dangerBg, borderColor: '#f5c0c0' },
+  actionBtnText:    { fontSize: 12, fontWeight: '600', color: colors.violet },
   fab:              { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.orange, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: colors.orange, shadowOpacity: 0.4, shadowRadius: 10 },
   fabText:          { fontSize: 28, color: colors.white, fontWeight: '300', lineHeight: 32 },
   noFabPlaceholder: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56 },

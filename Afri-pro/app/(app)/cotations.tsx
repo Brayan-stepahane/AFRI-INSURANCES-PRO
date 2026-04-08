@@ -65,6 +65,29 @@ export default function CotationsScreen() {
        }}]);
   };
 
+  const deleteCotation = (cot: Cotation) => {
+    Alert.alert(
+      'Supprimer la cotation',
+      `Êtes-vous sûr de vouloir supprimer COT-${String(cot.noCot).padStart(3,'0')} ?`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: () => {
+            const idx = cotations.findIndex(c => c.id === cot.id);
+            if (idx >= 0) {
+              cotations.splice(idx, 1);
+              // Refresh
+              setRefreshing(true);
+              setTimeout(() => setRefreshing(false), 100);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const renderItem = ({ item: c }: { item: Cotation }) => {
     const cli = getClient(c.clientId);
     const sc  = STATUT_BADGE_COLORS[c.statut] ?? { bg: colors.gray100, text: colors.gray600 };
@@ -122,6 +145,14 @@ export default function CotationsScreen() {
               <Text style={styles.actionBtnText}>→ Convertir en vente</Text>
             </TouchableOpacity>
           )}
+          <TouchableOpacity style={[styles.actionBtn, styles.actionEdit]} onPress={() => {
+            Alert.alert('Modifier', 'Fonctionnalité en développement');
+          }}>
+            <Text style={styles.actionBtnText}>✏️ Modifier</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.actionBtn, styles.actionDelete]} onPress={() => deleteCotation(c)}>
+            <Text style={[styles.actionBtnText, { color: colors.danger }]}>🗑️ Supprimer</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={[styles.actionBtn, styles.actionView]} onPress={() => router.push(`/(app)/cotations/${c.id}` as any)}>
             <Text style={[styles.actionBtnText, { color: colors.violet }]}>👁️ Détail</Text>
           </TouchableOpacity>
@@ -250,6 +281,8 @@ const styles = StyleSheet.create({
   actionValidate: { backgroundColor: colors.tealBg, borderColor: colors.teal },
   actionRefuse:   { backgroundColor: colors.dangerBg, borderColor: '#f5c0c0' },
   actionConvert:  { backgroundColor: colors.orange, borderColor: colors.orange, flex: 1 },
+  actionEdit:     { backgroundColor: colors.violetPale, borderColor: colors.violetLight },
+  actionDelete:   { backgroundColor: colors.dangerBg, borderColor: '#f5c0c0' },
   actionView:     { backgroundColor: colors.violetPale, borderColor: colors.violetLight },
   actionBtnText:  { fontSize: 12, fontWeight: '600', color: colors.teal },
   fab:            { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.teal, alignItems: 'center', justifyContent: 'center', elevation: 6 },

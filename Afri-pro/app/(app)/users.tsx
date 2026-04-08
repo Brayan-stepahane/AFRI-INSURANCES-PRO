@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Modal } from 'react-native';
 import { useAuth } from '../../src/hooks/useAuth';
 import { useRouter } from 'expo-router';
 import { colors, spacing, radius } from '../../src/config/theme';
@@ -9,10 +9,11 @@ import { UserRole, User } from '../../src/types/auth.types';
 export default function UsersScreen() {
   const { user } = useAuth();
   const router = useRouter();
-  const role = user?.role ?? 'commercial';
+  const role = user?.role ?? 'unknown';
+  const ALLOWED_USER_ROLES: UserRole[] = ['commercial', 'manager_adj', 'manager', 'chef', 'admin'];
 
   const [users, setUsers] = useState<User[]>([]);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{ name: string; email: string; role: UserRole; phone: string; password: string }>({
     name: '',
     email: '',
     role: 'commercial' as UserRole,
@@ -21,13 +22,24 @@ export default function UsersScreen() {
   });
   const [message, setMessage] = useState<string>('');
   const [error, setError] = useState<string>('');
+  const [roleOpen, setRoleOpen] = useState(false);
+  const ROLE_OPTIONS: UserRole[] = ['commercial', 'manager_adj', 'manager', 'chef', 'admin'];
 
   useEffect(() => {
-    const allUsers = userService.getUsers();
-    setUsers(allUsers);
+    const loadUsers = async () => {
+      try {
+        const allUsers = await userService.getUsers();
+        setUsers(allUsers);
+      } catch (err) {
+        setError('Impossible de charger les utilisateurs.');
+        console.error('Failed to load users:', err);
+      }
+    };
+
+    loadUsers();
   }, []);
 
-  const handleCreateUser = () => {
+  const handleCreateUser = async () => {
     setError('');
     setMessage('');
 
@@ -36,8 +48,13 @@ export default function UsersScreen() {
       return;
     }
 
+    if (!ALLOWED_USER_ROLES.includes(formData.role)) {
+      setError('Le rôle doit être commercial, manager_adj, manager, chef ou admin.');
+      return;
+    }
+
     try {
-      const newUser = userService.createUser(formData);
+      const newUser = await userService.createUser(formData);
       setUsers((prev) => [newUser, ...prev]);
       setMessage(`Utilisateur ${newUser.name} créé.`);
       setFormData({ name: '', email: '', role: 'commercial', phone: '', password: '' });
@@ -99,13 +116,28 @@ export default function UsersScreen() {
           onChangeText={(t) => setFormData((prev) => ({ ...prev, phone: t }))}
           placeholderTextColor={colors.gray400}
         />
-        <TextInput
-          style={styles.input}
-          placeholder="Role (commercial, manager_adj, manager, chef, admin)"
-          value={formData.role}
-          onChangeText={(t) => setFormData((prev) => ({ ...prev, role: t as UserRole }))}
-          placeholderTextColor={colors.gray400}
-        />
+        <TouchableOpacity style={[styles.input, styles.dropdownTrigger]} onPress={() => setRoleOpen(true)} activeOpacity={0.8}>
+          <Text style={styles.inputText}>{formData.role || 'Sélectionnez un rôle'}</Text>
+          <Text style={styles.dropdownCaret}>▾</Text>
+        </TouchableOpacity>
+        <Modal transparent visible={roleOpen} animationType="fade" onRequestClose={() => setRoleOpen(false)}>
+          <TouchableOpacity style={styles.modalOverlay} onPress={() => setRoleOpen(false)} activeOpacity={1}>
+            <View style={styles.dropdownBox}>
+              {ROLE_OPTIONS.map((roleOption) => (
+                <TouchableOpacity
+                  key={roleOption}
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    setFormData((prev) => ({ ...prev, role: roleOption }));
+                    setRoleOpen(false);
+                  }}
+                >
+                  <Text style={styles.dropdownItemText}>{roleOption}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </TouchableOpacity>
+        </Modal>
         <TouchableOpacity style={styles.createButton} onPress={handleCreateUser} activeOpacity={0.85}>
           <Text style={styles.createButtonText}>Créer l'utilisateur</Text>
         </TouchableOpacity>
@@ -115,7 +147,7 @@ export default function UsersScreen() {
       {users.map((u) => (
         <View key={u.id} style={styles.userRow}>
           <Text style={styles.userText}>{u.name} ({u.email})</Text>
-          <Text style={styles.userMeta}>{(u.role || 'unknown').toUpperCase()}</Text>
+          <Text style={styles.userMeta}>{u.role ? u.role.toUpperCase() : 'UNKNOWN'}</Text>
         </View>
       ))}
     </ScrollView>
@@ -136,6 +168,27 @@ const styles = StyleSheet.create({
   userRow: { backgroundColor: colors.white, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.gray100, padding: spacing.sm, marginBottom: spacing.xs },
   userText: { fontSize: 13, color: colors.gray800, fontWeight: '600' },
   userMeta: { fontSize: 11, color: colors.gray100 },
+  dropdownTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.sm,
+    alignSelf: 'flex-start',
+    minWidth: 220,
+    maxWidth: 280,
+  },
+  inputText: { fontSize: 14, color: colors.gray800 },
+  dropdownCaret: { fontSize: 16, color: colors.gray400 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', padding: spacing.xl },
+  dropdownBox: { backgroundColor: colors.white, borderRadius: radius.md, borderWidth: 1, borderColor: colors.gray200, overflow: 'hidden', minWidth: 220, maxWidth: 280, alignSelf: 'center' },
+  dropdownItem: { paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.gray100 },
+  dropdownItemText: { fontSize: 14, color: colors.gray800 },
   errorText: { color: colors.danger, fontWeight: '600', marginBottom: spacing.sm },
   successText: { color: colors.teal, fontWeight: '600', marginBottom: spacing.sm },
 });

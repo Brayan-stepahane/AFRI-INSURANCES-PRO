@@ -28,7 +28,6 @@ export default function AppLayout() {
           <Stack.Screen name="equipe" />
           <Stack.Screen name="stats" />
           <Stack.Screen name="users" />
-          <Stack.Screen name="offres-de-services" />
           <Stack.Screen name="profile" />
         </Stack>
       </View>

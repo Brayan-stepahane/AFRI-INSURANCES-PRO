@@ -63,4 +63,18 @@ router.put('/:id', auth, async (req, res) => {
   }
 });
 
+// DELETE /api/cotations/:id
+router.delete('/:id', auth, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'DELETE FROM cotations WHERE id = $1 RETURNING *',
+      [req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Cotation introuvable' });
+    res.json({ message: 'Cotation supprimée' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;

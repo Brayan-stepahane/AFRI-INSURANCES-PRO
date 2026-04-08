@@ -1,37 +1,69 @@
-import React from 'react';
-import { ScrollView, View, Text, StyleSheet, TouchableOpacity, RefreshControl } from 'react-native';
+﻿import React from 'react';
+import { ScrollView, View, Text, StyleSheet, TouchableOpacity, RefreshControl, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/hooks/useAuth';
 import { useDashboardStats, useObjective } from '../../src/hooks/useDashboardStats';
 import { Button } from '../../src/components/common/Button';
 import { MetricCard, ObjectiveBox, Pipeline, UrgentFollowUps } from '../../src/components/dashboard/MetricCard';
 import { NewProspectionModal } from '../../src/components/modals/NewProspectionModal';
-import { colors, spacing, radius } from '../../src/config/theme';
-import { fmt, fmtDate, getClient, ventes as allVentes } from '../../src/store/data';
+import apiClient from '../../src/services/api/client';
+import { API_ENDPOINTS } from '../../src/services/api/endpoints';
+import { colors, spacing } from '../../src/config/theme';
+import { fmt } from '../../src/store/data';
 
 export default function DashboardScreen() {
-  const router   = useRouter();
+  const router = useRouter();
   const { user, logout } = useAuth();
-  const stats    = useDashboardStats();
-  const objective = useObjective();
+  const [reloadKey, setReloadKey] = React.useState(0);
+  const stats = useDashboardStats(reloadKey);
+  const objective = useObjective(reloadKey);
   const [refreshing, setRefreshing] = React.useState(false);
   const [showNewProspectionModal, setShowNewProspectionModal] = React.useState(false);
 
-  const handleNewProspectionSubmit = (data: any) => {
-    console.log('New prospection from dashboard:', data);
-    setShowNewProspectionModal(false);
+  const handleNewProspectionSubmit = async (data: any) => {
+    try {
+      const response = await apiClient.post(API_ENDPOINTS.PROSPECTIONS.CREATE, data);
+      console.log('Created prospection from dashboard:', response.data);
+      setShowNewProspectionModal(false);
+      setReloadKey(prev => prev + 1);
+    } catch (error) {
+      console.error('Failed to create prospection:', error);
+      Alert.alert('Erreur', 'Impossible de créer la prospection. Vérifiez vos informations et réessayez.');
+    }
   };
 
-  const onRefresh = async () => { setRefreshing(true); setTimeout(() => setRefreshing(false), 600); };
+  const onRefresh = async () => {
+    setRefreshing(true);
+    setReloadKey(prev => prev + 1);
+    setTimeout(() => setRefreshing(false), 600);
+  };
 
   const role = user?.role ?? 'commercial';
   const isCommercial = role === 'commercial';
 
-  const recentSales = allVentes
-    .filter(v => !isCommercial || v.commercial === user?.name)
-    .slice(-4).reverse();
+  const handleLogout = async () => {
+    await logout();
+    router.replace('/(auth)/login');
+  };
 
-  const handleLogout = async () => { await logout(); router.replace('/(auth)/login'); };
+  if (stats.loading || objective.loading) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color={colors.violet} />
+        <Text style={styles.loadingText}>Chargement du tableau de bord...</Text>
+      </View>
+    );
+  }
+
+  if (stats.error || objective.error) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <Text style={styles.errorText}>Erreur de chargement</Text>
+        <Text style={styles.errorSubtext}>{stats.error || objective.error}</Text>
+        <Button title="Réessayer" onPress={() => setReloadKey(prev => prev + 1)} style={{ marginTop: spacing.lg }} />
+      </View>
+    );
+  }
 
   return (
     <ScrollView
@@ -39,7 +71,6 @@ export default function DashboardScreen() {
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
-      {/* ── Top bar with title and buttons ── */}
       <View style={styles.topBar}>
         <View>
           <Text style={styles.pageTitle}>Tableau de bord</Text>
@@ -54,10 +85,8 @@ export default function DashboardScreen() {
       </View>
 
       <View style={styles.content}>
-        {/* ── Objective box (commercial) ── */}
         {isCommercial && <ObjectiveBox objective={objective} />}
 
-        {/* ── Stats grid - 4 cards to match design ── */}
         <View style={styles.metricsGrid}>
           <View style={styles.metricCol}>
             <MetricCard label="Prospects actifs" value={stats.activeProspects} subtext="en cours" valueColor={colors.violet} />
@@ -78,7 +107,6 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* ── Pipeline & Urgent follow-ups side by side ── */}
         <View style={styles.twoColumnSection}>
           <View style={styles.leftColumn}>
             <Pipeline
@@ -105,6 +133,10 @@ export default function DashboardScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.gray50 },
+  centerContent: { justifyContent: 'center', alignItems: 'center', padding: spacing.xl },
+  loadingText: { marginTop: spacing.md, fontSize: 16, color: colors.gray600 },
+  errorText: { fontSize: 18, fontWeight: '600', color: colors.danger, textAlign: 'center' },
+  errorSubtext: { fontSize: 14, color: colors.gray600, textAlign: 'center', marginTop: spacing.sm },
   topBar: { backgroundColor: colors.white, paddingHorizontal: spacing.xl, paddingTop: spacing.lg, paddingBottom: spacing.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.gray200 },
   pageTitle: { fontSize: 18, fontWeight: '700', color: colors.violetDark },
   pageSubtitle: { fontSize: 13, color: colors.gray400, marginTop: 2 },

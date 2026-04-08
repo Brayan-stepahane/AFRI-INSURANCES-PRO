@@ -146,16 +146,18 @@ export const caThisMois = (commercial: string): number => {
 };
 
 export const getProspectionsForUser = (userName: string, role: string): Prospection[] => {
+  if (!Array.isArray(prospections)) return [];
   if (role === 'commercial') return prospections.filter(p => p.commercial === userName);
   if (role === 'manager_adj') return prospections; // Environnement simplifié: voir l'équipe entière
-  if (role === 'manager' || role === 'chef' || role === 'admin') return prospections;
+  if (role === 'manager' || role === 'chef' || role === 'chef_agence' || role === 'admin') return prospections;
   return [];
 };
 
 export const getCotationsForUser = (userName: string, role: string): Cotation[] => {
+  if (!Array.isArray(cotations)) return [];
   if (role === 'commercial') return cotations.filter(c => c.commercial === userName);
   if (role === 'manager_adj') return cotations;
-  if (role === 'manager' || role === 'chef' || role === 'admin') return cotations;
+  if (role === 'manager' || role === 'chef' || role === 'chef_agence' || role === 'admin') return cotations;
   return [];
 };
 

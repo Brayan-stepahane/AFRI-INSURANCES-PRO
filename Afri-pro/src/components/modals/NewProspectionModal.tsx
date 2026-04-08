@@ -1,9 +1,10 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, Modal, StyleSheet, TextInput, TouchableOpacity,
   ScrollView, Platform, Pressable,
 } from 'react-native';
 import { colors, spacing, radius } from '../../config/theme';
+import { getClient } from '../../store/data';
 
 interface ProspectionFormData {
   clientName: string;
@@ -40,7 +41,8 @@ interface ProspectionFormData {
 interface NewProspectionModalProps {
   visible: boolean;
   onClose: () => void;
-  onSubmit?: (data: ProspectionFormData) => void;
+  onSubmit?: (data: ProspectionFormData, isEdit?: boolean, prospectionId?: number) => void;
+  editProspection?: any; // For editing
 }
 
 const STEP_LABELS  = ['Client', 'Prospection', 'Cotation', 'Vente'];
@@ -67,11 +69,24 @@ function SelectField({
   value: string; options: string[]; isOpen: boolean;
   onToggle: () => void; onSelect: (v: string) => void;
 }) {
+  const triggerRef = useRef<View>(null);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
+
+  const measureAndOpen = () => {
+    if (!isOpen && triggerRef.current) {
+      triggerRef.current.measureInWindow((x, y, width, height) => {
+        setDropdownPos({ top: y + height, left: x, width });
+      });
+    }
+    onToggle();
+  };
+
   return (
     <View style={sf.wrapper}>
       <TouchableOpacity
+        ref={triggerRef}
         style={[sf.trigger, isOpen && sf.triggerOpen]}
-        onPress={onToggle}
+        onPress={measureAndOpen}
         activeOpacity={0.8}
       >
         <Text style={sf.triggerText} numberOfLines={1}>{value}</Text>
@@ -79,49 +94,74 @@ function SelectField({
       </TouchableOpacity>
 
       {isOpen && (
-        <View style={sf.list}>
-          <ScrollView
-            nestedScrollEnabled
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            {options.map(item => (
-              <TouchableOpacity
-                key={item}
-                style={[sf.item, item === value && sf.itemActive]}
-                onPress={() => { onSelect(item); onToggle(); }}
-                activeOpacity={0.7}
+        <Modal
+          transparent
+          visible={isOpen}
+          animationType="none"
+          onRequestClose={onToggle}
+        >
+          {/* Invisible backdrop to close on outside tap */}
+          <TouchableOpacity style={sf.modalBackdrop} onPress={onToggle} activeOpacity={1}>
+            <View
+              style={[sf.list, { top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }]}
+            >
+              <ScrollView
+                nestedScrollEnabled
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
               >
-                <Text style={[sf.itemText, item === value && sf.itemTextActive]}>{item}</Text>
-                {item === value && <Text style={sf.checkmark}>✓</Text>}
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
+                {options.map(item => (
+                  <TouchableOpacity
+                    key={item}
+                    style={[sf.item, item === value && sf.itemActive]}
+                    onPress={() => { onSelect(item); onToggle(); }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[sf.itemText, item === value && sf.itemTextActive]}>{item}</Text>
+                    {item === value && <Text style={sf.checkmark}>✓</Text>}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </TouchableOpacity>
+        </Modal>
       )}
     </View>
   );
 }
 
 const sf = StyleSheet.create({
-  wrapper:         { position: 'relative', zIndex: 10 },
+  wrapper: { position: 'relative' },
   trigger: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     borderWidth: 1, borderColor: colors.gray200, borderRadius: radius.sm,
     paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
     backgroundColor: colors.white, minHeight: 40,
   },
-  triggerOpen:     { borderColor: colors.violet, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
-  triggerText:     { flex: 1, fontSize: 14, color: colors.gray800 },
-  caret:           { fontSize: 9, color: colors.gray400, marginLeft: 6 },
+  triggerOpen: { borderColor: colors.violet },
+  triggerText: { flex: 1, fontSize: 14, color: colors.gray800 },
+  caret: { fontSize: 9, color: colors.gray400, marginLeft: 6 },
+
+  // Full-screen backdrop
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+
+  // Dropdown panel — positioned absolutely in window coords
   list: {
-    position: 'absolute', top: 40, left: 0, right: 0,
-    maxHeight: 160, backgroundColor: colors.white,
-    borderWidth: 1, borderTopWidth: 0, borderColor: colors.violet,
-    borderBottomLeftRadius: radius.sm, borderBottomRightRadius: radius.sm,
-    zIndex: 9999, elevation: 20,
-    shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 }, overflow: 'hidden',
+    position: 'absolute',
+    maxHeight: 200,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.violet,
+    borderRadius: radius.sm,
+    elevation: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    overflow: 'hidden',
   },
   item: {
     flexDirection: 'row', alignItems: 'center',
@@ -135,7 +175,7 @@ const sf = StyleSheet.create({
 });
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export function NewProspectionModal({ visible, onClose, onSubmit }: NewProspectionModalProps) {
+export function NewProspectionModal({ visible, onClose, onSubmit, editProspection }: NewProspectionModalProps) {
   const [step, setStep] = useState(1);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const toggle = (name: string) => setOpenDropdown(prev => (prev === name ? null : name));
@@ -152,6 +192,59 @@ export function NewProspectionModal({ visible, onClose, onSubmit }: NewProspecti
     policyNumber: '', attestationNumber: '', netPremiums: '', accessories: '',
     effectDate: '', expiryDate: '', carRoseNumber: '',
   });
+
+  // If editing, populate form
+  React.useEffect(() => {
+    if (editProspection && visible) {
+      const client = getClient(editProspection.clientId);
+      // Populate form with prospection data
+      setForm({
+        clientName: client?.nom || '',
+        phone: client?.tel || '',
+        clientType: client?.type || 'Particulier',
+        activity: client?.activite || 'Chef d\'entreprise',
+        prospectionDate: editProspection.dateContact || new Date().toISOString().split('T')[0],
+        product: editProspection.produit || 'Afrilife étude',
+        potentialCA: String(editProspection.potentielCA || ''),
+        status: editProspection.statut || 'Premier contact',
+        probability: editProspection.chance || 50,
+        visitDate1: editProspection.dateV1 || '',
+        nextFollowUp: editProspection.dateRelance || '',
+        visitDate2: editProspection.dateV2 || '',
+        visitDate3: editProspection.dateV3 || '',
+        previousInsurer: editProspection.ancienAssureur || '',
+        previousContract: editProspection.dateAncienEch || '',
+        observations: editProspection.observations || '',
+        ratedRisk: '— Non coté —',
+        quotationDate: '',
+        quotationAmount: '',
+        validationDate: '',
+        saleDate: '',
+        saleType: 'Nouvelle vente (NouVe)',
+        policyNumber: '',
+        attestationNumber: '',
+        netPremiums: '',
+        accessories: '',
+        effectDate: editProspection.dateAncienEch || '',
+        expiryDate: '',
+        carRoseNumber: '',
+      });
+    } else if (!editProspection && visible) {
+      // Reset for new
+      setForm({
+        clientName: '', phone: '', clientType: 'Particulier',
+        activity: 'Chef d\'entreprise',
+        prospectionDate: new Date().toISOString().split('T')[0],
+        product: 'Afrilife étude', potentialCA: '', status: 'Premier contact',
+        probability: 50, visitDate1: '', nextFollowUp: '', visitDate2: '',
+        visitDate3: '', previousInsurer: '', previousContract: '', observations: '',
+        ratedRisk: '— Non coté —', quotationDate: '', quotationAmount: '',
+        validationDate: '', saleDate: '', saleType: 'Nouvelle vente (NouVe)',
+        policyNumber: '', attestationNumber: '', netPremiums: '', accessories: '',
+        effectDate: '', expiryDate: '', carRoseNumber: '',
+      });
+    }
+  }, [editProspection, visible]);
 
   const upd = (field: keyof ProspectionFormData, value: any) =>
     setForm(prev => ({ ...prev, [field]: value }));
@@ -209,7 +302,7 @@ export function NewProspectionModal({ visible, onClose, onSubmit }: NewProspecti
             onChangeText={v => upd('phone', v)} placeholderTextColor={colors.gray400}
           />
         </View>
-        <View style={[styles.half, openDropdown === 'clientType' && styles.elevated]}>
+        <View style={styles.half}>
           <Text style={styles.label}>Type de client</Text>
           <SelectField
             value={form.clientType} options={CLIENT_TYPES}
@@ -220,7 +313,7 @@ export function NewProspectionModal({ visible, onClose, onSubmit }: NewProspecti
         </View>
       </View>
 
-      <View style={openDropdown === 'activity' ? styles.elevated : undefined}>
+      <View>
         <Text style={styles.label}>Activité</Text>
         <SelectField
           value={form.activity} options={ACTIVITIES}
@@ -229,9 +322,6 @@ export function NewProspectionModal({ visible, onClose, onSubmit }: NewProspecti
           onSelect={v => upd('activity', v)}
         />
       </View>
-
-      {/* Spacer so list has room when open */}
-      <View style={{ height: 180 }} />
     </ScrollView>
   );
 
@@ -246,7 +336,7 @@ export function NewProspectionModal({ visible, onClose, onSubmit }: NewProspecti
       <Text style={styles.subtitle}>Détails de la prospection</Text>
 
       <View style={styles.row}>
-        <View style={[styles.half, openDropdown === 'product' && styles.elevated]}>
+        <View style={styles.half}>
           <Text style={styles.label}>Produit / Risque visé *</Text>
           <SelectField
             value={form.product} options={PRODUCTS}
@@ -255,7 +345,7 @@ export function NewProspectionModal({ visible, onClose, onSubmit }: NewProspecti
             onSelect={v => upd('product', v)}
           />
         </View>
-        <View style={[styles.half, openDropdown === 'status' && styles.elevated]}>
+        <View style={styles.half}>
           <Text style={styles.label}>Statut *</Text>
           <SelectField
             value={form.status} options={STATUSES}
@@ -323,8 +413,6 @@ export function NewProspectionModal({ visible, onClose, onSubmit }: NewProspecti
         value={form.observations} onChangeText={v => upd('observations', v)}
         placeholderTextColor={colors.gray400} multiline numberOfLines={3}
       />
-
-      {(openDropdown === 'product' || openDropdown === 'status') && <View style={{ height: 160 }} />}
     </ScrollView>
   );
 
@@ -345,7 +433,7 @@ export function NewProspectionModal({ visible, onClose, onSubmit }: NewProspecti
       </View>
 
       <View style={styles.row}>
-        <View style={[styles.half, openDropdown === 'ratedRisk' && styles.elevated]}>
+        <View style={styles.half}>
           <Text style={styles.label}>Risque coté</Text>
           <SelectField
             value={form.ratedRisk} options={RISKS}
@@ -373,8 +461,6 @@ export function NewProspectionModal({ visible, onClose, onSubmit }: NewProspecti
             onChangeText={v => upd('validationDate', v)} placeholderTextColor={colors.gray400} />
         </View>
       </View>
-
-      {openDropdown === 'ratedRisk' && <View style={{ height: 160 }} />}
     </ScrollView>
   );
 
@@ -400,7 +486,7 @@ export function NewProspectionModal({ visible, onClose, onSubmit }: NewProspecti
           <TextInput style={styles.input} placeholder="dd/mm/yyyy" value={form.saleDate}
             onChangeText={v => upd('saleDate', v)} placeholderTextColor={colors.gray400} />
         </View>
-        <View style={[styles.half, openDropdown === 'saleType' && styles.elevated]}>
+        <View style={styles.half}>
           <Text style={styles.label}>Type de vente</Text>
           <SelectField
             value={form.saleType} options={SALE_TYPES}
@@ -453,8 +539,6 @@ export function NewProspectionModal({ visible, onClose, onSubmit }: NewProspecti
       <Text style={styles.label}>N° Carte rose (automobile)</Text>
       <TextInput style={styles.input} placeholder="Numéro carte rose" value={form.carRoseNumber}
         onChangeText={v => upd('carRoseNumber', v)} placeholderTextColor={colors.gray400} />
-
-      {openDropdown === 'saleType' && <View style={{ height: 160 }} />}
     </ScrollView>
   );
 
@@ -485,7 +569,7 @@ export function NewProspectionModal({ visible, onClose, onSubmit }: NewProspecti
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={step === 4 ? () => { if (onSubmit) onSubmit(form); onClose(); } : () => setStep(step + 1)}
+            onPress={step === 4 ? () => { if (onSubmit) onSubmit(form, !!editProspection, editProspection?.id); onClose(); } : () => setStep(step + 1)}
             style={[styles.nextButton, step === 4 && styles.submitButton]}
           >
             <Text style={styles.nextButtonText}>{step === 4 ? 'Enregistrer ✓' : 'Suivant →'}</Text>
@@ -531,8 +615,7 @@ const styles = StyleSheet.create({
   textarea:             { minHeight: 80, paddingTop: spacing.sm, textAlignVertical: 'top' },
   helperText:           { fontSize: 12, color: colors.gray400, marginTop: 4 },
   row:                  { flexDirection: 'row', gap: spacing.md, marginVertical: spacing.sm },
-  half:                 { flex: 1, zIndex: 1 },
-  elevated:             { zIndex: 100 },
+  half:                 { flex: 1 },
   probabilityContainer: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.lg },
   probabilityInput:     { flex: 1, borderWidth: 1, borderColor: colors.gray200, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: 14, color: colors.gray800, backgroundColor: colors.white },
   probabilityBadge:     { backgroundColor: colors.violet, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: 20, minWidth: 60, alignItems: 'center' },

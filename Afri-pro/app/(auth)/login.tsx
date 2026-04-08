@@ -19,17 +19,17 @@ export default function LoginScreen() {
   const router = useRouter();
   const { login, isLoading, error } = useAuth();
 
-  const [email, setEmail]                   = useState('ngueguim');
+  const [identifiant, setIdentifiant]      = useState('');
   const [password, setPassword]             = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const handleLogin = async () => {
     setValidationError(null);
-    if (!email.trim())    { setValidationError('Entrez votre identifiant');  return; }
-    if (!password.trim()) { setValidationError('Entrez votre mot de passe'); return; }
+    if (!identifiant.trim()) { setValidationError('Entrez votre identifiant');  return; }
+    if (!password.trim())    { setValidationError('Entrez votre mot de passe'); return; }
 
     try {
-      const loggedUser = await login({ email, password });
+      const loggedUser = await login({ email: identifiant, password });
       const role = loggedUser?.role ?? 'commercial';
 
       const roleRoute: Record<string, string> = {
@@ -86,13 +86,13 @@ export default function LoginScreen() {
 
             {/* Identifiant */}
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Identifiant</Text>
+              <Text style={styles.inputLabel}>Identifiant (nom d'utilisateur)</Text>
               <TextInput
-                style={[styles.input, validationError && !email ? styles.inputError : null]}
-                placeholder="Votre identifiant"
+                style={[styles.input, validationError && !identifiant ? styles.inputError : null]}
+                placeholder="Votre identifiant de connexion"
                 placeholderTextColor={colors.gray400}
-                value={email}
-                onChangeText={setEmail}
+                value={identifiant}
+                onChangeText={setIdentifiant}
                 editable={!isLoading}
                 autoCapitalize="none"
               />
@@ -130,16 +130,6 @@ export default function LoginScreen() {
                 : <Text style={styles.loginButtonText}>Se connecter</Text>
               }
             </Pressable>
-
-            {/* Demo hint */}
-            <View style={styles.demoBox}>
-              <Text style={styles.demoText}>
-                Mode démo: Identifiant:{' '}
-                <Text style={styles.demoBold}>ngueguim</Text>
-                {' '}| Mot de passe:{' '}
-                <Text style={styles.demoBold}>demo1234</Text>
-              </Text>
-            </View>
           </View>
         </View>
 

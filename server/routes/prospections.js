@@ -72,27 +72,45 @@ router.get('/:id', auth, async (req, res) => {
 // POST /api/prospections
 router.post('/', auth, async (req, res) => {
   const {
-    client_id, date_prospection, risque_prospecte, potentiel_ca,
-    chance_realisation, ancien_assureur, date_effet_ancien,
-    date_echeance_ancien, date_visite_1, date_visite_2, date_visite_3,
-    date_relance, observations, statut
+    clientName, phone, clientType, activity,
+    prospectionDate, product, potentialCA, status, probability,
+    visitDate1, nextFollowUp, visitDate2, visitDate3,
+    previousInsurer, previousContract, observations,
+    ratedRisk, quotationDate, quotationAmount, validationDate,
+    saleDate, saleType, policyNumber, attestationNumber,
+    netPremiums, accessories, effectDate, expiryDate, carRoseNumber
   } = req.body;
 
   const commercial_id = req.user.role === 'commercial' ? req.user.id : req.body.commercial_id;
 
   try {
+    // Call the insert_new_prospection function
     const { rows } = await pool.query(
-      `INSERT INTO prospections
-        (commercial_id, client_id, date_prospection, risque_prospecte, potentiel_ca,
-         chance_realisation, ancien_assureur, date_effet_ancien, date_echeance_ancien,
-         date_visite_1, date_visite_2, date_visite_3, date_relance, observations, statut)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
-      [commercial_id, client_id, date_prospection, risque_prospecte, potentiel_ca,
-       chance_realisation, ancien_assureur, date_effet_ancien, date_echeance_ancien,
-       date_visite_1, date_visite_2, date_visite_3, date_relance, observations,
-       statut || 'Premier contact']
+      `SELECT insert_new_prospection(
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+        $11, $12, $13, $14, $15, $16, $17, $18, $19,
+        $20, $21, $22, $23, $24, $25, $26, $27, $28,
+        $29, $30
+      ) AS prospection_id`,
+      [
+        clientName, phone, clientType, activity,
+        commercial_id, prospectionDate, product, potentialCA, status, probability,
+        visitDate1, nextFollowUp, visitDate2, visitDate3,
+        previousInsurer, previousContract, observations,
+        ratedRisk, quotationDate, quotationAmount, validationDate,
+        saleDate, saleType, policyNumber, attestationNumber,
+        netPremiums, accessories, effectDate, expiryDate, carRoseNumber
+      ]
     );
-    res.status(201).json(rows[0]);
+
+    const prospection_id = rows[0].prospection_id;
+
+    // Fetch the created prospection with full details
+    const { rows: prospectionRows } = await pool.query(
+      'SELECT * FROM v_prospections WHERE id = $1', [prospection_id]
+    );
+
+    res.status(201).json(prospectionRows[0]);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -116,6 +134,20 @@ router.put('/:id', auth, async (req, res) => {
     );
     if (!rows[0]) return res.status(404).json({ error: 'Prospection introuvable' });
     res.json(rows[0]);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE /api/prospections/:id
+router.delete('/:id', auth, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'DELETE FROM prospections WHERE id = $1 RETURNING *',
+      [req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Prospection introuvable' });
+    res.json({ message: 'Prospection supprimée' });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
