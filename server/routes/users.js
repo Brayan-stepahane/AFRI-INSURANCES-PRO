@@ -5,7 +5,7 @@ const bcrypt = require('bcryptjs');
 
 // Middleware : réservé aux managers et admins
 const managerOnly = (req, res, next) => {
-  const allowed = ['manager', 'chef_agence', 'admin', 'manager_adjoint'];
+  const allowed = ['manager', 'chef_agence', 'admin', 'manager_adj', 'manager_adjoint'];
   if (!allowed.includes(req.user.role))
     return res.status(403).json({ error: 'Accès refusé' });
   next();

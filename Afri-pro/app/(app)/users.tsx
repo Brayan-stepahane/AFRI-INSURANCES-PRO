@@ -68,7 +68,7 @@ export default function UsersScreen() {
       <View style={styles.container}>
         <Text style={styles.title}>Accès refusé</Text>
         <Text style={styles.text}>Seuls les administrateurs peuvent gérer les utilisateurs.</Text>
-        <TouchableOpacity style={styles.button} onPress={() => router.push('/(app)/dashboard' as any)}>
+        <TouchableOpacity style={styles.button} onPress={() => router.push('/dashboard' as any)}>
           <Text style={styles.buttonText}>Retour</Text>
         </TouchableOpacity>
       </View>
@@ -192,3 +192,4 @@ const styles = StyleSheet.create({
   errorText: { color: colors.danger, fontWeight: '600', marginBottom: spacing.sm },
   successText: { color: colors.teal, fontWeight: '600', marginBottom: spacing.sm },
 });
+ 

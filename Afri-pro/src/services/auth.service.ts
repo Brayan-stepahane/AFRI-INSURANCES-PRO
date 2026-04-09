@@ -14,10 +14,13 @@ export const authService = {
       token: response.data.token,
       user: {
         id: apiUser.id,
+        identifiant: apiUser.identifiant || apiUser.email || '',
         email: apiUser.email || apiUser.identifiant || '',
         name: apiUser.name || `${[apiUser.nom, apiUser.prenom].filter(Boolean).join(' ')}`.trim() || apiUser.identifiant || '',
         phone: apiUser.phone,
         role: apiUser.role as UserRole,
+        equipe: apiUser.equipe,
+        objectifMensuel: apiUser.objectif_mensuel ?? apiUser.objectifMensuel,
         createdAt: apiUser.createdAt || new Date().toISOString(),
       },
     };
@@ -37,10 +40,13 @@ export const authService = {
     const apiUser = response.data;
     return {
       id: apiUser.id,
+      identifiant: apiUser.identifiant || apiUser.email || '',
       email: apiUser.email || apiUser.identifiant || '',
       name: apiUser.name || `${[apiUser.nom, apiUser.prenom].filter(Boolean).join(' ')}`.trim() || apiUser.identifiant || '',
       phone: apiUser.phone,
       role: apiUser.role as UserRole,
+      equipe: apiUser.equipe,
+      objectifMensuel: apiUser.objectif_mensuel ?? apiUser.objectifMensuel,
       createdAt: apiUser.createdAt || new Date().toISOString(),
     };
   },

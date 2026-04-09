@@ -2,10 +2,13 @@ export type UserRole = 'commercial' | 'manager_adj' | 'manager' | 'chef' | 'admi
 
 export interface User {
   id: string;
+  identifiant?: string;
   email: string;
   name: string;
   phone?: string;
   role?: UserRole;
+  equipe?: string;
+  objectifMensuel?: number;
   createdAt: string;
 }
 

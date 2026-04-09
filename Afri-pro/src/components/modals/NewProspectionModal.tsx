@@ -4,7 +4,8 @@ import {
   ScrollView, Platform, Pressable,
 } from 'react-native';
 import { colors, spacing, radius } from '../../config/theme';
-import { getClient } from '../../store/data';
+import { getClient, searchClientsByName } from '../../store/data';
+import type { Client } from '../../types';
 
 interface ProspectionFormData {
   clientName: string;
@@ -192,6 +193,33 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
     policyNumber: '', attestationNumber: '', netPremiums: '', accessories: '',
     effectDate: '', expiryDate: '', carRoseNumber: '',
   });
+  const [clientSearchResults, setClientSearchResults] = useState<Client[]>([]);
+  const [clientSearchMessage, setClientSearchMessage] = useState<string>('');
+
+  const handleSearchClient = () => {
+    const query = form.clientName.trim();
+    if (!query) {
+      setClientSearchResults([]);
+      setClientSearchMessage('Entrez un nom ou un identifiant de client pour rechercher.');
+      return;
+    }
+
+    const results = searchClientsByName(query);
+    setClientSearchResults(results);
+    setClientSearchMessage(results.length === 0 ? 'Aucun client trouvé dans la base.' : '');
+  };
+
+  const selectClient = (client: Client) => {
+    setForm(prev => ({
+      ...prev,
+      clientName: client.nom,
+      phone: client.tel,
+      clientType: client.type,
+      activity: client.activite,
+    }));
+    setClientSearchResults([]);
+    setClientSearchMessage(`Client sélectionné : ${client.nom}`);
+  };
 
   // If editing, populate form
   React.useEffect(() => {
@@ -285,14 +313,38 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
       <Text style={styles.hint}>Tapez le nom pour rechercher un client existant</Text>
 
       <Text style={styles.label}>Nom du client *</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Tapez pour rechercher ou créer..."
-        value={form.clientName}
-        onChangeText={v => upd('clientName', v)}
-        placeholderTextColor={colors.gray400}
-      />
-      <Text style={styles.helperText}>Le système cherche automatiquement dans la base clients</Text>
+      <View style={styles.searchRow}>
+        <TextInput
+          style={[styles.input, styles.searchInput]}
+          placeholder="Tapez pour rechercher ou créer..."
+          value={form.clientName}
+          onChangeText={v => {
+            upd('clientName', v);
+            setClientSearchResults([]);
+            setClientSearchMessage('');
+          }}
+          placeholderTextColor={colors.gray400}
+        />
+        <TouchableOpacity style={styles.searchButton} onPress={handleSearchClient} activeOpacity={0.8}>
+          <Text style={styles.searchButtonText}>Rechercher</Text>
+        </TouchableOpacity>
+      </View>
+      <Text style={styles.helperText}>Le système cherche dans la base clients après validation.</Text>
+      {clientSearchMessage ? <Text style={styles.searchMessage}>{clientSearchMessage}</Text> : null}
+      {clientSearchResults.length > 0 && (
+        <View style={styles.searchResults}>
+          {clientSearchResults.map(client => (
+            <TouchableOpacity
+              key={client.id}
+              style={styles.resultItem}
+              onPress={() => selectClient(client)}
+            >
+              <Text style={styles.resultName}>{client.nom}</Text>
+              <Text style={styles.resultMeta}>{client.id} · {client.activite}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
 
       <View style={styles.row}>
         <View style={styles.half}>
@@ -614,6 +666,15 @@ const styles = StyleSheet.create({
   input:                { borderWidth: 1, borderColor: colors.gray200, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: 14, color: colors.gray800, backgroundColor: colors.white, minHeight: 40 },
   textarea:             { minHeight: 80, paddingTop: spacing.sm, textAlignVertical: 'top' },
   helperText:           { fontSize: 12, color: colors.gray400, marginTop: 4 },
+  searchRow:            { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },
+  searchInput:          { flex: 1 },
+  searchButton:         { backgroundColor: colors.violet, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.sm, marginLeft: spacing.sm, minHeight: 40, justifyContent: 'center', alignItems: 'center' },
+  searchButtonText:     { color: colors.white, fontWeight: '700', fontSize: 14 },
+  searchResults:        { marginTop: spacing.sm, borderWidth: 1, borderColor: colors.gray200, borderRadius: radius.sm, overflow: 'hidden', backgroundColor: colors.white },
+  resultItem:           { padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.gray100 },
+  resultName:           { fontSize: 14, fontWeight: '600', color: colors.gray800 },
+  resultMeta:           { fontSize: 12, color: colors.gray400, marginTop: 4 },
+  searchMessage:        { fontSize: 12, color: colors.gray400, marginTop: spacing.sm },
   row:                  { flexDirection: 'row', gap: spacing.md, marginVertical: spacing.sm },
   half:                 { flex: 1 },
   probabilityContainer: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.lg },

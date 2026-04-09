@@ -43,7 +43,7 @@ export default function DashboardScreen() {
 
   const handleLogout = async () => {
     await logout();
-    router.replace('/(auth)/login');
+    router.replace('/login');
   };
 
   if (stats.loading || objective.loading) {
@@ -77,7 +77,7 @@ export default function DashboardScreen() {
           <Text style={styles.pageSubtitle}>Vue d'ensemble</Text>
         </View>
         <View style={styles.topBarActions}>
-          <TouchableOpacity style={styles.notificationBtn} onPress={() => router.push('/(app)/notifications' as any)}>
+          <TouchableOpacity style={styles.notificationBtn} onPress={() => router.push('/notifications' as any)}>
             <Text style={styles.notificationIcon}>🔔</Text>
           </TouchableOpacity>
           <Button title="+ Nouvelle prospection" onPress={() => setShowNewProspectionModal(true)} style={styles.topButton} />

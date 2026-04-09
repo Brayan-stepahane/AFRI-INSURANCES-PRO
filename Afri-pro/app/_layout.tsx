@@ -22,9 +22,9 @@ export default function RootLayout() {
 
     setTimeout(() => {
       if (!token) {
-        router.replace('/(auth)/login');
+        router.replace('/login');
       } else {
-        router.replace('/(app)/dashboard');
+        router.replace('/dashboard');
       }
     }, 0);
   }, [token, navigationState?.key]);

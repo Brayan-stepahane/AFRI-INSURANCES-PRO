@@ -239,7 +239,7 @@ export default function CotationsScreen() {
       />
 
       {/* FAB */}
-      <TouchableOpacity style={styles.fab} onPress={() => router.push('/(app)/cotations/new' as any)}>
+      <TouchableOpacity style={styles.fab} onPress={() => router.push('/cotations/new' as any)}>
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
     </View>

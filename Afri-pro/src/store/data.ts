@@ -119,6 +119,15 @@ export const ACTIVITES = [
 export const getClient = (id: string): Client | undefined =>
   clients.find(c => c.id === id);
 
+export const searchClientsByName = (query: string): Client[] => {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+
+  return clients.filter(c =>
+    c.nom.toLowerCase().includes(q) || c.id.toLowerCase().includes(q)
+  );
+};
+
 export const genClientId = (): string => {
   const max = clients.reduce((m, c) => Math.max(m, parseInt(c.id.split('-')[1] || '0')), 0);
   return 'CLI-' + String(max + 1).padStart(4, '0');
@@ -129,6 +138,16 @@ export const fmt = (n: number): string =>
 
 export const fmtDate = (d: string): string =>
   d ? new Date(d).toLocaleDateString('fr-FR') : '—';
+
+const normalizeCommercialName = (name: string) =>
+  name?.trim().toLowerCase().replace(/\s+/g, ' ');
+
+const isSameCommercial = (commercial: string, userName: string) => {
+  const c = normalizeCommercialName(commercial);
+  const u = normalizeCommercialName(userName);
+  if (!c || !u) return false;
+  return c === u || u.includes(c) || c.includes(u);
+};
 
 export const isOverdue = (d: string): boolean =>
   Boolean(d && new Date(d) < new Date());
@@ -147,7 +166,7 @@ export const caThisMois = (commercial: string): number => {
 
 export const getProspectionsForUser = (userName: string, role: string): Prospection[] => {
   if (!Array.isArray(prospections)) return [];
-  if (role === 'commercial') return prospections.filter(p => p.commercial === userName);
+  if (role === 'commercial') return prospections.filter(p => isSameCommercial(p.commercial, userName));
   if (role === 'manager_adj') return prospections; // Environnement simplifié: voir l'équipe entière
   if (role === 'manager' || role === 'chef' || role === 'chef_agence' || role === 'admin') return prospections;
   return [];
@@ -155,14 +174,14 @@ export const getProspectionsForUser = (userName: string, role: string): Prospect
 
 export const getCotationsForUser = (userName: string, role: string): Cotation[] => {
   if (!Array.isArray(cotations)) return [];
-  if (role === 'commercial') return cotations.filter(c => c.commercial === userName);
+  if (role === 'commercial') return cotations.filter(c => isSameCommercial(c.commercial, userName));
   if (role === 'manager_adj') return cotations;
   if (role === 'manager' || role === 'chef' || role === 'chef_agence' || role === 'admin') return cotations;
   return [];
 };
 
 export const getVentesForUser = (userName: string, role: string): Vente[] => {
-  if (role === 'commercial') return ventes.filter(v => v.commercial === userName);
+  if (role === 'commercial') return ventes.filter(v => isSameCommercial(v.commercial, userName));
   if (role === 'manager_adj') return ventes;
   if (role === 'manager' || role === 'chef' || role === 'admin') return ventes;
   return [];

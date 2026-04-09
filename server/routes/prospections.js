@@ -15,7 +15,7 @@ router.get('/', auth, async (req, res) => {
     if (user.role === 'commercial') {
       params.push(user.id);
       query += ` AND commercial_id = $${params.length}`;
-    } else if (user.role === 'manager_adjoint') {
+    } else if (user.role === 'manager_adj' || user.role === 'manager_adjoint') {
       // Voit son équipe
       params.push(user.equipe);
       query += ` AND equipe = $${params.length}`;

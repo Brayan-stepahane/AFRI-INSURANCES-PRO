@@ -33,14 +33,14 @@ export default function LoginScreen() {
       const role = loggedUser?.role ?? 'commercial';
 
       const roleRoute: Record<string, string> = {
-        commercial: '/(app)/dashboard?role=commercial',
-        manager_adj: '/(app)/dashboard?role=manager_adj',
-        manager: '/(app)/dashboard?role=manager',
-        chef: '/(app)/dashboard?role=chef',
-        admin: '/(app)/dashboard?role=admin',
+        commercial: '/dashboard?role=commercial',
+        manager_adj: '/dashboard?role=manager_adj',
+        manager: '/dashboard?role=manager',
+        chef: '/dashboard?role=chef',
+        admin: '/dashboard?role=admin',
       };
 
-      router.replace(roleRoute[role] || '/(app)/dashboard');
+      router.replace(roleRoute[role] || '/dashboard');
     } catch {
       setValidationError('Identifiant ou mot de passe incorrect');
     }

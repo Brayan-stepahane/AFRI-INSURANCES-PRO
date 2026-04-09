@@ -18,7 +18,20 @@ router.get('/', auth, async (req, res) => {
     }
 
     // Objectifs du mois
-    let objQuery = `SELECT * FROM v_objectifs_realises WHERE TO_CHAR(mois,'YYYY-MM') = $1`;
+    let objQuery = `
+      SELECT
+        id,
+        commercial_id,
+        commercial_nom,
+        mois,
+        montant_mensuel AS objectif_mensuel,
+        montant_reporte AS reporte,
+        total_objectif,
+        ca_realise,
+        montant_restant,
+        pct_atteint
+      FROM v_objectifs_realises
+      WHERE TO_CHAR(mois,'YYYY-MM') = $1`;
     const objParams = [moisActuel];
 
     if (user.role === 'commercial') {
