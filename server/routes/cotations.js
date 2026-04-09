@@ -49,12 +49,12 @@ router.post('/', auth, async (req, res) => {
 
 // PUT /api/cotations/:id
 router.put('/:id', auth, async (req, res) => {
-  const { statut, montant, date_validation } = req.body;
+  const { risque_cote, date_cotation, montant, date_validation, statut } = req.body;
   try {
     const { rows } = await pool.query(
-      `UPDATE cotations SET statut=$1, montant=$2, date_validation=$3, updated_at=NOW()
-       WHERE id=$4 RETURNING *`,
-      [statut, montant, date_validation, req.params.id]
+      `UPDATE cotations SET risque_cote=$1, date_cotation=$2, montant=$3, date_validation=$4, statut=$5, updated_at=NOW()
+       WHERE id=$6 RETURNING *`,
+      [risque_cote, date_cotation, montant, date_validation, statut, req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Cotation introuvable' });
     res.json(rows[0]);

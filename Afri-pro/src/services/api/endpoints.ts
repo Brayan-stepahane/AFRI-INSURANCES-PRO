@@ -19,9 +19,11 @@ export const API_ENDPOINTS = {
   },
   COTATIONS: {
     LIST: '/api/cotations',
+    UPDATE: '/api/cotations',
   },
   VENTES: {
     LIST: '/api/ventes',
+    UPDATE: '/api/ventes',
   },
   PROSPECTIONS: {
     LIST: '/api/prospections',

@@ -101,7 +101,13 @@ export default function ProspectionsScreen() {
     );
   };
 
-  const handleNewProspectionSubmit = async (data: any, isEdit?: boolean, prospectionId?: number) => {
+  const handleNewProspectionSubmit = async (data: any, isEdit?: boolean, prospectionId?: number, options?: { refreshOnly?: boolean }) => {
+    if (options?.refreshOnly) {
+      setRefreshing(true);
+      setTimeout(() => setRefreshing(false), 100);
+      return;
+    }
+
     try {
       if (isEdit && prospectionId) {
         // Update existing prospection - call PUT API

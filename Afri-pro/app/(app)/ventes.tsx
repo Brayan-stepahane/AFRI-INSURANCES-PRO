@@ -1,20 +1,24 @@
 import React, { useState } from 'react';
 import {
   View, Text, FlatList, StyleSheet, TextInput,
-  TouchableOpacity, RefreshControl, ScrollView,
+  TouchableOpacity, RefreshControl, ScrollView, Alert,
 } from 'react-native';
 import { useAuth } from '../../src/hooks/useAuth';
-import { getVentesForUser, getClient, fmt, fmtDate } from '../../src/store/data';
+import { getVentesForUser, getClient, fmt, fmtDate, ventes } from '../../src/store/data';
 import { colors, spacing, radius } from '../../src/config/theme';
 import { Badge, EmptyState, ClientIdBadge, StatCard } from '../../src/components/common/Button';
 import { Header } from '../../src/components/common/Header';
 import { Vente } from '../../src/types';
+import { NewVenteModal } from '../../src/components/modals/NewVenteModal';
+import apiClient from '../../src/services/api/client';
+import { API_ENDPOINTS } from '../../src/services/api/endpoints';
 
 export default function VentesScreen() {
   const { user }  = useAuth();
   const [search, setSearch]   = useState('');
   const [filterMois, setFilterMois] = useState('Tous');
   const [refreshing, setRefreshing] = useState(false);
+  const [editingVente, setEditingVente] = useState<Vente | null>(null);
 
   const name = user?.name ?? '';
   const role = user?.role ?? 'commercial';
@@ -38,6 +42,70 @@ export default function VentesScreen() {
   const totalPrimes = list.reduce((s, v) => s + (v.primeNette || 0), 0);
   const totalAcc    = list.reduce((s, v) => s + (v.accessoires || 0), 0);
   const totalCA     = totalPrimes + totalAcc;
+
+  const deleteVente = (v: Vente) => {
+    Alert.alert(
+      'Supprimer la vente',
+      `Êtes-vous sûr de vouloir supprimer cette vente de ${getClient(v.clientId)?.nom || v.clientId} ?`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: () => {
+            const idx = ventes.findIndex(ve => ve.id === v.id);
+            if (idx >= 0) {
+              ventes.splice(idx, 1);
+              setRefreshing(true);
+              setTimeout(() => setRefreshing(false), 100);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleVenteSubmit = async (data: any, isEdit?: boolean, venteId?: number, options?: { refreshOnly?: boolean }) => {
+    if (options?.refreshOnly) {
+      setRefreshing(true);
+      setTimeout(() => setRefreshing(false), 100);
+      return;
+    }
+
+    try {
+      if (isEdit && venteId) {
+        // Update existing vente - already handled in modal
+        setRefreshing(true);
+        setTimeout(() => setRefreshing(false), 100);
+      } else {
+        // Create new vente - call POST API
+        const apiData = {
+          prospection_id: data.prospectionId || null,
+          cotation_id: data.cotationId || null,
+          client_id: data.clientId,
+          date_vente: data.dateVente,
+          type_vente: data.typeVente.includes('Nouvelle') ? 'NouVe' : 'VenRec',
+          no_police: data.noPolice,
+          prime_nette: Number(data.primeNette) || 0,
+          accessoires: Number(data.accessories) || 0,
+          no_attestation: data.noAttestation,
+          no_carte_rose: data.noCarteRose,
+          date_effet: data.dateEffet,
+          date_echeance: data.dateEcheance,
+        };
+        const response = await apiClient.post(API_ENDPOINTS.VENTES.LIST, apiData);
+        console.log('Created vente:', response.data);
+        if (response?.data && response.data.id) {
+          ventes.unshift(response.data);
+        }
+      }
+      setRefreshing(true);
+      setTimeout(() => setRefreshing(false), 100);
+    } catch (error) {
+      console.error('Error submitting vente:', error);
+      Alert.alert('Erreur', 'Une erreur est survenue lors de l\'enregistrement');
+    }
+  };
 
   const renderItem = ({ item: v, index }: { item: Vente; index: number }) => {
     const cli = getClient(v.clientId);
@@ -100,6 +168,16 @@ export default function VentesScreen() {
         {role !== 'commercial' && (
           <Text style={styles.commercialText}>👤 {v.commercial}</Text>
         )}
+
+        {/* Actions */}
+        <View style={styles.actions}>
+          <TouchableOpacity style={[styles.actionBtn, styles.actionEdit]} onPress={() => setEditingVente(v)}>
+            <Text style={styles.actionBtnText}>✏️ Modifier</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.actionBtn, styles.actionDelete]} onPress={() => deleteVente(v)}>
+            <Text style={[styles.actionBtnText, { color: colors.danger }]}>🗑️ Supprimer</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   };
@@ -162,6 +240,13 @@ export default function VentesScreen() {
           <EmptyState icon="✅" title="Aucune vente trouvée" sub="Modifiez vos filtres" />
         }
       />
+
+      <NewVenteModal
+        visible={!!editingVente}
+        onClose={() => setEditingVente(null)}
+        onSubmit={handleVenteSubmit}
+        editVente={editingVente as any}
+      />
     </View>
   );
 }
@@ -202,4 +287,9 @@ const styles = StyleSheet.create({
   datesRow:   { gap: 4, marginTop: 4 },
   dateText:   { fontSize: 11, color: colors.gray400 },
   commercialText: { fontSize: 12, color: colors.gray400, marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.gray100 },
+  actions: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg, paddingTop: spacing.lg, borderTopWidth: 1, borderTopColor: colors.gray100 },
+  actionBtn: { flex: 1, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
+  actionEdit: { backgroundColor: colors.violetPale, borderWidth: 1, borderColor: colors.violet },
+  actionDelete: { backgroundColor: colors.dangerBg, borderWidth: 1, borderColor: colors.danger },
+  actionBtnText: { fontSize: 12, fontWeight: '600', color: colors.violet },
 });

@@ -3,11 +3,13 @@ import {
   View, Text, Modal, StyleSheet, TextInput, TouchableOpacity,
   ScrollView, Platform, Pressable,
 } from 'react-native';
+import { useAuth } from '../../hooks/useAuth';
 import { colors, spacing, radius } from '../../config/theme';
-import { getClient, searchClientsByName } from '../../store/data';
+import { getClient, searchClientsByName, clients, genClientId, prospections, cotations, ventes } from '../../store/data';
 import type { Client } from '../../types';
 
 interface ProspectionFormData {
+  clientId: string;
   clientName: string;
   phone: string;
   clientType: string;
@@ -42,7 +44,7 @@ interface ProspectionFormData {
 interface NewProspectionModalProps {
   visible: boolean;
   onClose: () => void;
-  onSubmit?: (data: ProspectionFormData, isEdit?: boolean, prospectionId?: number) => void;
+  onSubmit?: (data: ProspectionFormData, isEdit?: boolean, prospectionId?: number, options?: { refreshOnly?: boolean }) => void;
   editProspection?: any; // For editing
 }
 
@@ -177,12 +179,13 @@ const sf = StyleSheet.create({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export function NewProspectionModal({ visible, onClose, onSubmit, editProspection }: NewProspectionModalProps) {
+  const { user } = useAuth();
   const [step, setStep] = useState(1);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const toggle = (name: string) => setOpenDropdown(prev => (prev === name ? null : name));
 
   const [form, setForm] = useState<ProspectionFormData>({
-    clientName: '', phone: '', clientType: 'Particulier',
+    clientId: '', clientName: '', phone: '', clientType: 'Particulier',
     activity: 'Chef d\'entreprise',
     prospectionDate: new Date().toISOString().split('T')[0],
     product: 'Afrilife étude', potentialCA: '', status: 'Premier contact',
@@ -195,6 +198,10 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
   });
   const [clientSearchResults, setClientSearchResults] = useState<Client[]>([]);
   const [clientSearchMessage, setClientSearchMessage] = useState<string>('');
+  const [prospectionId, setProspectionId] = useState<number | null>(editProspection?.id ?? null);
+  const [cotationId, setCotationId] = useState<number | null>(null);
+  const [saveMessage, setSaveMessage] = useState<string>('');
+  const [saveError, setSaveError] = useState<string>('');
 
   const handleSearchClient = () => {
     const query = form.clientName.trim();
@@ -212,6 +219,7 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
   const selectClient = (client: Client) => {
     setForm(prev => ({
       ...prev,
+      clientId: client.id,
       clientName: client.nom,
       phone: client.tel,
       clientType: client.type,
@@ -221,12 +229,186 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
     setClientSearchMessage(`Client sélectionné : ${client.nom}`);
   };
 
+  const getOrCreateClientId = () => {
+    const trimmedName = form.clientName.trim();
+    if (!trimmedName) return '';
+    if (form.clientId) return form.clientId;
+
+    const existing = clients.find(c => c.nom.trim().toLowerCase() === trimmedName.toLowerCase());
+    if (existing) {
+      setForm(prev => ({ ...prev, clientId: existing.id }));
+      return existing.id;
+    }
+
+    const newClientId = genClientId();
+    const newClient: Client = {
+      id: newClientId,
+      nom: trimmedName,
+      tel: form.phone,
+      activite: form.activity,
+      type: form.clientType as any,
+    };
+    clients.unshift(newClient);
+    setForm(prev => ({ ...prev, clientId: newClientId }));
+    return newClientId;
+  };
+
+  const getNextId = (items: { id: number }[]) =>
+    items.reduce((max, item) => Math.max(max, item.id), 0) + 1;
+
+  const saveProspectionLocal = () => {
+    const clientId = getOrCreateClientId();
+    if (!clientId) {
+      setSaveError('Veuillez sélectionner ou créer un client avant de sauvegarder.');
+      return null;
+    }
+
+    const record = {
+      clientId,
+      commercial: user?.name || 'commercial',
+      produit: form.product,
+      potentielCA: Number(form.potentialCA) || 0,
+      chance: form.probability,
+      statut: form.status as any,
+      dateContact: form.prospectionDate,
+      dateRelance: form.nextFollowUp,
+      dateV1: form.visitDate1,
+      dateV2: form.visitDate2,
+      dateV3: form.visitDate3,
+      observations: form.observations,
+      ancienAssureur: form.previousInsurer,
+      dateAncienEch: form.previousContract,
+    };
+
+    if (prospectionId) {
+      const idx = prospections.findIndex(p => p.id === prospectionId);
+      if (idx >= 0) {
+        prospections[idx] = { ...prospections[idx], ...record } as any;
+        return prospectionId;
+      }
+    }
+
+    const nextId = getNextId(prospections);
+    const newProspection = { id: nextId, ...record } as any;
+    prospections.unshift(newProspection);
+    setProspectionId(nextId);
+    return nextId;
+  };
+
+  const saveCotationLocal = (savedProspectionId: number) => {
+    if (!form.quotationDate && !form.quotationAmount && form.ratedRisk === '— Non coté —') {
+      return null;
+    }
+
+    const clientId = getOrCreateClientId();
+    if (!clientId) {
+      setSaveError('Veuillez sélectionner ou créer un client avant de sauvegarder la cotation.');
+      return null;
+    }
+
+    const nextId = getNextId(cotations);
+    const newCotation = {
+      id: nextId,
+      noCot: nextId,
+      prospId: savedProspectionId,
+      clientId,
+      commercial: user?.name || 'commercial',
+      risqueCote: form.ratedRisk,
+      dateCotation: form.quotationDate,
+      montant: Number(form.quotationAmount) || 0,
+      dateValidation: form.validationDate,
+      statut: form.validationDate ? 'Validée' : 'En attente',
+    } as any;
+    cotations.unshift(newCotation);
+    setCotationId(nextId);
+
+    const pi = prospections.findIndex(p => p.id === savedProspectionId);
+    if (pi >= 0) prospections[pi].statut = 'Cotation envoyée';
+
+    return nextId;
+  };
+
+  const saveVenteLocal = (savedProspectionId: number, savedCotationId?: number | null) => {
+    if (!form.saleDate) {
+      setSaveError('Veuillez renseigner la date de vente avant de sauvegarder.');
+      return null;
+    }
+
+    const clientId = getOrCreateClientId();
+    if (!clientId) {
+      setSaveError('Veuillez sélectionner ou créer un client avant de sauvegarder la vente.');
+      return null;
+    }
+
+    const nextId = getNextId(ventes);
+    const newVente = {
+      id: nextId,
+      prospId: savedProspectionId,
+      clientId,
+      commercial: user?.name || 'commercial',
+      produit: form.product,
+      dateVente: form.saleDate,
+      typeVente: form.saleType.includes('Nouvelle') ? 'NouVe' : 'VenRec',
+      noPolice: form.policyNumber,
+      noAttestation: form.attestationNumber,
+      noCarteRose: form.carRoseNumber,
+      primeNette: Number(form.netPremiums) || 0,
+      accessoires: Number(form.accessories) || 0,
+      dateEffet: form.effectDate,
+      dateEcheance: form.expiryDate,
+    } as any;
+    ventes.unshift(newVente);
+
+    const pi = prospections.findIndex(p => p.id === savedProspectionId);
+    if (pi >= 0) prospections[pi].statut = 'Contrat conclu';
+    if (savedCotationId) {
+      const ci = cotations.findIndex(c => c.id === savedCotationId);
+      if (ci >= 0) cotations[ci].statut = 'Convertie en vente';
+    }
+
+    return nextId;
+  };
+
+  const handleLocalSave = (message: string, savedProspectionId?: number) => {
+    setSaveMessage(message);
+    setSaveError('');
+    if (onSubmit) onSubmit(form, !!editProspection, savedProspectionId, { refreshOnly: true });
+  };
+
+  const handleSaveCurrentStep = () => {
+    setSaveError('');
+    setSaveMessage('');
+    const savedProspectionId = saveProspectionLocal();
+    if (!savedProspectionId) return false;
+
+    if (step === 2) {
+      handleLocalSave('Prospection enregistrée.', savedProspectionId);
+      return true;
+    }
+
+    const savedCotId = saveCotationLocal(savedProspectionId);
+    if (step === 3) {
+      handleLocalSave('Prospection et cotation enregistrées.', savedProspectionId);
+      return true;
+    }
+
+    const savedVenteId = saveVenteLocal(savedProspectionId, savedCotId);
+    if (!savedVenteId) return false;
+    handleLocalSave('Prospection, cotation et vente enregistrées.', savedProspectionId);
+    return true;
+  };
+
+  const handleSaveAndClose = () => {
+    const saved = handleSaveCurrentStep();
+    if (saved) onClose();
+  };
+
   // If editing, populate form
   React.useEffect(() => {
     if (editProspection && visible) {
       const client = getClient(editProspection.clientId);
-      // Populate form with prospection data
       setForm({
+        clientId: editProspection.clientId || '',
         clientName: client?.nom || '',
         phone: client?.tel || '',
         clientType: client?.type || 'Particulier',
@@ -257,10 +439,10 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
         expiryDate: '',
         carRoseNumber: '',
       });
+      setProspectionId(editProspection.id || null);
     } else if (!editProspection && visible) {
-      // Reset for new
       setForm({
-        clientName: '', phone: '', clientType: 'Particulier',
+        clientId: '', clientName: '', phone: '', clientType: 'Particulier',
         activity: 'Chef d\'entreprise',
         prospectionDate: new Date().toISOString().split('T')[0],
         product: 'Afrilife étude', potentialCA: '', status: 'Premier contact',
@@ -271,7 +453,11 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
         policyNumber: '', attestationNumber: '', netPremiums: '', accessories: '',
         effectDate: '', expiryDate: '', carRoseNumber: '',
       });
+      setProspectionId(null);
     }
+    setCotationId(null);
+    setSaveMessage('');
+    setSaveError('');
   }, [editProspection, visible]);
 
   const upd = (field: keyof ProspectionFormData, value: any) =>
@@ -606,6 +792,8 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
         </View>
 
         {renderStepIndicator()}
+        {saveMessage ? <Text style={styles.saveMessage}>{saveMessage}</Text> : null}
+        {saveError ? <Text style={styles.saveError}>{saveError}</Text> : null}
 
         <View style={styles.formArea}>
           {step === 1 && renderStep1()}
@@ -620,12 +808,19 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
               ← Précédent
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            onPress={step === 4 ? () => { if (onSubmit) onSubmit(form, !!editProspection, editProspection?.id); onClose(); } : () => setStep(step + 1)}
-            style={[styles.nextButton, step === 4 && styles.submitButton]}
-          >
-            <Text style={styles.nextButtonText}>{step === 4 ? 'Enregistrer ✓' : 'Suivant →'}</Text>
-          </TouchableOpacity>
+          <View style={styles.footerActions}>
+            {step > 1 && (
+              <TouchableOpacity style={styles.saveButton} onPress={handleSaveCurrentStep} activeOpacity={0.8}>
+                <Text style={styles.saveButtonText}>Enregistrer</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              onPress={step === 4 ? handleSaveAndClose : () => setStep(step + 1)}
+              style={[styles.nextButton, step === 4 && styles.submitButton]}
+            >
+              <Text style={styles.nextButtonText}>{step === 4 ? 'Enregistrer ✓' : 'Suivant →'}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </View>
@@ -687,6 +882,11 @@ const styles = StyleSheet.create({
   infoText:             { flex: 1, fontSize: 13, color: colors.info, lineHeight: 18 },
   successText:          { color: colors.success },
   footer:               { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, borderTopWidth: 1, borderTopColor: colors.gray100 },
+  footerActions:        { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  saveButton:           { backgroundColor: colors.violet, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderRadius: radius.sm },
+  saveButtonText:       { color: colors.white, fontWeight: '700', fontSize: 14 },
+  saveMessage:          { fontSize: 13, color: colors.violetDark, paddingHorizontal: spacing.xl, paddingTop: spacing.sm },
+  saveError:            { fontSize: 13, color: colors.danger, paddingHorizontal: spacing.xl, paddingTop: spacing.sm },
   prevButton:           { fontSize: 14, fontWeight: '600', color: colors.gray400, paddingVertical: spacing.md, paddingHorizontal: spacing.lg },
   prevButtonDisabled:   { color: colors.gray200 },
   nextButton:           { backgroundColor: colors.orange, paddingHorizontal: spacing.xl, paddingVertical: spacing.md, borderRadius: radius.sm },

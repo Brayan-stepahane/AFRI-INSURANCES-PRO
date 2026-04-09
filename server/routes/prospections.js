@@ -116,21 +116,24 @@ router.post('/', auth, async (req, res) => {
   }
 });
 
-// PUT /api/prospections/:id  (mise à jour statut + dates visites)
+// PUT /api/prospections/:id
 router.put('/:id', auth, async (req, res) => {
   const {
-    statut, date_visite_1, date_visite_2, date_visite_3,
-    date_relance, observations, potentiel_ca, chance_realisation
+    clientId, product, prospectionDate, potentialCA, probability, status,
+    visitDate1, visitDate2, visitDate3, nextFollowUp, observations,
+    previousInsurer, previousContract
   } = req.body;
   try {
     const { rows } = await pool.query(
       `UPDATE prospections SET
-        statut=$1, date_visite_1=$2, date_visite_2=$3, date_visite_3=$4,
-        date_relance=$5, observations=$6, potentiel_ca=$7,
-        chance_realisation=$8, updated_at=NOW()
-       WHERE id=$9 RETURNING *`,
-      [statut, date_visite_1, date_visite_2, date_visite_3,
-       date_relance, observations, potentiel_ca, chance_realisation, req.params.id]
+        client_id=$1, risque_prospecte=$2, date_prospection=$3, potentiel_ca=$4,
+        chance_realisation=$5, statut=$6, date_visite_1=$7, date_visite_2=$8,
+        date_visite_3=$9, date_relance=$10, observations=$11,
+        ancien_assureur=$12, date_effet_ancien=$13, updated_at=NOW()
+       WHERE id=$14 RETURNING *`,
+      [clientId, product, prospectionDate, potentialCA, probability, status,
+       visitDate1, visitDate2, visitDate3, nextFollowUp, observations,
+       previousInsurer, previousContract, req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Prospection introuvable' });
     res.json(rows[0]);

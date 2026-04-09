@@ -5,12 +5,14 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/hooks/useAuth';
-import { getCotationsForUser, getClient, fmt, fmtDate, cotations, prospections } from '../../src/store/data';
+import { getCotationsForUser, getClient, fmt, fmtDate, cotations, prospections, STATUTS_COT } from '../../src/store/data';
 import { colors, spacing, radius, STATUT_BADGE_COLORS } from '../../src/config/theme';
 import { Badge, EmptyState, ClientIdBadge, StatCard } from '../../src/components/common/Button';
 import { Header } from '../../src/components/common/Header';
-import { STATUTS_COT } from '../../src/store/data';
 import { Cotation } from '../../src/types';
+import { NewCotationModal } from '../../src/components/modals/NewCotationModal';
+import apiClient from '../../src/services/api/client';
+import { API_ENDPOINTS } from '../../src/services/api/endpoints';
 
 export default function CotationsScreen() {
   const { user } = useAuth();
@@ -18,6 +20,7 @@ export default function CotationsScreen() {
   const [search, setSearch]   = useState('');
   const [statut, setStatut]   = useState('Tous');
   const [refreshing, setRefreshing] = useState(false);
+  const [editingCotation, setEditingCotation] = useState<Cotation | null>(null);
 
   const name = user?.name ?? '';
   const role = user?.role ?? 'commercial';
@@ -88,6 +91,41 @@ export default function CotationsScreen() {
     );
   };
 
+  const handleCotationSubmit = async (data: any, isEdit?: boolean, cotationId?: number, options?: { refreshOnly?: boolean }) => {
+    if (options?.refreshOnly) {
+      setRefreshing(true);
+      setTimeout(() => setRefreshing(false), 100);
+      return;
+    }
+
+    try {
+      if (isEdit && cotationId) {
+        // Update existing cotation - already handled in modal
+        setRefreshing(true);
+        setTimeout(() => setRefreshing(false), 100);
+      } else {
+        // Create new cotation - call POST API
+        const apiData = {
+          prospection_id: data.prospectionId || null,
+          client_id: data.clientId,
+          risque_cote: data.risqueCote,
+          date_cotation: data.dateCotation,
+          montant: Number(data.montant) || 0,
+        };
+        const response = await apiClient.post(API_ENDPOINTS.COTATIONS.LIST, apiData);
+        console.log('Created cotation:', response.data);
+        if (response?.data && response.data.id) {
+          cotations.unshift(response.data);
+        }
+      }
+      setRefreshing(true);
+      setTimeout(() => setRefreshing(false), 100);
+    } catch (error) {
+      console.error('Error submitting cotation:', error);
+      Alert.alert('Erreur', 'Une erreur est survenue lors de l\'enregistrement');
+    }
+  };
+
   const renderItem = ({ item: c }: { item: Cotation }) => {
     const cli = getClient(c.clientId);
     const sc  = STATUT_BADGE_COLORS[c.statut] ?? { bg: colors.gray100, text: colors.gray600 };
@@ -145,9 +183,7 @@ export default function CotationsScreen() {
               <Text style={styles.actionBtnText}>→ Convertir en vente</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity style={[styles.actionBtn, styles.actionEdit]} onPress={() => {
-            Alert.alert('Modifier', 'Fonctionnalité en développement');
-          }}>
+          <TouchableOpacity style={[styles.actionBtn, styles.actionEdit]} onPress={() => setEditingCotation(c)}>
             <Text style={styles.actionBtnText}>✏️ Modifier</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.actionBtn, styles.actionDelete]} onPress={() => deleteCotation(c)}>
@@ -242,6 +278,13 @@ export default function CotationsScreen() {
       <TouchableOpacity style={styles.fab} onPress={() => router.push('/cotations/new' as any)}>
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
+
+      <NewCotationModal
+        visible={!!editingCotation}
+        onClose={() => setEditingCotation(null)}
+        onSubmit={handleCotationSubmit}
+        editCotation={editingCotation as any}
+      />
     </View>
   );
 }

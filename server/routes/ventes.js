@@ -70,4 +70,41 @@ router.post('/', auth, async (req, res) => {
   }
 });
 
+// PUT /api/ventes/:id
+router.put('/:id', auth, async (req, res) => {
+  const {
+    produit, date_vente, type_vente, no_police,
+    prime_nette, accessoires, no_attestation,
+    no_carte_rose, date_effet, date_echeance
+  } = req.body;
+  try {
+    const { rows } = await pool.query(
+      `UPDATE ventes SET produit=$1, date_vente=$2, type_vente=$3, no_police=$4,
+       prime_nette=$5, accessoires=$6, no_attestation=$7, no_carte_rose=$8,
+       date_effet=$9, date_echeance=$10, updated_at=NOW()
+       WHERE id=$11 RETURNING *`,
+      [produit, date_vente, type_vente, no_police, prime_nette, accessoires || 0,
+       no_attestation, no_carte_rose, date_effet, date_echeance, req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Vente introuvable' });
+    res.json(rows[0]);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE /api/ventes/:id
+router.delete('/:id', auth, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'DELETE FROM ventes WHERE id = $1 RETURNING *',
+      [req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Vente introuvable' });
+    res.json({ message: 'Vente supprimée' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;

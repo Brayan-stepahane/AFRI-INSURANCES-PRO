@@ -20,7 +20,12 @@ export default function DashboardScreen() {
   const [refreshing, setRefreshing] = React.useState(false);
   const [showNewProspectionModal, setShowNewProspectionModal] = React.useState(false);
 
-  const handleNewProspectionSubmit = async (data: any) => {
+  const handleNewProspectionSubmit = async (data: any, isEdit?: boolean, prospectionId?: number, options?: { refreshOnly?: boolean }) => {
+    if (options?.refreshOnly) {
+      setReloadKey(prev => prev + 1);
+      return;
+    }
+
     try {
       const response = await apiClient.post(API_ENDPOINTS.PROSPECTIONS.CREATE, data);
       console.log('Created prospection from dashboard:', response.data);
