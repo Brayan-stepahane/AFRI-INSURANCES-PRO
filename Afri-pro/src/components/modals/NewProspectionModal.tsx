@@ -202,6 +202,7 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
   const [cotationId, setCotationId] = useState<number | null>(null);
   const [saveMessage, setSaveMessage] = useState<string>('');
   const [saveError, setSaveError] = useState<string>('');
+  const [savedSteps, setSavedSteps] = useState<{ client?: boolean; prospection?: boolean; cotation?: boolean }>({});
 
   const handleSearchClient = () => {
     const query = form.clientName.trim();
@@ -587,7 +588,7 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
     setSaveError('');
     setSaveMessage('');
 
-    // Step 1: Save client to database first, then proceed
+    // Step 1: Save client to database first
     if (step === 1) {
       const clientId = getOrCreateClientId();
       if (!clientId) {
@@ -597,34 +598,55 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
       const success = await saveClientToDatabase(clientId);
       if (!success) return false;
       setSaveMessage('Client enregistré.');
+      setSavedSteps(prev => ({ ...prev, client: true }));
       return true;
     }
 
-    // Step 2+: Save prospection to database
+    // Step 2+: Validate that client was saved first
+    if (!savedSteps.client) {
+      setSaveError('Veuillez d\'abord enregistrer le client (Étape 1).');
+      return false;
+    }
+
+    // Step 2: Save prospection to database
     const savedProspectionId = await saveProspectionToDatabase();
     if (!savedProspectionId) {
       setSaveError('Erreur lors de l\'enregistrement de la prospection.');
       return false;
     }
-    saveProspectionLocal(); // Also save to local for UI updates
+    saveProspectionLocal();
+    setSavedSteps(prev => ({ ...prev, prospection: true }));
 
     if (step === 2) {
       setSaveMessage('Prospection enregistrée.');
       return true;
     }
 
+    // Step 3: Validate that prospection was saved
+    if (!savedSteps.prospection) {
+      setSaveError('Veuillez d\'abord enregistrer la prospection (Étape 2).');
+      return false;
+    }
+
     // Step 3: Save cotation to database
     const savedCotId = await saveCotationToDatabase(savedProspectionId);
-    saveCotationLocal(savedProspectionId); // Also save to local for UI
+    saveCotationLocal(savedProspectionId);
+    setSavedSteps(prev => ({ ...prev, cotation: true }));
 
     if (step === 3) {
-      setSaveMessage('Prospection et cotation enregistrées.');
+      setSaveMessage('Cotation enregistrée.');
       return true;
+    }
+
+    // Step 4: Validate that cotation step was saved
+    if (!savedSteps.cotation) {
+      setSaveError('Veuillez d\'abord enregistrer la cotation (Étape 3).');
+      return false;
     }
 
     // Step 4: Save vente to database
     const savedVenteId = await saveVenteToDatabase(savedProspectionId, savedCotId || undefined);
-    saveVenteLocal(savedProspectionId, savedCotId || undefined); // Also save to local for UI
+    saveVenteLocal(savedProspectionId, savedCotId || undefined);
 
     if (!savedVenteId) {
       setSaveError('Erreur lors de l\'enregistrement de la vente.');
@@ -678,6 +700,7 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
       setProspectionId(editProspection.id || null);
     } else if (!editProspection && visible) {
       setStep(1);
+      setSavedSteps({}); // Reset saved steps for new prospection
       setForm({
         clientId: '', clientName: '', phone: '', clientType: 'Particulier',
         activity: 'Chef d\'entreprise',
@@ -1060,7 +1083,15 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
               </TouchableOpacity>
             )}
             <TouchableOpacity
-              onPress={step === 4 ? handleSaveAndClose : () => setStep(step + 1)}
+              onPress={async () => {
+                if (step === 4) {
+                  await handleSaveAndClose();
+                } else {
+                  // For steps 1-3, require saving first
+                  const saved = await handleSaveCurrentStep();
+                  if (saved) setStep(step + 1);
+                }
+              }}
               style={[styles.nextButton, step === 4 && styles.submitButton]}
             >
               <Text style={styles.nextButtonText}>{step === 4 ? 'Enregistrer ✓' : 'Suivant →'}</Text>
