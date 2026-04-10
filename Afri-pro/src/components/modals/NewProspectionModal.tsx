@@ -3,10 +3,13 @@ import {
   View, Text, Modal, StyleSheet, TextInput, TouchableOpacity,
   ScrollView, Platform, Pressable,
 } from 'react-native';
+import { AxiosResponse } from 'axios';
 import { useAuth } from '../../hooks/useAuth';
 import { colors, spacing, radius } from '../../config/theme';
 import { getClient, searchClientsByName, clients, genClientId, prospections, cotations, ventes } from '../../store/data';
 import type { Client } from '../../types';
+import apiClient from '../../services/api/client';
+import { API_ENDPOINTS } from '../../services/api/endpoints';
 
 interface ProspectionFormData {
   clientId: string;
@@ -104,7 +107,7 @@ function SelectField({
           onRequestClose={onToggle}
         >
           {/* Invisible backdrop to close on outside tap */}
-          <TouchableOpacity style={sf.modalBackdrop} onPress={onToggle} activeOpacity={1}>
+          <TouchableOpacity style={[sf.modalBackdrop, { pointerEvents: 'auto' }]} onPress={onToggle} activeOpacity={1}>
             <View
               style={[sf.list, { top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }]}
             >
@@ -160,10 +163,7 @@ const sf = StyleSheet.create({
     borderColor: colors.violet,
     borderRadius: radius.sm,
     elevation: 20,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
+    boxShadow: '0px 4px 8px rgba(0,0,0,0.15)',
     overflow: 'hidden',
   },
   item: {
@@ -251,6 +251,214 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
     clients.unshift(newClient);
     setForm(prev => ({ ...prev, clientId: newClientId }));
     return newClientId;
+  };
+
+  const saveClientToDatabase = async (clientId: string): Promise<boolean> => {
+    try {
+      if (!clientId) {
+        setSaveError('Identifiant client manquant.');
+        return false;
+      }
+
+      const clientToSave = clients.find(c => c.id === clientId);
+      if (!clientToSave) {
+        setSaveError('Client non trouvé dans la base locale.');
+        return false;
+      }
+
+      if (!clientToSave.nom || !clientToSave.nom.trim()) {
+        setSaveError('Le nom du client est requis.');
+        return false;
+      }
+
+      const payload = {
+        nom: clientToSave.nom.trim(),
+        telephone: clientToSave.tel?.trim() || '',
+        activite: clientToSave.activite?.trim() || '',
+        type_client: clientToSave.type || 'Particulier',
+        email: '',
+        ville: '',
+      };
+
+      let response: AxiosResponse<any>;
+      // Check if this is a new client (doesn't match CLI-#### pattern)
+      const isNewClient = !clientId.match(/^CLI-\d{4}$/);
+
+      if (isNewClient) {
+        // Create new client
+        response = await apiClient.post(API_ENDPOINTS.CLIENTS.LIST, payload);
+        if (response?.data) {
+          const idx = clients.findIndex(c => c.id === clientId);
+          if (idx >= 0) {
+            clients[idx] = { ...clients[idx], ...response.data } as any;
+            setForm(prev => ({ ...prev, clientId: response.data.id }));
+          }
+          return true;
+        }
+      } else {
+        // Update existing client
+        response = await apiClient.put(`${API_ENDPOINTS.CLIENTS.LIST}/${clientId}`, payload);
+        if (response?.data) {
+          const idx = clients.findIndex(c => c.id === clientId);
+          if (idx >= 0) {
+            clients[idx] = { ...clients[idx], ...response.data } as any;
+          }
+          return true;
+        }
+      }
+
+      setSaveError('Réponse du serveur invalide.');
+      return false;
+    } catch (error: any) {
+      console.error('Error saving client to database:', error);
+      const errorMsg = error?.response?.data?.error || 'Erreur lors de l\'enregistrement du client sur le serveur.';
+      setSaveError(errorMsg);
+      return false;
+    }
+  };
+
+  const saveProspectionToDatabase = async (): Promise<number | null> => {
+    try {
+      const clientId = form.clientId || getOrCreateClientId();
+      if (!clientId) {
+        setSaveError('Client requis pour enregistrer la prospection.');
+        return null;
+      }
+
+      const payload = {
+        clientName: form.clientName,
+        phone: form.phone || '',
+        clientType: form.clientType,
+        activity: form.activity,
+        prospectionDate: form.prospectionDate,
+        product: form.product,
+        potentialCA: form.potentialCA,
+        status: form.status,
+        probability: form.probability,
+        visitDate1: form.visitDate1 || '',
+        nextFollowUp: form.nextFollowUp || '',
+        visitDate2: form.visitDate2 || '',
+        visitDate3: form.visitDate3 || '',
+        previousInsurer: form.previousInsurer || '',
+        previousContract: form.previousContract || '',
+        observations: form.observations || '',
+        ratedRisk: form.ratedRisk,
+        quotationDate: form.quotationDate || '',
+        quotationAmount: form.quotationAmount || '',
+        validationDate: form.validationDate || '',
+        saleDate: form.saleDate || '',
+        saleType: form.saleType,
+        policyNumber: form.policyNumber || '',
+        attestationNumber: form.attestationNumber || '',
+        netPremiums: form.netPremiums || '',
+        accessories: form.accessories || '',
+        effectDate: form.effectDate || '',
+        expiryDate: form.expiryDate || '',
+        carRoseNumber: form.carRoseNumber || '',
+      };
+
+      let response: AxiosResponse<any>;
+      if (prospectionId) {
+        // Update existing prospection
+        response = await apiClient.put(`${API_ENDPOINTS.PROSPECTIONS.LIST}/${prospectionId}`, {
+          clientId,
+          product: form.product,
+          prospectionDate: form.prospectionDate,
+          potentialCA: form.potentialCA,
+          probability: form.probability,
+          status: form.status,
+          visitDate1: form.visitDate1,
+          visitDate2: form.visitDate2,
+          visitDate3: form.visitDate3,
+          nextFollowUp: form.nextFollowUp,
+          observations: form.observations,
+          previousInsurer: form.previousInsurer,
+          previousContract: form.previousContract,
+        });
+      } else {
+        // Create new prospection
+        response = await apiClient.post(API_ENDPOINTS.PROSPECTIONS.CREATE, payload);
+      }
+
+      if (response?.data?.id) {
+        setProspectionId(response.data.id);
+        return response.data.id;
+      }
+      setSaveError('Erreur lors de l\'enregistrement de la prospection.');
+      return null;
+    } catch (error: any) {
+      console.error('Error saving prospection:', error);
+      const errorMsg = error?.response?.data?.error || 'Erreur lors de l\'enregistrement de la prospection.';
+      setSaveError(errorMsg);
+      return null;
+    }
+  };
+
+  const saveCotationToDatabase = async (prospectionId: number): Promise<number | null> => {
+    try {
+      if (!prospectionId || !form.quotationAmount) {
+        return null;
+      }
+
+      const clientId = form.clientId || getOrCreateClientId();
+      if (!clientId) {
+        setSaveError('Client requis pour enregistrer la cotation.');
+        return null;
+      }
+
+      const payload = {
+        prospection_id: prospectionId,
+        client_id: clientId,
+        risque_cote: form.ratedRisk,
+        date_cotation: form.quotationDate,
+        montant: Number(form.quotationAmount) || 0,
+      };
+
+      const response: AxiosResponse<any> = await apiClient.post(API_ENDPOINTS.COTATIONS.LIST, payload);
+      if (response?.data?.id) {
+        setCotationId(response.data.id);
+        return response.data.id;
+      }
+      return null;
+    } catch (error: any) {
+      console.error('Error saving cotation:', error);
+      return null;
+    }
+  };
+
+  const saveVenteToDatabase = async (prospectionId: number, cotationId?: number): Promise<number | null> => {
+    try {
+      if (!prospectionId || !form.saleDate || !form.policyNumber) {
+        return null;
+      }
+
+      const clientId = form.clientId || getOrCreateClientId();
+      if (!clientId) {
+        setSaveError('Client requis pour enregistrer la vente.');
+        return null;
+      }
+
+      const payload = {
+        prospection_id: prospectionId,
+        cotation_id: cotationId || null,
+        client_id: clientId,
+        date_vente: form.saleDate,
+        type_vente: form.saleType,
+        numero_police: form.policyNumber,
+        numero_attestation: form.attestationNumber || '',
+        prime_nette: Number(form.netPremiums) || 0,
+        accessoires: Number(form.accessories) || 0,
+      };
+
+      const response: AxiosResponse<any> = await apiClient.post(API_ENDPOINTS.VENTES.LIST, payload);
+      if (response?.data?.id) {
+        return response.data.id;
+      }
+      return null;
+    } catch (error: any) {
+      console.error('Error saving vente:', error);
+      return null;
+    }
   };
 
   const getNextId = (items: { id: number }[]) =>
@@ -375,31 +583,59 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
     if (onSubmit) onSubmit(form, !!editProspection, savedProspectionId, { refreshOnly: true });
   };
 
-  const handleSaveCurrentStep = () => {
+  const handleSaveCurrentStep = async () => {
     setSaveError('');
     setSaveMessage('');
-    const savedProspectionId = saveProspectionLocal();
-    if (!savedProspectionId) return false;
+
+    // Step 1: Save client to database first, then proceed
+    if (step === 1) {
+      const clientId = getOrCreateClientId();
+      if (!clientId) {
+        setSaveError('Veuillez sélectionner ou créer un client avant de sauvegarder.');
+        return false;
+      }
+      const success = await saveClientToDatabase(clientId);
+      if (!success) return false;
+      setSaveMessage('Client enregistré.');
+      return true;
+    }
+
+    // Step 2+: Save prospection to database
+    const savedProspectionId = await saveProspectionToDatabase();
+    if (!savedProspectionId) {
+      setSaveError('Erreur lors de l\'enregistrement de la prospection.');
+      return false;
+    }
+    saveProspectionLocal(); // Also save to local for UI updates
 
     if (step === 2) {
-      handleLocalSave('Prospection enregistrée.', savedProspectionId);
+      setSaveMessage('Prospection enregistrée.');
       return true;
     }
 
-    const savedCotId = saveCotationLocal(savedProspectionId);
+    // Step 3: Save cotation to database
+    const savedCotId = await saveCotationToDatabase(savedProspectionId);
+    saveCotationLocal(savedProspectionId); // Also save to local for UI
+
     if (step === 3) {
-      handleLocalSave('Prospection et cotation enregistrées.', savedProspectionId);
+      setSaveMessage('Prospection et cotation enregistrées.');
       return true;
     }
 
-    const savedVenteId = saveVenteLocal(savedProspectionId, savedCotId);
-    if (!savedVenteId) return false;
-    handleLocalSave('Prospection, cotation et vente enregistrées.', savedProspectionId);
+    // Step 4: Save vente to database
+    const savedVenteId = await saveVenteToDatabase(savedProspectionId, savedCotId || undefined);
+    saveVenteLocal(savedProspectionId, savedCotId || undefined); // Also save to local for UI
+
+    if (!savedVenteId) {
+      setSaveError('Erreur lors de l\'enregistrement de la vente.');
+      return false;
+    }
+    setSaveMessage('Prospection, cotation et vente enregistrées.');
     return true;
   };
 
-  const handleSaveAndClose = () => {
-    const saved = handleSaveCurrentStep();
+  const handleSaveAndClose = async () => {
+    const saved = await handleSaveCurrentStep();
     if (saved) onClose();
   };
 
@@ -441,6 +677,7 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
       });
       setProspectionId(editProspection.id || null);
     } else if (!editProspection && visible) {
+      setStep(1);
       setForm({
         clientId: '', clientName: '', phone: '', clientType: 'Particulier',
         activity: 'Chef d\'entreprise',
@@ -454,6 +691,9 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
         effectDate: '', expiryDate: '', carRoseNumber: '',
       });
       setProspectionId(null);
+      setOpenDropdown(null);
+      setClientSearchResults([]);
+      setClientSearchMessage('');
     }
     setCotationId(null);
     setSaveMessage('');
@@ -809,7 +1049,12 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
             </Text>
           </TouchableOpacity>
           <View style={styles.footerActions}>
-            {step > 1 && (
+            {step === 1 && (
+              <TouchableOpacity style={styles.saveButton} onPress={handleSaveCurrentStep} activeOpacity={0.8}>
+                <Text style={styles.saveButtonText}>Enregistrer</Text>
+              </TouchableOpacity>
+            )}
+            {step > 1 && step < 4 && (
               <TouchableOpacity style={styles.saveButton} onPress={handleSaveCurrentStep} activeOpacity={0.8}>
                 <Text style={styles.saveButtonText}>Enregistrer</Text>
               </TouchableOpacity>
@@ -839,7 +1084,7 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
 const styles = StyleSheet.create({
   webContainer:         { ...StyleSheet.absoluteFillObject, zIndex: 999 },
   backdrop:             { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center' },
-  backdropPress:        { ...StyleSheet.absoluteFillObject },
+  backdropPress:        { ...StyleSheet.absoluteFillObject, pointerEvents: 'auto' },
   modal:                { width: '90%', maxWidth: 800, maxHeight: '90%', backgroundColor: colors.white, borderRadius: radius.lg, flexDirection: 'column' },
   header:               { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.gray100 },
   title:                { fontSize: 18, fontWeight: '700', color: colors.violetDark },

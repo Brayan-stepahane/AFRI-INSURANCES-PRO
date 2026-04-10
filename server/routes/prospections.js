@@ -95,7 +95,7 @@ router.post('/', auth, async (req, res) => {
       [
         clientName, phone, clientType, activity,
         commercial_id, prospectionDate, product, potentialCA, status, probability,
-        visitDate1, nextFollowUp, visitDate2, visitDate3,
+        visitDate1, visitDate2, visitDate3, nextFollowUp,
         previousInsurer, previousContract, observations,
         ratedRisk, quotationDate, quotationAmount, validationDate,
         saleDate, saleType, policyNumber, attestationNumber,
