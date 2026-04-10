@@ -44,6 +44,7 @@ export default function AppLayout() {
       <Stack.Screen name="ventes" />
       <Stack.Screen name="notifications" />
       <Stack.Screen name="objectifs" />
+      <Stack.Screen name="clients" />
       <Stack.Screen name="profile" />
     </Stack>
   );

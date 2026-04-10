@@ -48,6 +48,7 @@ export function Sidebar() {
       { label: 'Mes cotations', icon: '💼', route: '/cotations' },
       { label: 'Mes ventes', icon: '✅', route: '/ventes' },
       { label: 'Mon objectif', icon: '🎯', route: '/objectifs' },
+      { label: 'Base clients', icon: '🆔', route: '/clients' },
       { label: 'Notifications', icon: '🔔', route: '/notifications' },
     ],
     manager_adj: [
