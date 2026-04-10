@@ -97,9 +97,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     elevation: 2,
-    shadowColor: colors.orange,
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    boxShadow: '0px 2px 4px rgba(232,82,26,0.3)',
   },
   actionBtnIcon: {
     fontSize: 14,

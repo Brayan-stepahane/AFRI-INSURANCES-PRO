@@ -73,18 +73,28 @@ router.post('/', auth, async (req, res) => {
 // PUT /api/ventes/:id
 router.put('/:id', auth, async (req, res) => {
   const {
-    produit, date_vente, type_vente, no_police,
-    prime_nette, accessoires, no_attestation,
-    no_carte_rose, date_effet, date_echeance
+    produit, date_vente, dateVente, type_vente, typeVente, no_police,
+    noPolice, prime_nette, primeNette, accessoires, no_attestation,
+    no_carte_rose, noCarteRose, date_effet, dateEffet, date_echeance, dateEcheance
   } = req.body;
+
+  const finalDateVente = date_vente || dateVente;
+  const finalTypeVente = type_vente || typeVente;
+  const finalNoPolice = no_police || noPolice;
+  const finalPrimeNette = prime_nette || primeNette;
+  const finalNoAttestation = no_attestation;
+  const finalNoCarteRose = no_carte_rose || noCarteRose;
+  const finalDateEffet = date_effet || dateEffet;
+  const finalDateEcheance = date_echeance || dateEcheance;
+
   try {
     const { rows } = await pool.query(
-      `UPDATE ventes SET produit=$1, date_vente=$2, type_vente=$3, no_police=$4,
-       prime_nette=$5, accessoires=$6, no_attestation=$7, no_carte_rose=$8,
-       date_effet=$9, date_echeance=$10, updated_at=NOW()
-       WHERE id=$11 RETURNING *`,
-      [produit, date_vente, type_vente, no_police, prime_nette, accessoires || 0,
-       no_attestation, no_carte_rose, date_effet, date_echeance, req.params.id]
+      `UPDATE ventes SET date_vente=$1, type_vente=$2, no_police=$3,
+       prime_nette=$4, accessoires=$5, no_attestation=$6, no_carte_rose=$7,
+       date_effet=$8, date_echeance=$9, updated_at=NOW()
+       WHERE id=$10 RETURNING *`,
+      [finalDateVente, finalTypeVente, finalNoPolice, finalPrimeNette, accessoires || 0,
+       finalNoAttestation, finalNoCarteRose, finalDateEffet, finalDateEcheance, req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Vente introuvable' });
     res.json(rows[0]);

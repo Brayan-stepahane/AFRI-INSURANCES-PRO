@@ -5,7 +5,6 @@ import {
 } from 'react-native';
 import { useAuth } from '../../hooks/useAuth';
 import { colors, spacing, radius } from '../../config/theme';
-import { cotations, prospections, getClient } from '../../store/data';
 import type { Cotation } from '../../types';
 import apiClient from '../../services/api/client';
 import { API_ENDPOINTS } from '../../services/api/endpoints';
@@ -125,23 +124,22 @@ export function NewCotationModal({ visible, onClose, onSubmit, editCotation }: N
     }
 
     try {
-      // Save locally first
       const record = {
-        risqueCote: form.risqueCote,
-        dateCotation: form.dateCotation,
+        risque_cote: form.risqueCote,
+        date_cotation: form.dateCotation,
         montant: Number(form.montant) || 0,
-        dateValidation: form.dateValidation,
+        date_validation: form.dateValidation,
         statut: form.dateValidation ? 'Validée' : 'En attente',
       };
 
       if (cotationId) {
         // Update existing cotation
-        const response = await apiClient.put(`${API_ENDPOINTS.COTATIONS.UPDATE}/${cotationId}`, record);
+        await apiClient.put(`${API_ENDPOINTS.COTATIONS.UPDATE}/${cotationId}`, record);
+      } else {
+        // Create new cotation via API
+        const response = await apiClient.post(API_ENDPOINTS.COTATIONS.CREATE, record);
         if (response?.data) {
-          const idx = cotations.findIndex(c => c.id === cotationId);
-          if (idx >= 0) {
-            cotations[idx] = { ...cotations[idx], ...response.data } as any;
-          }
+          setCotationId(response.data.id);
         }
       }
 
@@ -264,8 +262,8 @@ const sf = StyleSheet.create({
   list: {
     position: 'absolute', backgroundColor: colors.white,
     borderWidth: 1, borderColor: colors.violet, borderRadius: radius.sm,
-    elevation: 20, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 }, overflow: 'hidden', top: 50, width: '100%',
+    elevation: 20, boxShadow: '0px 4px 8px rgba(0,0,0,0.15)',
+    overflow: 'hidden', top: 50, width: '100%',
   },
   item: {
     flexDirection: 'row', alignItems: 'center',

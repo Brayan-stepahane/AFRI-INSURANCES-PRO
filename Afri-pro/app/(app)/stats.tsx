@@ -1,8 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useAuth } from '../../src/hooks/useAuth';
+import { useCotations } from '../../src/hooks/useCotations';
+import { useVentes } from '../../src/hooks/useVentes';
 import { colors, spacing, radius } from '../../src/config/theme';
-import { cotations, ventes } from '../../src/store/data';
 
 type AggregatedData = { name: string; value: number }[];
 
@@ -15,6 +16,8 @@ const sortByValueDesc = (items: AggregatedData) => [...items].sort((a, b) => b.v
 export default function StatsScreen() {
   const { user } = useAuth();
   const role = user?.role ?? 'commercial';
+  const { cotations } = useCotations();
+  const { ventes } = useVentes();
 
   if (!ADMIN_ROLES.includes(role)) {
     return (

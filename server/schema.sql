@@ -56,7 +56,7 @@ CREATE TABLE clients (
   telephone     VARCHAR(25),
   activite      VARCHAR(100),
   type_client   VARCHAR(20)  NOT NULL DEFAULT 'Particulier'
-                CHECK (type_client IN ('Particulier','Corporate','Personnel')),
+                CHECK (type_client IN ('Particulier','PME','Entreprise','Autre')),
   email         VARCHAR(150),
   ville         VARCHAR(100),
   created_at    TIMESTAMP    DEFAULT NOW(),

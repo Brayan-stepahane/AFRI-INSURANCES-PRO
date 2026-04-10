@@ -3,7 +3,17 @@ import { useAuth } from './useAuth';
 import { api } from '../services/api/api';
 import { API_ENDPOINTS } from '../services/api/endpoints';
 import { Prospection } from '../types';
-import { caThisMois, objectifs } from '../store/data';
+
+// Dummy data - should be fetched from API
+const objectifs: Record<string, { mensuel: number; reporte: number }> = {
+  'Commercial 1': { mensuel: 500000, reporte: 0 },
+  'Commercial 2': { mensuel: 600000, reporte: 100000 },
+};
+
+const caThisMois = (commercial: string) => {
+  // TODO: calculate from ventes data
+  return 300000; // dummy
+};
 
 interface DashboardStats {
   activeProspects: number;

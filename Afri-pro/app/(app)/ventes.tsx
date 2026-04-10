@@ -4,7 +4,9 @@ import {
   TouchableOpacity, RefreshControl, ScrollView, Alert,
 } from 'react-native';
 import { useAuth } from '../../src/hooks/useAuth';
-import { getVentesForUser, getClient, fmt, fmtDate, ventes } from '../../src/store/data';
+import { useVentes } from '../../src/hooks/useVentes';
+import { useClients } from '../../src/hooks/useClients';
+import { fmt, fmtDate } from '../../src/utils/constants';
 import { colors, spacing, radius } from '../../src/config/theme';
 import { Badge, EmptyState, ClientIdBadge, StatCard } from '../../src/components/common/Button';
 import { Header } from '../../src/components/common/Header';
@@ -15,32 +17,36 @@ import { API_ENDPOINTS } from '../../src/services/api/endpoints';
 
 export default function VentesScreen() {
   const { user }  = useAuth();
+  const { ventes, refetch } = useVentes();
+  const { clients } = useClients();
   const [search, setSearch]   = useState('');
   const [filterMois, setFilterMois] = useState('Tous');
   const [refreshing, setRefreshing] = useState(false);
+
+  const getClient = (id: string) => clients.find(c => c.id === id);
   const [editingVente, setEditingVente] = useState<Vente | null>(null);
 
   const name = user?.name ?? '';
   const role = user?.role ?? 'commercial';
-  const allVentes = getVentesForUser(name, role);
+  const allVentes = ventes;
 
   // Months available
   const mois = ['Tous', ...Array.from(new Set(
-    allVentes.map(v => v.dateVente?.slice(0, 7)).filter(Boolean)
+    allVentes.map((v: any) => v.dateVente?.slice(0, 7)).filter(Boolean)
   )).sort().reverse()];
 
   let list = allVentes;
-  if (filterMois !== 'Tous') list = list.filter(v => v.dateVente?.startsWith(filterMois));
+  if (filterMois !== 'Tous') list = list.filter((v: any) => v.dateVente?.startsWith(filterMois));
   if (search) {
     const q = search.toLowerCase();
-    list = list.filter(v => {
+    list = list.filter((v: any) => {
       const cli = getClient(v.clientId);
       return (cli?.nom || '').toLowerCase().includes(q) || v.produit.toLowerCase().includes(q);
     });
   }
 
-  const totalPrimes = list.reduce((s, v) => s + (v.primeNette || 0), 0);
-  const totalAcc    = list.reduce((s, v) => s + (v.accessoires || 0), 0);
+  const totalPrimes = list.reduce((s: number, v: any) => s + (v.primeNette || 0), 0);
+  const totalAcc    = list.reduce((s: number, v: any) => s + (v.accessoires || 0), 0);
   const totalCA     = totalPrimes + totalAcc;
 
   const deleteVente = (v: Vente) => {
@@ -271,7 +277,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.white, borderRadius: radius.md,
     padding: spacing.xl, marginBottom: spacing.lg,
-    elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6,
+    elevation: 2, boxShadow: '0px 2px 6px rgba(0,0,0,0.05)',
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
   numBadge:   { backgroundColor: colors.gray100, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginRight: spacing.md },

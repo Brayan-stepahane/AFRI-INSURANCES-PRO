@@ -19,14 +19,22 @@ export const API_ENDPOINTS = {
   },
   COTATIONS: {
     LIST: '/api/cotations',
+    CREATE: '/api/cotations',
     UPDATE: '/api/cotations',
   },
   VENTES: {
     LIST: '/api/ventes',
+    CREATE: '/api/ventes',
     UPDATE: '/api/ventes',
+  },
+  CLIENTS: {
+    LIST: '/api/clients',
+    CREATE: '/api/clients',
+    UPDATE: '/api/clients',
   },
   PROSPECTIONS: {
     LIST: '/api/prospections',
     CREATE: '/api/prospections',
+    UPDATE: '/api/prospections',
   },
 };

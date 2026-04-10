@@ -1,0 +1,63 @@
+import { useState, useEffect } from 'react';
+import { useAuth } from './useAuth';
+import apiClient from '../services/api/client';
+import { API_ENDPOINTS } from '../services/api/endpoints';
+import { Vente } from '../types';
+
+export function useVentes(refreshKey = 0) {
+  const { user } = useAuth();
+  const [ventes, setVentes] = useState<Vente[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchVentes = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await apiClient.get(API_ENDPOINTS.VENTES.LIST);
+
+      // Transform snake_case API response to camelCase TypeScript types
+      let transformed = Array.isArray(response.data) ? response.data.map((v: any) => ({
+        id: v.id,
+        prospId: v.prospection_id,
+        clientId: v.client_id,
+        commercial: v.commercial_nom || '',
+        produit: v.produit || '',
+        dateVente: v.date_vente,
+        typeVente: v.type_vente,
+        noPolice: v.no_police || '',
+        noAttestation: v.no_attestation || '',
+        noCarteRose: v.no_carte_rose || '',
+        primeNette: Number(v.prime_nette) || 0,
+        accessoires: Number(v.accessoires) || 0,
+        dateEffet: v.date_effet,
+        dateEcheance: v.date_echeance,
+      })) : [];
+
+      // Filter by role and user
+      let filtered = transformed;
+
+      if (user?.role === 'commercial') {
+        const normalizedUserName = (user.name || '').trim().toLowerCase();
+        filtered = filtered.filter((v: Vente) => {
+          const vCommercial = (v.commercial || '').trim().toLowerCase();
+          return vCommercial === normalizedUserName || normalizedUserName.includes(vCommercial) || vCommercial.includes(normalizedUserName);
+        });
+      }
+
+      setVentes(filtered);
+    } catch (err) {
+      console.error('Error fetching ventes:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load ventes');
+      setVentes([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchVentes();
+  }, [user, refreshKey]);
+
+  return { ventes, loading, error, refetch: fetchVentes };
+}

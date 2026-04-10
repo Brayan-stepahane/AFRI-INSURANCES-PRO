@@ -4,10 +4,10 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/hooks/useAuth';
-import {
-  getProspectionsForUser, getCotationsForUser,
-  getClient, isOverdue, fmt, fmtDate,
-} from '../../src/store/data';
+import { useProspections } from '../../src/hooks/useProspections';
+import { useCotations } from '../../src/hooks/useCotations';
+import { useClients } from '../../src/hooks/useClients';
+import { isOverdue, fmt, fmtDate } from '../../src/utils/constants';
 import { colors, spacing, radius } from '../../src/config/theme';
 import { Header } from '../../src/components/common/Header';
 import { EmptyState } from '../../src/components/common/Button';
@@ -16,17 +16,22 @@ export default function NotificationsScreen() {
   const { user }  = useAuth();
   const router    = useRouter();
   const [refreshing, setRefreshing] = React.useState(false);
+  const { prospections } = useProspections();
+  const { cotations } = useCotations();
+  const { clients } = useClients();
+
+  const getClient = (id: string) => clients.find(c => c.id === id);
 
   const name = user?.name ?? '';
   const role = user?.role ?? 'commercial';
 
-  const relances = getProspectionsForUser(name, role).filter(
-    p => p.dateRelance && isOverdue(p.dateRelance) &&
+  const relances = prospections.filter(
+    (p: any) => p.dateRelance && isOverdue(p.dateRelance) &&
          !['Contrat conclu', 'Perdu'].includes(p.statut)
   );
 
-  const cotEnAttente = getCotationsForUser(name, role).filter(
-    c => c.statut === 'En attente'
+  const cotEnAttente = cotations.filter(
+    (c: any) => c.statut === 'En attente'
   );
 
   const total = relances.length + cotEnAttente.length;

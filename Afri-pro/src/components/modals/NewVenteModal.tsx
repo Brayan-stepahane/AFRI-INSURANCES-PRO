@@ -4,8 +4,8 @@ import {
   ScrollView, Platform, Pressable, Alert,
 } from 'react-native';
 import { useAuth } from '../../hooks/useAuth';
+import { useClients } from '../../hooks/useClients';
 import { colors, spacing, radius } from '../../config/theme';
-import { ventes, cotations, prospections, getClient } from '../../store/data';
 import type { Vente } from '../../types';
 import apiClient from '../../services/api/client';
 import { API_ENDPOINTS } from '../../services/api/endpoints';
@@ -91,6 +91,9 @@ function SelectField({
 
 export function NewVenteModal({ visible, onClose, onSubmit, editVente }: NewVenteModalProps) {
   const { user } = useAuth();
+  const { clients } = useClients();
+
+  const getClient = (id: string) => clients.find(c => c.id === id);
   const [venteId, setVenteId] = useState<number | null>(editVente?.id ?? null);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string>('');
@@ -159,28 +162,27 @@ export function NewVenteModal({ visible, onClose, onSubmit, editVente }: NewVent
     }
 
     try {
-      // Save locally first
       const record = {
         produit: form.produit,
-        dateVente: form.dateVente,
-        typeVente: form.typeVente.includes('Nouvelle') ? 'NouVe' : 'VenRec',
-        noPolice: form.noPolice,
-        noAttestation: form.noAttestation,
-        noCarteRose: form.noCarteRose,
-        primeNette: Number(form.primeNette) || 0,
+        date_vente: form.dateVente,
+        type_vente: form.typeVente.includes('Nouvelle') ? 'NouVe' : 'VenRec',
+        numero_police: form.noPolice,
+        numero_attestation: form.noAttestation,
+        no_carte_rose: form.noCarteRose,
+        prime_nette: Number(form.primeNette) || 0,
         accessoires: Number(form.accessories) || 0,
-        dateEffet: form.dateEffet,
-        dateEcheance: form.dateEcheance,
+        date_effet: form.dateEffet,
+        date_echeance: form.dateEcheance,
       };
 
       if (venteId) {
         // Update existing vente
-        const response = await apiClient.put(`${API_ENDPOINTS.VENTES.UPDATE}/${venteId}`, record);
+        await apiClient.put(`${API_ENDPOINTS.VENTES.UPDATE}/${venteId}`, record);
+      } else {
+        // Create new vente via API
+        const response = await apiClient.post(API_ENDPOINTS.VENTES.CREATE, record);
         if (response?.data) {
-          const idx = ventes.findIndex(v => v.id === venteId);
-          if (idx >= 0) {
-            ventes[idx] = { ...ventes[idx], ...response.data } as any;
-          }
+          setVenteId(response.data.id);
         }
       }
 
@@ -373,8 +375,8 @@ const sf = StyleSheet.create({
   list: {
     position: 'absolute', backgroundColor: colors.white,
     borderWidth: 1, borderColor: colors.violet, borderRadius: radius.sm,
-    elevation: 20, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 }, overflow: 'hidden', top: 50, width: '100%',
+    elevation: 20, boxShadow: '0px 4px 8px rgba(0,0,0,0.15)',
+    overflow: 'hidden', top: 50, width: '100%',
   },
   item: {
     flexDirection: 'row', alignItems: 'center',

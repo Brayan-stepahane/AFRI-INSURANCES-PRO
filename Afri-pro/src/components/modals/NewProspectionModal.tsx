@@ -5,8 +5,11 @@ import {
 } from 'react-native';
 import { AxiosResponse } from 'axios';
 import { useAuth } from '../../hooks/useAuth';
+import { useClients } from '../../hooks/useClients';
+import { useProspections } from '../../hooks/useProspections';
+import { useCotations } from '../../hooks/useCotations';
+import { useVentes } from '../../hooks/useVentes';
 import { colors, spacing, radius } from '../../config/theme';
-import { getClient, searchClientsByName, clients, genClientId, prospections, cotations, ventes } from '../../store/data';
 import type { Client } from '../../types';
 import apiClient from '../../services/api/client';
 import { API_ENDPOINTS } from '../../services/api/endpoints';
@@ -54,6 +57,23 @@ interface NewProspectionModalProps {
 const STEP_LABELS  = ['Client', 'Prospection', 'Cotation', 'Vente'];
 const CLIENT_TYPES = ['Particulier', 'PME', 'Entreprise', 'Autre'];
 const ACTIVITIES   = ['Chef d\'entreprise', 'Salarié', 'Indépendant', 'Autre'];
+
+const normalizeDate = (value: string) => {
+  if (!value) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const parts = value.split(/[\/\.-]/);
+  if (parts.length === 3) {
+    const [day, month, year] = parts;
+    return `${year.padStart(4, '0')}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+  return value;
+};
+
+const normalizeProbability = (value: number) => {
+  if (typeof value !== 'number' || Number.isNaN(value)) return 0;
+  return value > 1 ? Math.min(Math.max(value, 0), 100) / 100 : Math.min(Math.max(value, 0), 1);
+};
+
 const PRODUCTS     = [
   'Afrilife étude', 'Afrilife retraite individuelle', 'Afrilife retraite plus',
   'Afrilife libre retraite', 'Afrilife Pension', 'Afrilife prévoyance individuelle',
@@ -180,6 +200,20 @@ const sf = StyleSheet.create({
 // ─── Main component ───────────────────────────────────────────────────────────
 export function NewProspectionModal({ visible, onClose, onSubmit, editProspection }: NewProspectionModalProps) {
   const { user } = useAuth();
+  const { clients } = useClients();
+  const { prospections } = useProspections();
+  const { cotations } = useCotations();
+  const { ventes } = useVentes();
+
+  // Helper functions
+  const getClient = (id: string) => clients.find(c => c.id === id);
+  const searchClientsByName = (query: string) => {
+    if (!query.trim()) return [];
+    const q = query.toLowerCase();
+    return clients.filter(c => c.nom.toLowerCase().includes(q));
+  };
+  const genClientId = () => `CLI${Date.now()}${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+
   const [step, setStep] = useState(1);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const toggle = (name: string) => setOpenDropdown(prev => (prev === name ? null : name));
@@ -222,9 +256,9 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
       ...prev,
       clientId: client.id,
       clientName: client.nom,
-      phone: client.tel,
-      clientType: client.type,
-      activity: client.activite,
+      phone: client.telephone || '',
+      clientType: client.type_client || 'Particulier',
+      activity: client.activite || '',
     }));
     setClientSearchResults([]);
     setClientSearchMessage(`Client sélectionné : ${client.nom}`);
@@ -242,14 +276,6 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
     }
 
     const newClientId = genClientId();
-    const newClient: Client = {
-      id: newClientId,
-      nom: trimmedName,
-      tel: form.phone,
-      activite: form.activity,
-      type: form.clientType as any,
-    };
-    clients.unshift(newClient);
     setForm(prev => ({ ...prev, clientId: newClientId }));
     return newClientId;
   };
@@ -261,49 +287,35 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
         return false;
       }
 
-      const clientToSave = clients.find(c => c.id === clientId);
-      if (!clientToSave) {
-        setSaveError('Client non trouvé dans la base locale.');
-        return false;
-      }
-
-      if (!clientToSave.nom || !clientToSave.nom.trim()) {
+      if (!form.clientName || !form.clientName.trim()) {
         setSaveError('Le nom du client est requis.');
         return false;
       }
 
       const payload = {
-        nom: clientToSave.nom.trim(),
-        telephone: clientToSave.tel?.trim() || '',
-        activite: clientToSave.activite?.trim() || '',
-        type_client: clientToSave.type || 'Particulier',
+        nom: form.clientName.trim(),
+        telephone: form.phone?.trim() || '',
+        activite: form.activity?.trim() || '',
+        type_client: form.clientType || 'Particulier',
         email: '',
         ville: '',
       };
 
       let response: AxiosResponse<any>;
-      // Check if this is a new client (doesn't match CLI-#### pattern)
-      const isNewClient = !clientId.match(/^CLI-\d{4}$/);
+      // Check if this is a new client (generated id)
+      const isNewClient = clientId.startsWith('CLI');
 
       if (isNewClient) {
         // Create new client
         response = await apiClient.post(API_ENDPOINTS.CLIENTS.LIST, payload);
         if (response?.data) {
-          const idx = clients.findIndex(c => c.id === clientId);
-          if (idx >= 0) {
-            clients[idx] = { ...clients[idx], ...response.data } as any;
-            setForm(prev => ({ ...prev, clientId: response.data.id }));
-          }
+          setForm(prev => ({ ...prev, clientId: response.data.id }));
           return true;
         }
       } else {
         // Update existing client
         response = await apiClient.put(`${API_ENDPOINTS.CLIENTS.LIST}/${clientId}`, payload);
         if (response?.data) {
-          const idx = clients.findIndex(c => c.id === clientId);
-          if (idx >= 0) {
-            clients[idx] = { ...clients[idx], ...response.data } as any;
-          }
           return true;
         }
       }
@@ -331,30 +343,30 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
         phone: form.phone || '',
         clientType: form.clientType,
         activity: form.activity,
-        prospectionDate: form.prospectionDate,
+        prospectionDate: normalizeDate(form.prospectionDate),
         product: form.product,
-        potentialCA: form.potentialCA,
+        potentialCA: Number(form.potentialCA) || 0,
         status: form.status,
-        probability: form.probability,
-        visitDate1: form.visitDate1 || '',
-        nextFollowUp: form.nextFollowUp || '',
-        visitDate2: form.visitDate2 || '',
-        visitDate3: form.visitDate3 || '',
+        probability: normalizeProbability(form.probability),
+        visitDate1: normalizeDate(form.visitDate1 || ''),
+        nextFollowUp: normalizeDate(form.nextFollowUp || ''),
+        visitDate2: normalizeDate(form.visitDate2 || ''),
+        visitDate3: normalizeDate(form.visitDate3 || ''),
         previousInsurer: form.previousInsurer || '',
-        previousContract: form.previousContract || '',
+        previousContract: normalizeDate(form.previousContract || ''),
         observations: form.observations || '',
         ratedRisk: form.ratedRisk,
-        quotationDate: form.quotationDate || '',
+        quotationDate: normalizeDate(form.quotationDate || ''),
         quotationAmount: form.quotationAmount || '',
-        validationDate: form.validationDate || '',
-        saleDate: form.saleDate || '',
+        validationDate: normalizeDate(form.validationDate || ''),
+        saleDate: normalizeDate(form.saleDate || ''),
         saleType: form.saleType,
         policyNumber: form.policyNumber || '',
         attestationNumber: form.attestationNumber || '',
         netPremiums: form.netPremiums || '',
         accessories: form.accessories || '',
-        effectDate: form.effectDate || '',
-        expiryDate: form.expiryDate || '',
+        effectDate: normalizeDate(form.effectDate || ''),
+        expiryDate: normalizeDate(form.expiryDate || ''),
         carRoseNumber: form.carRoseNumber || '',
       };
 
@@ -364,17 +376,17 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
         response = await apiClient.put(`${API_ENDPOINTS.PROSPECTIONS.LIST}/${prospectionId}`, {
           clientId,
           product: form.product,
-          prospectionDate: form.prospectionDate,
-          potentialCA: form.potentialCA,
-          probability: form.probability,
+          prospectionDate: normalizeDate(form.prospectionDate),
+          potentialCA: Number(form.potentialCA) || 0,
+          probability: normalizeProbability(form.probability),
           status: form.status,
-          visitDate1: form.visitDate1,
-          visitDate2: form.visitDate2,
-          visitDate3: form.visitDate3,
-          nextFollowUp: form.nextFollowUp,
+          visitDate1: normalizeDate(form.visitDate1 || ''),
+          visitDate2: normalizeDate(form.visitDate2 || ''),
+          visitDate3: normalizeDate(form.visitDate3 || ''),
+          nextFollowUp: normalizeDate(form.nextFollowUp || ''),
           observations: form.observations,
           previousInsurer: form.previousInsurer,
-          previousContract: form.previousContract,
+          previousContract: normalizeDate(form.previousContract || ''),
         });
       } else {
         // Create new prospection
@@ -462,121 +474,118 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
     }
   };
 
-  const getNextId = (items: { id: number }[]) =>
-    items.reduce((max, item) => Math.max(max, item.id), 0) + 1;
+  // const handleLocalSave = (message: string, savedProspectionId?: number) => {
+  //   const clientId = getOrCreateClientId();
+  //   if (!clientId) {
+  //     setSaveError('Veuillez sélectionner ou créer un client avant de sauvegarder.');
+  //     return null;
+  //   }
 
-  const saveProspectionLocal = () => {
-    const clientId = getOrCreateClientId();
-    if (!clientId) {
-      setSaveError('Veuillez sélectionner ou créer un client avant de sauvegarder.');
-      return null;
-    }
+  //   const record = {
+  //     clientId,
+  //     commercial: user?.name || 'commercial',
+  //     produit: form.product,
+  //     potentielCA: Number(form.potentialCA) || 0,
+  //     chance: form.probability,
+  //     statut: form.status as any,
+  //     dateContact: form.prospectionDate,
+  //     dateRelance: form.nextFollowUp,
+  //     dateV1: form.visitDate1,
+  //     dateV2: form.visitDate2,
+  //     dateV3: form.visitDate3,
+  //     observations: form.observations,
+  //     ancienAssureur: form.previousInsurer,
+  //     dateAncienEch: form.previousContract,
+  //   };
 
-    const record = {
-      clientId,
-      commercial: user?.name || 'commercial',
-      produit: form.product,
-      potentielCA: Number(form.potentialCA) || 0,
-      chance: form.probability,
-      statut: form.status as any,
-      dateContact: form.prospectionDate,
-      dateRelance: form.nextFollowUp,
-      dateV1: form.visitDate1,
-      dateV2: form.visitDate2,
-      dateV3: form.visitDate3,
-      observations: form.observations,
-      ancienAssureur: form.previousInsurer,
-      dateAncienEch: form.previousContract,
-    };
+  //   if (prospectionId) {
+  //     const idx = prospections.findIndex(p => p.id === prospectionId);
+  //     if (idx >= 0) {
+  //       prospections[idx] = { ...prospections[idx], ...record } as any;
+  //       return prospectionId;
+  //     }
+  //   }
 
-    if (prospectionId) {
-      const idx = prospections.findIndex(p => p.id === prospectionId);
-      if (idx >= 0) {
-        prospections[idx] = { ...prospections[idx], ...record } as any;
-        return prospectionId;
-      }
-    }
+  //   const nextId = getNextId(prospections);
+  //   const newProspection = { id: nextId, ...record } as any;
+  //   // prospections.unshift(newProspection); // Removed: data will be refetched
+  //   setProspectionId(nextId);
+  //   return nextId;
+  // };
 
-    const nextId = getNextId(prospections);
-    const newProspection = { id: nextId, ...record } as any;
-    prospections.unshift(newProspection);
-    setProspectionId(nextId);
-    return nextId;
-  };
+  // const saveCotationLocal = (savedProspectionId: number) => {
+  //   if (!form.quotationDate && !form.quotationAmount && form.ratedRisk === '— Non coté —') {
+  //     return null;
+  //   }
 
-  const saveCotationLocal = (savedProspectionId: number) => {
-    if (!form.quotationDate && !form.quotationAmount && form.ratedRisk === '— Non coté —') {
-      return null;
-    }
+  //   const clientId = getOrCreateClientId();
+  //   if (!clientId) {
+  //     setSaveError('Veuillez sélectionner ou créer un client avant de sauvegarder la cotation.');
+  //     return null;
+  //   }
 
-    const clientId = getOrCreateClientId();
-    if (!clientId) {
-      setSaveError('Veuillez sélectionner ou créer un client avant de sauvegarder la cotation.');
-      return null;
-    }
+  //   const nextId = getNextId(cotations);
+  //   const newCotation = {
+  //     id: nextId,
+  //     noCot: nextId,
+  //     prospId: savedProspectionId,
+  //     clientId,
+  //     commercial: user?.name || 'commercial',
+  //     risqueCote: form.ratedRisk,
+  //     dateCotation: form.quotationDate,
+  //     montant: Number(form.quotationAmount) || 0,
+  //     dateValidation: form.validationDate,
+  //     statut: form.validationDate ? 'Validée' : 'En attente',
+  //   } as any;
+  //   // cotations.unshift(newCotation); // Removed: data will be refetched
+  //   setCotationId(nextId);
 
-    const nextId = getNextId(cotations);
-    const newCotation = {
-      id: nextId,
-      noCot: nextId,
-      prospId: savedProspectionId,
-      clientId,
-      commercial: user?.name || 'commercial',
-      risqueCote: form.ratedRisk,
-      dateCotation: form.quotationDate,
-      montant: Number(form.quotationAmount) || 0,
-      dateValidation: form.validationDate,
-      statut: form.validationDate ? 'Validée' : 'En attente',
-    } as any;
-    cotations.unshift(newCotation);
-    setCotationId(nextId);
+  //   // const pi = prospections.findIndex(p => p.id === savedProspectionId);
+  //   // if (pi >= 0) prospections[pi].statut = 'Cotation envoyée'; // Removed: will be updated via API
 
-    const pi = prospections.findIndex(p => p.id === savedProspectionId);
-    if (pi >= 0) prospections[pi].statut = 'Cotation envoyée';
+  //   return nextId;
+  // };
 
-    return nextId;
-  };
+  // const saveVenteLocal = (savedProspectionId: number, savedCotationId?: number | null) => {
+  //   if (!form.saleDate) {
+  //     setSaveError('Veuillez renseigner la date de vente avant de sauvegarder.');
+  //     return null;
+  //   }
 
-  const saveVenteLocal = (savedProspectionId: number, savedCotationId?: number | null) => {
-    if (!form.saleDate) {
-      setSaveError('Veuillez renseigner la date de vente avant de sauvegarder.');
-      return null;
-    }
+  //   const clientId = getOrCreateClientId();
+  //   if (!clientId) {
+  //     setSaveError('Veuillez sélectionner ou créer un client avant de sauvegarder la vente.');
+  //     return null;
+  //   }
 
-    const clientId = getOrCreateClientId();
-    if (!clientId) {
-      setSaveError('Veuillez sélectionner ou créer un client avant de sauvegarder la vente.');
-      return null;
-    }
+  //   const nextId = getNextId(ventes);
+  //   const newVente = {
+  //     id: nextId,
+  //     prospId: savedProspectionId,
+  //     clientId,
+  //     commercial: user?.name || 'commercial',
+  //     produit: form.product,
+  //     dateVente: form.saleDate,
+  //     typeVente: form.saleType.includes('Nouvelle') ? 'NouVe' : 'VenRec',
+  //     noPolice: form.policyNumber,
+  //     noAttestation: form.attestationNumber,
+  //     noCarteRose: form.carRoseNumber,
+  //     primeNette: Number(form.netPremiums) || 0,
+  //     accessoires: Number(form.accessories) || 0,
+  //     dateEffet: form.effectDate,
+  //     dateEcheance: form.expiryDate,
+  //   } as any;
+  //   // ventes.unshift(newVente); // Removed: data will be refetched
 
-    const nextId = getNextId(ventes);
-    const newVente = {
-      id: nextId,
-      prospId: savedProspectionId,
-      clientId,
-      commercial: user?.name || 'commercial',
-      produit: form.product,
-      dateVente: form.saleDate,
-      typeVente: form.saleType.includes('Nouvelle') ? 'NouVe' : 'VenRec',
-      noPolice: form.policyNumber,
-      noAttestation: form.attestationNumber,
-      noCarteRose: form.carRoseNumber,
-      primeNette: Number(form.netPremiums) || 0,
-      accessoires: Number(form.accessories) || 0,
-      dateEffet: form.effectDate,
-      dateEcheance: form.expiryDate,
-    } as any;
-    ventes.unshift(newVente);
+  //   // const pi = prospections.findIndex(p => p.id === savedProspectionId);
+  //   // if (pi >= 0) prospections[pi].statut = 'Contrat conclu'; // Removed: will be updated via API
+  //   // if (savedCotationId) {
+  //   //   const ci = cotations.findIndex(c => c.id === savedCotationId);
+  //   //   if (ci >= 0) cotations[ci].statut = 'Convertie en vente'; // Removed: will be updated via API
+  //   // }
 
-    const pi = prospections.findIndex(p => p.id === savedProspectionId);
-    if (pi >= 0) prospections[pi].statut = 'Contrat conclu';
-    if (savedCotationId) {
-      const ci = cotations.findIndex(c => c.id === savedCotationId);
-      if (ci >= 0) cotations[ci].statut = 'Convertie en vente';
-    }
-
-    return nextId;
-  };
+  //   return nextId;
+  // };
 
   const handleLocalSave = (message: string, savedProspectionId?: number) => {
     setSaveMessage(message);
@@ -614,7 +623,6 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
       setSaveError('Erreur lors de l\'enregistrement de la prospection.');
       return false;
     }
-    saveProspectionLocal();
     setSavedSteps(prev => ({ ...prev, prospection: true }));
 
     if (step === 2) {
@@ -630,7 +638,6 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
 
     // Step 3: Save cotation to database
     const savedCotId = await saveCotationToDatabase(savedProspectionId);
-    saveCotationLocal(savedProspectionId);
     setSavedSteps(prev => ({ ...prev, cotation: true }));
 
     if (step === 3) {
@@ -646,7 +653,6 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
 
     // Step 4: Save vente to database
     const savedVenteId = await saveVenteToDatabase(savedProspectionId, savedCotId || undefined);
-    saveVenteLocal(savedProspectionId, savedCotId || undefined);
 
     if (!savedVenteId) {
       setSaveError('Erreur lors de l\'enregistrement de la vente.');
@@ -668,8 +674,8 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
       setForm({
         clientId: editProspection.clientId || '',
         clientName: client?.nom || '',
-        phone: client?.tel || '',
-        clientType: client?.type || 'Particulier',
+        phone: client?.telephone || '',
+        clientType: client?.type_client || 'Particulier',
         activity: client?.activite || 'Chef d\'entreprise',
         prospectionDate: editProspection.dateContact || new Date().toISOString().split('T')[0],
         product: editProspection.produit || 'Afrilife étude',
@@ -1113,10 +1119,10 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
 }
 
 const styles = StyleSheet.create({
-  webContainer:         { ...StyleSheet.absoluteFillObject, zIndex: 999 },
+  webContainer:         { ...StyleSheet.absoluteFillObject, zIndex: 999, position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   backdrop:             { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center' },
   backdropPress:        { ...StyleSheet.absoluteFillObject, pointerEvents: 'auto' },
-  modal:                { width: '90%', maxWidth: 800, maxHeight: '90%', backgroundColor: colors.white, borderRadius: radius.lg, flexDirection: 'column' },
+  modal:                { width: '90%', maxWidth: 900, maxHeight: '90%', backgroundColor: colors.white, borderRadius: radius.lg, flexDirection: 'column', overflow: 'hidden' },
   header:               { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.gray100 },
   title:                { fontSize: 18, fontWeight: '700', color: colors.violetDark },
   closeButton:          { fontSize: 22, color: colors.gray400 },
@@ -1128,8 +1134,8 @@ const styles = StyleSheet.create({
   stepNumberActive:     { color: colors.white },
   stepLabel:            { fontSize: 12, color: colors.gray600, fontWeight: '500' },
   stepLabelActive:      { color: colors.white },
-  formArea:             { flex: 1 },
-  formScroll:           { flex: 1 },
+  formArea:             { flex: 1, minHeight: 0 },
+  formScroll:           { flex: 1, minHeight: 0 },
   formContent:          { paddingHorizontal: spacing.xl, paddingVertical: spacing.lg },
   subtitle:             { fontSize: 16, fontWeight: '700', color: colors.violetDark, marginBottom: spacing.sm },
   hint:                 { fontSize: 13, color: colors.gray400, marginBottom: spacing.lg },

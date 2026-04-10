@@ -33,9 +33,7 @@ export const COMPONENT_STYLES = {
     borderWidth: 1,
     borderColor: colors.gray200,
     elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
+    boxShadow: '0px 2px 6px rgba(0,0,0,0.05)',
   },
 
   // Buttons
@@ -46,9 +44,7 @@ export const COMPONENT_STYLES = {
       paddingVertical: spacing.md,
       borderRadius: radius.sm,
       elevation: 2,
-      shadowColor: colors.orange,
-      shadowOpacity: 0.3,
-      shadowRadius: 4,
+      boxShadow: '0px 2px 4px rgba(232,82,26,0.3)',
     },
     secondary: {
       backgroundColor: colors.white,
@@ -86,9 +82,7 @@ export const COMPONENT_STYLES = {
     backgroundColor: colors.white,
     borderRadius: radius.lg,
     elevation: 10,
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
+    boxShadow: '0px 4px 12px rgba(0,0,0,0.25)',
   },
 };
 

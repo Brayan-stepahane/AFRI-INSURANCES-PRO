@@ -2,7 +2,8 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { colors, spacing, radius, typography } from '../../config/theme';
 import { ProgressBar } from '../common/Button';
-import { fmt, fmtDate, getClient } from '../../store/data';
+import { fmt, fmtDate } from '../../utils/constants';
+import { useClients } from '../../hooks/useClients';
 import { Prospection } from '../../types';
 
 // ─── METRIC CARD ─────────────────────────────────────────────────────────────
@@ -162,6 +163,9 @@ const pStyles = StyleSheet.create({
 
 // ─── URGENT FOLLOW-UPS ────────────────────────────────────────────────────────
 export function UrgentFollowUps({ prospects }: { prospects: Prospection[] }) {
+  const { clients } = useClients();
+  const getClient = (id: string) => clients.find(c => c.id === id);
+
   return (
     <View style={ufStyles.card}>
       <View style={ufStyles.header}>

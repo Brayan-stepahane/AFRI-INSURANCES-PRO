@@ -6,12 +6,13 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/hooks/useAuth';
-import { getProspectionsForUser, getClient, isOverdue, fmt, prospections } from '../../src/store/data';
+import { useProspections } from '../../src/hooks/useProspections';
+import { useClients } from '../../src/hooks/useClients';
+import { fmt, fmtDate, isOverdue, STATUTS_PROSP } from '../../src/utils/constants';
 import { colors, spacing, radius } from '../../src/config/theme';
 import { Badge, EmptyState, ClientIdBadge } from '../../src/components/common/Button';
 import { Header } from '../../src/components/common/Header';
 import { STATUT_BADGE_COLORS } from '../../src/config/theme';
-import { STATUTS_PROSP } from '../../src/store/data';
 import { Prospection } from '../../src/types';
 import { NewProspectionModal } from '../../src/components/modals/NewProspectionModal';
 import apiClient from '../../src/services/api/client';
@@ -19,9 +20,11 @@ import { API_ENDPOINTS } from '../../src/services/api/endpoints';
 
 export default function ProspectionsScreen() {
   const { user } = useAuth();
-  const router   = useRouter();
-  const [search, setSearch]       = useState('');
-  const [statut, setStatut]       = useState('Tous');
+  const router = useRouter();
+  const { prospections, loading, refetch } = useProspections();
+  const { clients } = useClients();
+  const [search, setSearch] = useState('');
+  const [statut, setStatut] = useState('Tous');
   const [refreshing, setRefreshing] = useState(false);
   const [showNewProspectionModal, setShowNewProspectionModal] = useState(false);
   const [editingProspection, setEditingProspection] = useState<Prospection | null>(null);
@@ -30,7 +33,11 @@ export default function ProspectionsScreen() {
   const role = user?.role ?? 'commercial';
   const canCreateProspection = ['commercial', 'manager_adj', 'manager', 'chef', 'admin'].includes(role);
   const canValidateProspection = ['manager_adj', 'manager', 'chef', 'admin'].includes(role);
-  let list = getProspectionsForUser(name, role);
+
+  // Helper function to get client by ID
+  const getClient = (id: string) => clients.find(c => c.id === id);
+
+  let list = prospections;
 
   if (statut !== 'Tous') list = list.filter(p => p.statut === statut);
   if (search) {
@@ -50,16 +57,11 @@ export default function ProspectionsScreen() {
 
   const renderItem = ({ item: p }: { item: Prospection }) => {
     const cli = getClient(p.clientId);
-    const urgent = p.dateRelance && isOverdue(p.dateRelance) &&
-      !['Contrat conclu', 'Perdu'].includes(p.statut);
+    const urgent = p.dateRelance && isOverdue(p.dateRelance) && !['Contrat conclu', 'Perdu'].includes(p.statut);
     const sc = STATUT_BADGE_COLORS[p.statut] ?? { bg: colors.gray100, text: colors.gray600 };
 
     return (
-      <TouchableOpacity
-        style={[styles.card, urgent && styles.cardUrgent]}
-        onPress={() => router.push(`/(app)/prospections/${p.id}` as any)}
-        activeOpacity={0.8}
-      >
+      <TouchableOpacity style={[styles.card, urgent && styles.cardUrgent]} onPress={() => router.push(`/(app)/prospections/${p.id}` as any)} activeOpacity={0.8}>
         <View style={styles.cardHeader}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{(cli?.nom || '?')[0]}</Text>
@@ -74,21 +76,17 @@ export default function ProspectionsScreen() {
         <Text style={styles.produit}>{p.produit}</Text>
 
         <View style={styles.cardFooter}>
-          <Text style={styles.footerText}>
-            Potentiel : <Text style={styles.footerBold}>{fmt(p.potentielCA)} FCFA</Text>
-          </Text>
+          <Text style={styles.footerText}>Potentiel : <Text style={styles.footerBold}>{fmt(p.potentielCA)} FCFA</Text></Text>
           <Text style={styles.footerText}>Chance : {p.chance}%</Text>
           {urgent && <Text style={styles.urgentText}>⚠️ Relance en retard</Text>}
         </View>
 
-        {p.dateRelance ? (
+        {p.dateRelance && (
           <Text style={[styles.relanceText, urgent && { color: colors.danger }]}>
-            📅 Relance : {p.dateRelance ? new Date(p.dateRelance).toLocaleDateString('fr-FR') : '—'}
-            {urgent ? ' ⚠️' : ''}
+            📅 Relance : {new Date(p.dateRelance).toLocaleDateString('fr-FR')}{urgent ? ' ⚠️' : ''}
           </Text>
-        ) : null}
+        )}
 
-        {/* Actions */}
         <View style={styles.actions}>
           <TouchableOpacity style={[styles.actionBtn, styles.actionEdit]} onPress={() => setEditingProspection(p)}>
             <Text style={styles.actionBtnText}>✏️ Modifier</Text>
@@ -103,38 +101,26 @@ export default function ProspectionsScreen() {
 
   const handleNewProspectionSubmit = async (data: any, isEdit?: boolean, prospectionId?: number, options?: { refreshOnly?: boolean }) => {
     if (options?.refreshOnly) {
-      setRefreshing(true);
-      setTimeout(() => setRefreshing(false), 100);
+      refetch();
       return;
     }
 
     try {
       if (isEdit && prospectionId) {
-        // Update existing prospection - call PUT API
-        const response = await apiClient.put(`${API_ENDPOINTS.PROSPECTIONS.LIST}/${prospectionId}`, data);
-        if (response?.data) {
-          const idx = prospections.findIndex(p => p.id === prospectionId);
-          if (idx >= 0) {
-            prospections[idx] = { ...prospections[idx], ...data, ...response.data } as any;
-          }
-        }
+        await apiClient.put(`${API_ENDPOINTS.PROSPECTIONS.LIST}/${prospectionId}`, data);
       } else {
-        // Create new prospection - call POST API
-        const response = await apiClient.post(API_ENDPOINTS.PROSPECTIONS.CREATE, data);
-        console.log('Created prospection:', response.data);
-        if (response?.data && response.data.id) {
-          prospections.unshift(response.data);
-        }
+        await apiClient.post(API_ENDPOINTS.PROSPECTIONS.CREATE, data);
       }
-      setRefreshing(true);
-      setTimeout(() => setRefreshing(false), 100);
+      refetch();
+      setShowNewProspectionModal(false);
+      setEditingProspection(null);
     } catch (error) {
-      console.error('Error submitting prospection:', error);
-      Alert.alert('Erreur', 'Une erreur est survenue lors de l\'enregistrement');
+      console.error('Error saving prospection:', error);
+      Alert.alert('Erreur', 'Une erreur est survenue lors de la sauvegarde.');
     }
   };
 
-  const deleteProspection = (prospection: Prospection) => {
+  const deleteProspection = async (prospection: Prospection) => {
     Alert.alert(
       'Supprimer la prospection',
       `Êtes-vous sûr de vouloir supprimer la prospection de ${getClient(prospection.clientId)?.nom || prospection.clientId} ?`,
@@ -143,13 +129,13 @@ export default function ProspectionsScreen() {
         {
           text: 'Supprimer',
           style: 'destructive',
-          onPress: () => {
-            const idx = prospections.findIndex(p => p.id === prospection.id);
-            if (idx >= 0) {
-              prospections.splice(idx, 1);
-              // Refresh the list
-              setRefreshing(true);
-              setTimeout(() => setRefreshing(false), 100);
+          onPress: async () => {
+            try {
+              await apiClient.delete(`${API_ENDPOINTS.PROSPECTIONS.LIST}/${prospection.id}`);
+              refetch();
+            } catch (error) {
+              console.error('Error deleting prospection:', error);
+              Alert.alert('Erreur', 'Une erreur est survenue lors de la suppression');
             }
           }
         }
@@ -203,7 +189,7 @@ export default function ProspectionsScreen() {
         keyExtractor={p => String(p.id)}
         renderItem={renderItem}
         contentContainerStyle={{ padding: spacing.xl, paddingBottom: 100 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); setTimeout(() => setRefreshing(false), 600); }} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); refetch(); setTimeout(() => setRefreshing(false), 600); }} />}
         ListEmptyComponent={<EmptyState icon="📋" title="Aucune prospection trouvée" sub="Modifiez vos filtres ou ajoutez une prospection" />}
       />
 
@@ -248,7 +234,7 @@ const styles = StyleSheet.create({
   chipTextActive:   { color: colors.white, fontWeight: '600' },
   alertBanner:      { backgroundColor: colors.dangerBg, paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, borderBottomWidth: 1, borderBottomColor: '#f5c0c0' },
   alertText:        { fontSize: 13, color: colors.danger, fontWeight: '600' },
-  card:             { backgroundColor: colors.white, borderRadius: radius.md, padding: spacing.xl, marginBottom: spacing.lg, elevation: 2, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8 },
+  card:             { backgroundColor: colors.white, borderRadius: radius.md, padding: spacing.xl, marginBottom: spacing.lg, elevation: 2, boxShadow: '0px 2px 8px rgba(0,0,0,0.06)' },
   cardUrgent:       { borderLeftWidth: 3, borderLeftColor: colors.danger, backgroundColor: '#fff9f9' },
   cardHeader:       { flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginBottom: spacing.md },
   avatar:           { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.violetPale, alignItems: 'center', justifyContent: 'center' },
@@ -265,7 +251,7 @@ const styles = StyleSheet.create({
   actionEdit:       { backgroundColor: colors.violetPale, borderColor: colors.violetLight },
   actionDelete:     { backgroundColor: colors.dangerBg, borderColor: '#f5c0c0' },
   actionBtnText:    { fontSize: 12, fontWeight: '600', color: colors.violet },
-  fab:              { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.orange, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: colors.orange, shadowOpacity: 0.4, shadowRadius: 10 },
+  fab:              { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.orange, alignItems: 'center', justifyContent: 'center', elevation: 6, boxShadow: '0px 4px 10px rgba(232,82,26,0.4)' },
   fabText:          { fontSize: 28, color: colors.white, fontWeight: '300', lineHeight: 32 },
   noFabPlaceholder: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56 },
   validationBanner: { position: 'absolute', bottom: 94, right: 16, left: 16, backgroundColor: colors.violetPale, borderRadius: radius.sm, padding: spacing.sm, borderWidth: 1, borderColor: colors.violet },

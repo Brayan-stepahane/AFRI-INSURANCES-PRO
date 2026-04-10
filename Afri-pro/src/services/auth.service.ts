@@ -15,6 +15,7 @@ export const authService = {
       user: {
         id: apiUser.id,
         identifiant: apiUser.identifiant || apiUser.email || '',
+        surname: apiUser.prenom || '',
         email: apiUser.email || apiUser.identifiant || '',
         name: apiUser.name || `${[apiUser.nom, apiUser.prenom].filter(Boolean).join(' ')}`.trim() || apiUser.identifiant || '',
         phone: apiUser.phone,
@@ -43,6 +44,7 @@ export const authService = {
       identifiant: apiUser.identifiant || apiUser.email || '',
       email: apiUser.email || apiUser.identifiant || '',
       name: apiUser.name || `${[apiUser.nom, apiUser.prenom].filter(Boolean).join(' ')}`.trim() || apiUser.identifiant || '',
+      surname: apiUser.prenom || '',
       phone: apiUser.phone,
       role: apiUser.role as UserRole,
       equipe: apiUser.equipe,
@@ -59,20 +61,18 @@ export const userService = {
       id: apiUser.id,
       email: apiUser.identifiant || apiUser.email || '',
       name: apiUser.name || `${[apiUser.nom, apiUser.prenom].filter(Boolean).join(' ')}`.trim() || apiUser.identifiant || '',
+      surname: apiUser.prenom || '',
       phone: apiUser.phone,
       role: apiUser.role as UserRole,
       createdAt: apiUser.created_at || apiUser.createdAt || new Date().toISOString(),
     }));
   },
 
-  createUser: async (payload: { name: string; email: string; role: UserRole; phone?: string; password: string }): Promise<User> => {
-    const [nom, ...rest] = payload.name.trim().split(' ');
-    const prenom = rest.join(' ');
-
+  createUser: async (payload: { name: string; surname: string; email: string; role: UserRole; phone?: string; password: string }): Promise<User> => {
     const response = await apiClient.post(API_ENDPOINTS.USERS.CREATE, {
-      nom,
-      prenom,
-      identifiant: payload.email,
+      nom: payload.name,
+      prenom: payload.surname,
+      identifiant: payload.name.trim().toLowerCase().replace(/\s+/g, ''),
       mot_de_passe: payload.password,
       role: payload.role,
       equipe: 'Equipe A',
@@ -84,6 +84,7 @@ export const userService = {
       id: apiUser.id,
       email: apiUser.identifiant || apiUser.email || '',
       name: `${apiUser.nom || ''} ${apiUser.prenom || ''}`.trim(),
+      surname: apiUser.prenom || '',
       phone: apiUser.phone,
       role: apiUser.role as UserRole,
       createdAt: new Date().toISOString(),

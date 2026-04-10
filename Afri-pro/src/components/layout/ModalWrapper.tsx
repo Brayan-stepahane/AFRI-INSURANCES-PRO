@@ -61,10 +61,7 @@ const styles = StyleSheet.create({
     maxHeight: '80%',
     overflow: 'hidden',
     elevation: 10,
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
+    boxShadow: '0px 4px 12px rgba(0,0,0,0.25)',
   },
   header: {
     flexDirection: 'row',

@@ -9,7 +9,7 @@ import { NewProspectionModal } from '../../src/components/modals/NewProspectionM
 import apiClient from '../../src/services/api/client';
 import { API_ENDPOINTS } from '../../src/services/api/endpoints';
 import { colors, spacing } from '../../src/config/theme';
-import { fmt } from '../../src/store/data';
+import { fmt } from '../../src/utils/constants';
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -85,7 +85,7 @@ export default function DashboardScreen() {
           <TouchableOpacity style={styles.notificationBtn} onPress={() => router.push('/notifications' as any)}>
             <Text style={styles.notificationIcon}>🔔</Text>
           </TouchableOpacity>
-          <Button title="+ Nouvelle prospection" onPress={() => setShowNewProspectionModal(true)} style={styles.topButton} />
+          {/* <Button title="+ Nouvelle prospection" onPress={() => setShowNewProspectionModal(true)} style={styles.topButton} /> */}
         </View>
       </View>
 

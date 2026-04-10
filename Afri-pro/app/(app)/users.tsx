@@ -13,8 +13,9 @@ export default function UsersScreen() {
   const ALLOWED_USER_ROLES: UserRole[] = ['commercial', 'manager_adj', 'manager', 'chef', 'admin'];
 
   const [users, setUsers] = useState<User[]>([]);
-  const [formData, setFormData] = useState<{ name: string; email: string; role: UserRole; phone: string; password: string }>({
+  const [formData, setFormData] = useState<{ name: string; surname: string; email: string; role: UserRole; phone: string; password: string }>({
     name: '',
+    surname: '',
     email: '',
     role: 'commercial' as UserRole,
     phone: '',
@@ -43,8 +44,8 @@ export default function UsersScreen() {
     setError('');
     setMessage('');
 
-    if (!formData.name || !formData.email || !formData.password) {
-      setError('Nom, email et mot de passe sont requis.');
+    if (!formData.name || !formData.surname || !formData.password) {
+      setError('Nom, prénom et mot de passe sont requis.');
       return;
     }
 
@@ -57,7 +58,7 @@ export default function UsersScreen() {
       const newUser = await userService.createUser(formData);
       setUsers((prev) => [newUser, ...prev]);
       setMessage(`Utilisateur ${newUser.name} créé.`);
-      setFormData({ name: '', email: '', role: 'commercial', phone: '', password: '' });
+      setFormData({ name: '', surname: '', email: '', role: 'commercial', phone: '', password: '' });
     } catch (err) {
       setError((err as Error).message);
     }
@@ -92,6 +93,14 @@ export default function UsersScreen() {
           onChangeText={(t) => setFormData((prev) => ({ ...prev, name: t }))}
           placeholderTextColor={colors.gray400}
         />
+         <TextInput
+          style={styles.input}
+          placeholder="prenom"
+          value={formData.surname}
+          onChangeText={(t) => setFormData((prev) => ({ ...prev, surname: t }))}
+          placeholderTextColor={colors.gray400}
+        />
+        
         <TextInput
           style={styles.input}
           placeholder="Email"
@@ -146,7 +155,7 @@ export default function UsersScreen() {
       <Text style={styles.subTitle}>Liste des utilisateurs</Text>
       {users.map((u) => (
         <View key={u.id} style={styles.userRow}>
-          <Text style={styles.userText}>{u.name} ({u.email})</Text>
+          <Text style={styles.userText}>{u.name} ({u.surname})</Text>
           <Text style={styles.userMeta}>{u.role ? u.role.toUpperCase() : 'UNKNOWN'}</Text>
         </View>
       ))}

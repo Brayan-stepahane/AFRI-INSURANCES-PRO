@@ -13,3 +13,25 @@ export const HTTP_STATUS = {
   NOT_FOUND: 404,
   SERVER_ERROR: 500,
 };
+
+// Utility functions
+export const fmt = (n: number | string | null | undefined): string => {
+  const value = typeof n === 'string' ? Number(n) : n;
+  return typeof value === 'number' && !Number.isNaN(value)
+    ? value.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+    : '';
+};
+
+export const fmtDate = (d: string): string =>
+  d ? new Date(d).toLocaleDateString('fr-FR') : '';
+
+export const isOverdue = (d: string): boolean =>
+  d ? new Date(d) < new Date() : false;
+
+// Status constants
+export const STATUTS_PROSP = [
+  'Premier contact', 'En discussion', 'Proposition envoyée', 'Négociation',
+  'Contrat conclu', 'Perdu', 'Relance 1', 'Relance 2', 'Relance 3', 'Autre'
+];
+
+export const STATUTS_COT = ['En attente', 'Validée', 'Refusée', 'Convertie en vente'];

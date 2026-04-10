@@ -14,9 +14,13 @@ export type TypeVente = 'NouVe' | 'VenRec';
 export interface Client {
   id: string;           // CLI-0001
   nom: string;
-  tel: string;
-  activite: string;
-  type: TypeClient;
+  telephone?: string;
+  activite?: string;
+  type_client?: string;
+  email?: string;
+  ville?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Prospection {

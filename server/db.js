@@ -8,6 +8,16 @@ const pool = new Pool({
   password: process.env.DB_PASSWORD || '',
 });
 
+// Test the connection once on startup
+pool.connect()
+  .then(client => {
+    console.log('✅ PostgreSQL connecté:', process.env.DB_NAME || 'afri-pro');
+    client.release();
+  })
+  .catch(err => {
+    console.error('❌ Échec de connexion PostgreSQL:', err.message);
+  });
+
 pool.on('error', (err) => {
   console.error('Erreur PostgreSQL inattendue', err);
 });

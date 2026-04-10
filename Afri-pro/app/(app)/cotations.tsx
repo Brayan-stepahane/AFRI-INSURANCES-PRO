@@ -5,7 +5,9 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/hooks/useAuth';
-import { getCotationsForUser, getClient, fmt, fmtDate, cotations, prospections, STATUTS_COT } from '../../src/store/data';
+import { useCotations } from '../../src/hooks/useCotations';
+import { useClients } from '../../src/hooks/useClients';
+import { fmt, fmtDate, STATUTS_COT } from '../../src/utils/constants';
 import { colors, spacing, radius, STATUT_BADGE_COLORS } from '../../src/config/theme';
 import { Badge, EmptyState, ClientIdBadge, StatCard } from '../../src/components/common/Button';
 import { Header } from '../../src/components/common/Header';
@@ -16,15 +18,22 @@ import { API_ENDPOINTS } from '../../src/services/api/endpoints';
 
 export default function CotationsScreen() {
   const { user } = useAuth();
-  const router   = useRouter();
-  const [search, setSearch]   = useState('');
-  const [statut, setStatut]   = useState('Tous');
+  const router = useRouter();
+  const { cotations, loading, refetch } = useCotations();
+  const { clients } = useClients();
+  const [search, setSearch] = useState('');
+  const [statut, setStatut] = useState('Tous');
   const [refreshing, setRefreshing] = useState(false);
+  const [showNewCotationModal, setShowNewCotationModal] = useState(false);
   const [editingCotation, setEditingCotation] = useState<Cotation | null>(null);
 
   const name = user?.name ?? '';
   const role = user?.role ?? 'commercial';
-  let list = getCotationsForUser(name, role);
+
+  // Helper function to get client by ID
+  const getClient = (id: string) => clients.find(c => c.id === id);
+
+  let list = cotations;
 
   if (statut !== 'Tous') list = list.filter(c => c.statut === statut);
   if (search) {
@@ -36,39 +45,54 @@ export default function CotationsScreen() {
     });
   }
 
-  const allCotations = getCotationsForUser(name, role);
+  const allCotations = cotations;
   const totalCount = allCotations.length;
-  const enAttente   = allCotations.filter(c => c.statut === 'En attente').length;
-  const validees    = allCotations.filter(c => c.statut === 'Validée').length;
-  const converties  = allCotations.filter(c => c.statut === 'Convertie en vente').length;
-  const refusees    = allCotations.filter(c => c.statut === 'Refusée').length;
+  const enAttente = allCotations.filter(c => c.statut === 'En attente').length;
+  const validees = allCotations.filter(c => c.statut === 'Validée').length;
+  const converties = allCotations.filter(c => c.statut === 'Convertie en vente').length;
+  const refusees = allCotations.filter(c => c.statut === 'Refusée').length;
 
   const filters = ['Tous', ...STATUTS_COT];
 
-  const validerCotation = (cot: Cotation) => {
+  const validerCotation = async (cot: Cotation) => {
     Alert.alert('Valider la cotation', `Confirmer la validation de COT-${String(cot.noCot).padStart(3,'0')} pour ${fmt(cot.montant)} FCFA ?`,
       [{ text: 'Annuler', style: 'cancel' },
-       { text: 'Valider', onPress: () => {
-          const idx = cotations.findIndex(c => c.id === cot.id);
-          if (idx >= 0) { cotations[idx].statut = 'Validée'; cotations[idx].dateValidation = new Date().toISOString().split('T')[0]; }
-          const pi = prospections.findIndex(p => p.id === cot.prospId);
-          if (pi >= 0 && prospections[pi].statut === 'Cotation envoyée') prospections[pi].statut = 'En attente signature';
-          Alert.alert('✅', 'Cotation validée !');
+       { text: 'Valider', onPress: async () => {
+          try {
+            await apiClient.put(`${API_ENDPOINTS.COTATIONS.LIST}/${cot.id}`, {
+              statut: 'Validée',
+              date_validation: new Date().toISOString().split('T')[0]
+            });
+            refetch();
+            Alert.alert('✅', 'Cotation validée !');
+          } catch (error) {
+            console.error('Error validating cotation:', error);
+            Alert.alert('Erreur', 'Une erreur est survenue lors de la validation.');
+          }
        }}]);
   };
 
-  const refuserCotation = (cot: Cotation) => {
+  const refuserCotation = async (cot: Cotation) => {
     Alert.alert('Refuser', `Marquer COT-${String(cot.noCot).padStart(3,'0')} comme refusée ?`,
       [{ text: 'Annuler', style: 'cancel' },
-       { text: 'Refuser', style: 'destructive', onPress: () => {
-          const idx = cotations.findIndex(c => c.id === cot.id);
-          if (idx >= 0) cotations[idx].statut = 'Refusée';
-          const pi = prospections.findIndex(p => p.id === cot.prospId);
-          if (pi >= 0) prospections[pi].statut = 'Perdu';
+       { text: 'Refuser', style: 'destructive', onPress: async () => {
+          try {
+            await apiClient.put(`${API_ENDPOINTS.COTATIONS.LIST}/${cot.id}`, {
+              statut: 'Refusée'
+            });
+            // Also update prospection status to 'Perdu'
+            await apiClient.put(`${API_ENDPOINTS.PROSPECTIONS.LIST}/${cot.prospId}`, {
+              status: 'Perdu'
+            });
+            refetch();
+          } catch (error) {
+            console.error('Error refusing cotation:', error);
+            Alert.alert('Erreur', 'Une erreur est survenue lors du refus.');
+          }
        }}]);
   };
 
-  const deleteCotation = (cot: Cotation) => {
+  const deleteCotation = async (cot: Cotation) => {
     Alert.alert(
       'Supprimer la cotation',
       `Êtes-vous sûr de vouloir supprimer COT-${String(cot.noCot).padStart(3,'0')} ?`,
@@ -77,13 +101,13 @@ export default function CotationsScreen() {
         {
           text: 'Supprimer',
           style: 'destructive',
-          onPress: () => {
-            const idx = cotations.findIndex(c => c.id === cot.id);
-            if (idx >= 0) {
-              cotations.splice(idx, 1);
-              // Refresh
-              setRefreshing(true);
-              setTimeout(() => setRefreshing(false), 100);
+          onPress: async () => {
+            try {
+              await apiClient.delete(`${API_ENDPOINTS.COTATIONS.LIST}/${cot.id}`);
+              refetch();
+            } catch (error) {
+              console.error('Error deleting cotation:', error);
+              Alert.alert('Erreur', 'Une erreur est survenue lors de la suppression.');
             }
           }
         }
@@ -93,16 +117,14 @@ export default function CotationsScreen() {
 
   const handleCotationSubmit = async (data: any, isEdit?: boolean, cotationId?: number, options?: { refreshOnly?: boolean }) => {
     if (options?.refreshOnly) {
-      setRefreshing(true);
-      setTimeout(() => setRefreshing(false), 100);
+      refetch();
       return;
     }
 
     try {
       if (isEdit && cotationId) {
         // Update existing cotation - already handled in modal
-        setRefreshing(true);
-        setTimeout(() => setRefreshing(false), 100);
+        refetch();
       } else {
         // Create new cotation - call POST API
         const apiData = {
@@ -112,14 +134,11 @@ export default function CotationsScreen() {
           date_cotation: data.dateCotation,
           montant: Number(data.montant) || 0,
         };
-        const response = await apiClient.post(API_ENDPOINTS.COTATIONS.LIST, apiData);
-        console.log('Created cotation:', response.data);
-        if (response?.data && response.data.id) {
-          cotations.unshift(response.data);
-        }
+        await apiClient.post(API_ENDPOINTS.COTATIONS.LIST, apiData);
       }
-      setRefreshing(true);
-      setTimeout(() => setRefreshing(false), 100);
+      refetch();
+      setShowNewCotationModal(false);
+      setEditingCotation(null);
     } catch (error) {
       console.error('Error submitting cotation:', error);
       Alert.alert('Erreur', 'Une erreur est survenue lors de l\'enregistrement');
@@ -270,7 +289,7 @@ export default function CotationsScreen() {
         keyExtractor={c => String(c.id)}
         renderItem={renderItem}
         contentContainerStyle={{ padding: spacing.xl, paddingBottom: 100 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); setTimeout(() => setRefreshing(false), 600); }} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); refetch(); setTimeout(() => setRefreshing(false), 600); }} />}
         ListEmptyComponent={<EmptyState icon="💼" title="Aucune cotation trouvée" sub="Les cotations apparaissent ici une fois saisies" />}
       />
 
@@ -308,7 +327,7 @@ const styles = StyleSheet.create({
 
   alertBanner:    { backgroundColor: colors.warningBg, paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, borderBottomWidth: 1, borderBottomColor: '#e8c97a' },
   alertText:      { fontSize: 13, color: colors.warning, fontWeight: '600' },
-  card:           { backgroundColor: colors.white, borderRadius: radius.md, padding: spacing.xl, marginBottom: spacing.lg, elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6 },
+  card:           { backgroundColor: colors.white, borderRadius: radius.md, padding: spacing.xl, marginBottom: spacing.lg, elevation: 2, boxShadow: '0px 2px 6px rgba(0,0,0,0.05)' },
   cardPending:    { borderLeftWidth: 3, borderLeftColor: colors.warning },
   cardHeader:     { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg },
   noContainer:    { backgroundColor: colors.tealBg, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.sm },

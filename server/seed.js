@@ -83,7 +83,24 @@ const seedDatabase = async () => {
       }
     }
 
-    // 4. Verify seed data
+    // 4. Fix sequence for clients
+    try {
+      // Get the highest client number currently in database
+      const maxClientRes = await pool.query(`
+        SELECT COUNT(*) as count FROM clients
+      `);
+      const maxCount = parseInt(maxClientRes.rows[0].count, 10);
+      
+      // Reset the sequence to start at the next available number
+      await pool.query(`
+        SELECT setval('client_seq', ${maxCount + 1})
+      `);
+      console.log(`✅ Fixed client_seq sequence (next ID will be CLI-${String(maxCount + 1).padStart(4, '0')})`);
+    } catch (seqError) {
+      console.warn('⚠️  Could not reset sequence:', seqError.message);
+    }
+
+    // 5. Verify seed data
     const result = await pool.query(`
       SELECT 
         (SELECT COUNT(*) FROM users) as users_count,

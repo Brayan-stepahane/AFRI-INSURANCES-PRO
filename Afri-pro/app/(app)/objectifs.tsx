@@ -4,10 +4,12 @@ import {
 } from 'react-native';
 import { useAuth } from '../../src/hooks/useAuth';
 import { useObjective, useTeamObjectives } from '../../src/hooks/useDashboardStats';
+import { useVentes } from '../../src/hooks/useVentes';
+import { useProspections } from '../../src/hooks/useProspections';
 import { colors, spacing, radius } from '../../src/config/theme';
 import { ProgressBar } from '../../src/components/common/Button';
 import { Header } from '../../src/components/common/Header';
-import { fmt, fmtDate, prospections, ventes } from '../../src/store/data';
+import { fmt, fmtDate } from '../../src/utils/constants';
 
 export default function ObjectifsScreen() {
   const { user } = useAuth();
@@ -16,6 +18,8 @@ export default function ObjectifsScreen() {
   const isCommercial = role === 'commercial';
   const objective    = useObjective();
   const teamObj      = useTeamObjectives();
+  const { ventes } = useVentes();
+  const { prospections } = useProspections();
 
   const onRefresh = () => { setRefreshing(true); setTimeout(() => setRefreshing(false), 600); };
 
