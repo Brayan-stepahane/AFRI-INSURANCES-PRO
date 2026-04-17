@@ -1,17 +1,18 @@
-export type UserRole = 'commercial' | 'manager_adj' | 'manager' | 'chef' | 'admin';
+export type UserRole = 'commercial' | 'manager_adj' | 'manager' | 'chef_agence' | 'admin';
 
 export interface User {
   id: string;
   identifiant?: string;
   email: string;
   name: string;
-  surname:string;
+  surname: string;
   phone?: string;
   role?: UserRole;
   equipe?: string;
-  objectifMensuel?: number;
+  objectifMensuel?: string;
   createdAt: string;
 }
+
 
 export interface AuthResponse {
   token: string;
@@ -19,11 +20,28 @@ export interface AuthResponse {
 }
 
 export interface LoginPayload {
-  email: string;
+  identifiant: string;
   password: string;
 }
+
+
 
 export interface RegisterPayload extends LoginPayload {
   name: string;
   phone?: string;
 }
+
+export interface CreateUserPayload {
+  name: string;
+  surname: string;
+  email?: string;
+  role: UserRole;
+  phone?: string;
+  password: string;
+  objectifMensuel?: number;
+  manager_adjoint_id?: number;
+  manager_id?: number;
+  chef_agence__id?: number;
+  parentId?: number | null;
+}
+

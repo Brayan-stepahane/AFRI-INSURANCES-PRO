@@ -29,14 +29,14 @@ export default function LoginScreen() {
     if (!password.trim())    { setValidationError('Entrez votre mot de passe'); return; }
 
     try {
-      const loggedUser = await login({ email: identifiant, password });
+      const loggedUser = await login({ identifiant: identifiant, password });
       const role = loggedUser?.role ?? 'commercial';
 
       const roleRoute: Record<string, string> = {
         commercial: '/dashboard?role=commercial',
         manager_adj: '/dashboard?role=manager_adj',
         manager: '/dashboard?role=manager',
-        chef: '/dashboard?role=chef',
+        chef_agence: '/dashboard?role=chef_agence',
         admin: '/dashboard?role=admin',
       };
 
@@ -64,8 +64,8 @@ export default function LoginScreen() {
           </Text>
 
           <View style={styles.features}>
-            {FEATURES.map((f, i) => (
-              <View key={i} style={styles.featureItem}>
+            {FEATURES.map((f) => (
+              <View key={f.icon} style={styles.featureItem}>
                 <View style={styles.featureIcon}>
                   <Text style={styles.featureIconText}>{f.icon}</Text>
                 </View>
@@ -95,6 +95,9 @@ export default function LoginScreen() {
                 onChangeText={setIdentifiant}
                 editable={!isLoading}
                 autoCapitalize="none"
+                textContentType="username"
+                autoComplete="username"
+                returnKeyType="next"
               />
             </View>
 
@@ -109,6 +112,9 @@ export default function LoginScreen() {
                 onChangeText={setPassword}
                 secureTextEntry
                 editable={!isLoading}
+                textContentType="password"
+                autoComplete="password"
+                returnKeyType="done"
               />
             </View>
 

@@ -14,14 +14,19 @@ import { fmt, fmtDate } from '../../src/utils/constants';
 export default function ObjectifsScreen() {
   const { user } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const role = user?.role ?? 'commercial';
   const isCommercial = role === 'commercial';
-  const objective    = useObjective();
-  const teamObj      = useTeamObjectives();
+  const objective    = useObjective(refreshKey);
+  const teamObj      = useTeamObjectives(refreshKey);
   const { ventes } = useVentes();
   const { prospections } = useProspections();
 
-  const onRefresh = () => { setRefreshing(true); setTimeout(() => setRefreshing(false), 600); };
+  const onRefresh = () => {
+    setRefreshing(true);
+    setRefreshKey(prev => prev + 1);
+    setTimeout(() => setRefreshing(false), 600);
+  };
 
   // For commercial: contracts this month
   const name = user?.name ?? '';
@@ -90,7 +95,7 @@ export default function ObjectifsScreen() {
                   : myVentesMois.map(v => (
                     <View key={v.id} style={styles.listRow}>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.listNom} numberOfLines={1}>{v.produit.split(' ').slice(0, 2).join(' ')}</Text>
+                        <Text style={styles.listNom} numberOfLines={1}>{(v.produit || 'Produit').split(' ').slice(0, 2).join(' ')}</Text>
                         <Text style={styles.listSub}>{fmtDate(v.dateVente)}</Text>
                       </View>
                       <Text style={styles.listValue}>{fmt(v.primeNette)}</Text>
@@ -107,7 +112,7 @@ export default function ObjectifsScreen() {
                   : myProspActifs.map(p => (
                     <View key={p.id} style={styles.listRow}>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.listNom} numberOfLines={1}>{p.produit.split(' ').slice(0, 2).join(' ')}</Text>
+                        <Text style={styles.listNom} numberOfLines={1}>{(p.produit || 'Produit').split(' ').slice(0, 2).join(' ')}</Text>
                         <Text style={styles.listSub}>{fmt(p.potentielCA)} FCFA</Text>
                       </View>
                       <View style={[styles.miniStatut, { backgroundColor: p.statut === 'Cotation envoyée' ? colors.violetPale : colors.warningBg }]}>
@@ -129,7 +134,7 @@ export default function ObjectifsScreen() {
             </View>
 
             {teamObj.map(o => (
-              <View key={o.commercial} style={styles.teamCard}>
+              <View key={o.commercial + o.mensuel} style={styles.teamCard}>
                 <View style={styles.teamHeader}>
                   <View style={styles.teamAvatar}>
                     <Text style={styles.teamAvatarText}>{o.commercial.slice(0, 2)}</Text>

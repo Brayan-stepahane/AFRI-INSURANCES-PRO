@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import apiClient from '../services/api/client';
 import { API_ENDPOINTS } from '../services/api/endpoints';
+import { normalizeDateInput } from '../utils/constants';
 import { Prospection } from '../types';
 
 export function useProspections(refreshKey = 0) {
@@ -25,15 +26,17 @@ export function useProspections(refreshKey = 0) {
         potentielCA: Number(p.potentiel_ca) || 0,
         chance: (Number(p.chance_realisation) || 0) * 100,
         statut: p.statut,
-        dateContact: p.date_prospection,
-        dateRelance: p.date_relance,
-        dateV1: p.date_visite_1,
-        dateV2: p.date_visite_2,
-        dateV3: p.date_visite_3,
+        dateContact: normalizeDateInput(p.date_prospection),
+        dateRelance: normalizeDateInput(p.date_relance),
+        dateV1: normalizeDateInput(p.date_visite_1),
+        dateV2: normalizeDateInput(p.date_visite_2),
+        dateV3: normalizeDateInput(p.date_visite_3),
         observations: p.observations || '',
         ancienAssureur: p.ancien_assureur || '',
-        dateAncienEch: p.date_echeance_ancien,
+        dateAncienEch: normalizeDateInput(p.date_echeance_ancien),
+        active: p.active === true,
       })) : [];
+
 
       // Filter by role and user
       let filtered = transformed;

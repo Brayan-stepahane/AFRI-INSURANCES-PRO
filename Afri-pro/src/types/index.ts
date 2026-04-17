@@ -2,8 +2,8 @@
 export { type UserRole, type User, type AuthResponse, type LoginPayload, type RegisterPayload } from './auth.types';
 
 // Dashboard types
-export type Role = 'commercial' | 'manager_adj' | 'manager' | 'chef' | 'admin';
-export type TypeClient = 'Particulier' | 'Corporate' | 'Personnel';
+export type Role = 'commercial' | 'manager_adj' | 'manager' | 'chef_agence' | 'admin';
+export type TypeClient = 'Particulier' | 'PME' | 'Entreprise' | 'Autre';
 export type StatutProspection =
   | 'Premier contact' | 'Relance 1' | 'Relance 2'
   | 'Cotation envoyée' | 'En attente signature'
@@ -39,6 +39,7 @@ export interface Prospection {
   observations: string;
   ancienAssureur: string;
   dateAncienEch: string;
+  active?: boolean;
 }
 
 export interface Cotation {
@@ -46,6 +47,7 @@ export interface Cotation {
   noCot: number;
   prospId: number;
   clientId: string;
+  commercialId: number;
   commercial: string;
   risqueCote: string;
   dateCotation: string;
@@ -59,7 +61,8 @@ export interface Vente {
   prospId: number;
   clientId: string;
   commercial: string;
-  produit: string;
+  produit?: string;          // Legacy: use produit_id instead
+  produit_id?: number;       // Foreign key to produits table
   dateVente: string;
   typeVente: TypeVente;
   noPolice: string;

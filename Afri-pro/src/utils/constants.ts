@@ -25,6 +25,9 @@ export const fmt = (n: number | string | null | undefined): string => {
 export const fmtDate = (d: string): string =>
   d ? new Date(d).toLocaleDateString('fr-FR') : '';
 
+export const normalizeDateInput = (d: string | null | undefined): string =>
+  d ? String(d).split('T')[0] : '';
+
 export const isOverdue = (d: string): boolean =>
   d ? new Date(d) < new Date() : false;
 

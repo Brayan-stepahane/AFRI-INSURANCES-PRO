@@ -30,14 +30,14 @@ export function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
 
-  type UserRole = 'commercial' | 'manager_adj' | 'manager' | 'chef' | 'admin';
+  type UserRole = 'commercial' | 'manager_adj' | 'manager' | 'chef_agence' | 'admin';
   const role = (user?.role || 'commercial') as UserRole;
 
   const ROLE_LABELS: Record<UserRole, string> = {
     commercial: 'Commercial',
     manager_adj: 'Manager adjoint',
     manager: 'Manager',
-    chef: "Chef d'agence",
+    chef_agence: "chef_agence d'agence",
     admin: 'Administrateur',
   };
 
@@ -47,8 +47,6 @@ export function Sidebar() {
       { label: 'Mes prospections', icon: '📋', route: '/prospections' },
       { label: 'Mes cotations', icon: '💼', route: '/cotations' },
       { label: 'Mes ventes', icon: '✅', route: '/ventes' },
-      { label: 'Mon objectif', icon: '🎯', route: '/objectifs' },
-      { label: 'Base clients', icon: '🆔', route: '/clients' },
       { label: 'Notifications', icon: '🔔', route: '/notifications' },
     ],
     manager_adj: [
@@ -68,7 +66,7 @@ export function Sidebar() {
       { label: 'Mon équipe', icon: '👥', route: '/equipe' },
       { label: 'Statistiques', icon: '📊', route: '/stats' },
     ],
-    chef: [
+    chef_agence: [
       { label: 'Vue globale', icon: '🏠', route: '/dashboard' },
       { label: 'Toutes cotations', icon: '💼', route: '/cotations' },
       { label: 'Toutes ventes', icon: '✅', route: '/ventes' },

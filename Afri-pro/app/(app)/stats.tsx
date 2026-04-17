@@ -9,7 +9,7 @@ type AggregatedData = { name: string; value: number }[];
 
 type ValueMap = Record<string, number>;
 
-const ADMIN_ROLES = ['manager', 'chef', 'admin', 'manager_adj'];
+const ADMIN_ROLES = ['manager', 'chef_agence', 'admin', 'manager_adj'];
 
 const sortByValueDesc = (items: AggregatedData) => [...items].sort((a, b) => b.value - a.value);
 
@@ -94,10 +94,10 @@ export default function StatsScreen() {
       <View style={styles.chartsRow}>
         <View style={styles.chartCard}>
           <Text style={styles.chartTitle}>CA par produit (FCFA)</Text>
-          {productLines.map((item) => {
+          {productLines.map((item, idx) => {
             const width = Math.max(20, Math.round((item.value / maxProductValue) * 100));
             return (
-              <View key={item.name} style={styles.barLine}>
+              <View key={`product-${idx}`} style={styles.barLine}>
                 <Text style={styles.barLabel}>{item.name}</Text>
                 <View style={styles.barTrack}>
                   <View style={[styles.barFill, { width: `${width}%` }]} />
@@ -110,10 +110,10 @@ export default function StatsScreen() {
 
         <View style={styles.chartCard}>
           <Text style={styles.chartTitle}>CA mensuel (FCFA)</Text>
-          {monthLines.map((item) => {
+          {monthLines.map((item, idx) => {
             const width = Math.max(20, Math.round((item.value / maxMonthValue) * 100));
             return (
-              <View key={item.name} style={styles.barLine}>
+              <View key={`month-${idx}`} style={styles.barLine}>
                 <Text style={styles.barLabel}>{item.name}</Text>
                 <View style={styles.barTrack}> 
                   <View style={[styles.barFillAlt, { width: `${width}%` }]} />

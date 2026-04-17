@@ -2,18 +2,8 @@ import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { api } from '../services/api/api';
 import { API_ENDPOINTS } from '../services/api/endpoints';
+import { normalizeDateInput } from '../utils/constants';
 import { Prospection } from '../types';
-
-// Dummy data - should be fetched from API
-const objectifs: Record<string, { mensuel: number; reporte: number }> = {
-  'Commercial 1': { mensuel: 500000, reporte: 0 },
-  'Commercial 2': { mensuel: 600000, reporte: 100000 },
-};
-
-const caThisMois = (commercial: string) => {
-  // TODO: calculate from ventes data
-  return 300000; // dummy
-};
 
 interface DashboardStats {
   activeProspects: number;
@@ -65,25 +55,74 @@ export function useDashboardStats(refreshKey = 0): DashboardStats {
           api.get(API_ENDPOINTS.PROSPECTIONS.LIST, token),
         ]);
 
-        // Calculate stats from API data
-        const activeProspects = prospections.filter(
+        // Transform snake_case API responses to camelCase Prospection objects
+        const transformedProspections = Array.isArray(prospections) ? prospections.map((p: any) => ({
+          id: p.id,
+          clientId: p.client_id,
+          commercial: p.commercial_nom || '',
+          produit: p.risque_prospecte || '',
+          potentielCA: Number(p.potentiel_ca) || 0,
+          chance: (Number(p.chance_realisation) || 0) * 100,
+          statut: p.statut,
+          dateContact: normalizeDateInput(p.date_prospection),
+          dateRelance: normalizeDateInput(p.date_relance),
+          dateV1: normalizeDateInput(p.date_visite_1),
+          dateV2: normalizeDateInput(p.date_visite_2),
+          dateV3: normalizeDateInput(p.date_visite_3),
+          observations: p.observations || '',
+          ancienAssureur: p.ancien_assureur || '',
+          dateAncienEch: normalizeDateInput(p.date_echeance_ancien),
+        })) : [];
+
+        const transformedCotations = Array.isArray(cotations) ? cotations.map((c: any) => ({
+          id: c.id,
+          noCot: c.numero || 0,
+          prospId: c.prospection_id,
+          clientId: c.client_id,
+          commercial: c.commercial_nom || '',
+          risqueCote: c.risque_cote || '',
+          dateCotation: normalizeDateInput(c.date_cotation),
+          montant: Number(c.montant) || 0,
+          dateValidation: normalizeDateInput(c.date_validation),
+          statut: c.statut,
+        })) : [];
+
+        const transformedVentes = Array.isArray(ventes) ? ventes.map((v: any) => ({
+          id: v.id,
+          prospId: v.prospection_id,
+          clientId: v.client_id,
+          commercial: v.commercial_nom || '',
+          produit: v.produit || '',
+          dateVente: normalizeDateInput(v.date_vente),
+          typeVente: v.type_vente,
+          noPolice: v.no_police || '',
+          noAttestation: v.no_attestation || '',
+          noCarteRose: v.no_carte_rose || '',
+          primeNette: Number(v.prime_nette) || 0,
+          accessoires: Number(v.accessoires) || 0,
+          dateEffet: normalizeDateInput(v.date_effet),
+          dateEcheance: normalizeDateInput(v.date_echeance),
+        })) : [];
+
+        // Calculate stats from transformed data
+        const activeProspects = transformedProspections.filter(
           (p: any) => !['Contrat conclu', 'Perdu'].includes(p.statut)
         ).length;
 
-        const quotations = cotations.length;
-        const pendingCotations = cotations.filter((c: any) => c.statut === 'En attente').length;
-        const completedSales = ventes.length;
-        const totalRevenue = ventes.reduce(
-          (sum: number, v: any) => sum + (v.prime_nette || 0) + (v.accessoires || 0), 0
+        const quotations = transformedCotations.length;
+        const pendingCotations = transformedCotations.filter((c: any) => c.statut === 'En attente').length;
+        const completedSales = transformedVentes.length;
+        const totalRevenue = transformedVentes.reduce(
+          (sum: number, v: any) => sum + (v.primeNette || 0) + (v.accessoires || 0), 0
         );
 
-        const urgentFollowUps = prospections.filter((p: any) => {
-          if (!p.date_relance) return false;
-          const relanceDate = new Date(p.date_relance);
+        const urgentFollowUps = transformedProspections.filter((p: any) => {
+          if (!p.dateRelance) return false;
+          const relanceDate = new Date(p.dateRelance);
           return relanceDate < new Date();
         });
 
-        const recentSales = ventes.slice(-4).reverse();
+        const recentSales = transformedVentes.slice(-4).reverse();
 
         setStats({
           activeProspects,
@@ -93,7 +132,7 @@ export function useDashboardStats(refreshKey = 0): DashboardStats {
           totalRevenue,
           urgentFollowUps,
           pipelineData: {
-            prospects: prospections.length,
+            prospects: transformedProspections.length,
             quotations,
             sales: completedSales,
           },
@@ -126,11 +165,6 @@ export function useObjective(refreshKey = 0) {
     total: 500000,
     pct: 0,
     reste: 500000,
-    contractsCompletedThisMonth: 0,
-    estimatedContractTarget: 12,
-    contractsRemaining: 12,
-    contractsReported: 0,
-    contractsNew: 12,
     loading: true,
     error: null as string | null,
   });
@@ -146,35 +180,16 @@ export function useObjective(refreshKey = 0) {
         setObjective(prev => ({ ...prev, loading: true, error: null }));
 
         const dashboardData = await api.get(API_ENDPOINTS.DASHBOARD.STATS, token);
-        const ventes = await api.get(API_ENDPOINTS.VENTES.LIST, token);
 
         // Get objective data from dashboard API
-        const objData = dashboardData.objectifs?.[0] || { objectif_mensuel: 500000, reporte: 0, ca_realise: 0 };
+        const objData = dashboardData.objectifs?.[0] || { objectif_mensuel: user?.objectifMensuel || 500000, reporte: 0, ca_realise: 0 };
 
-        const mensuel = objData.objectif_mensuel || 500000;
+        const mensuel = objData.objectif_mensuel || user?.objectifMensuel || 500000;
         const reporte = objData.reporte || 0;
         const ca = objData.ca_realise || 0;
         const total = mensuel + reporte;
         const pct = total > 0 ? Math.min(100, Math.round((ca / total) * 100)) : 0;
         const reste = Math.max(0, total - ca);
-
-        // Contract metrics
-        const now = new Date();
-        const contractsCompletedThisMonth = ventes.filter((v: any) => {
-          if (!v.date_vente) return false;
-          const d = new Date(v.date_vente);
-          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-        }).length;
-
-        // Calculate average deal value to estimate contract target
-        const avgDealValue = ventes.length > 0
-          ? ventes.reduce((s: number, v: any) => s + (v.prime_nette || 0) + (v.accessoires || 0), 0) / ventes.length
-          : 50000; // fallback average
-
-        const estimatedContractTarget = total > 0 ? Math.round(total / avgDealValue) : 12; // 12 as default
-        const contractsRemaining = Math.max(0, estimatedContractTarget - contractsCompletedThisMonth);
-        const contractsReported = reporte > 0 ? Math.round(reporte / avgDealValue) : 0;
-        const contractsNew = estimatedContractTarget - contractsReported;
 
         setObjective({
           mensuel,
@@ -183,11 +198,6 @@ export function useObjective(refreshKey = 0) {
           total,
           pct,
           reste,
-          contractsCompletedThisMonth,
-          estimatedContractTarget,
-          contractsRemaining,
-          contractsReported,
-          contractsNew,
           loading: false,
           error: null,
         });
@@ -207,11 +217,58 @@ export function useObjective(refreshKey = 0) {
   return objective;
 }
 
-export function useTeamObjectives() {
-  return Object.entries(objectifs).map(([commercial, obj]) => {
-    const ca = caThisMois(commercial);
-    const total = obj.mensuel + obj.reporte;
-    const pct = total > 0 ? Math.min(100, Math.round((ca / total) * 100)) : 0;
-    return { commercial, ...obj, ca, total, pct, reste: Math.max(0, total - ca) };
-  });
+export function useTeamObjectives(refreshKey = 0) {
+  const { token } = useAuth();
+  const [objectives, setObjectives] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
+    const fetchTeamObjectives = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const dashboardData = await api.get(API_ENDPOINTS.DASHBOARD.STATS, token);
+        console.log('Dashboard data received:', dashboardData); // DEBUG
+        
+        const objectivesList = dashboardData.objectifs || [];
+        console.log('Objectifs array:', objectivesList); // DEBUG
+
+        const teamObjs = objectivesList
+          .filter((obj: any) => obj.commercial_nom) // Ensure we have commercial name
+          .map((obj: any) => {
+            const mapped = {
+              commercial: obj.commercial_nom,
+              mensuel: Number(obj.objectif_mensuel || obj.montant_mensuel) || 0,
+              reporte: Number(obj.reporte || obj.montant_reporte) || 0,
+              ca: Number(obj.ca_realise) || 0,
+              total: Number(obj.total_objectif) || (Number(obj.objectif_mensuel || obj.montant_mensuel) || 0) + (Number(obj.reporte || obj.montant_reporte) || 0),
+              pct: Number(obj.pct_atteint) || 0,
+              reste: Number(obj.montant_restant) || 0,
+            };
+            console.log(`Mapped objective for ${obj.commercial_nom}:`, mapped); // DEBUG
+            return mapped;
+          });
+
+        console.log('Final team objectives:', teamObjs); // DEBUG
+        setObjectives(teamObjs);
+        setLoading(false);
+      } catch (err) {
+        console.error('Error fetching team objectives:', err); // DEBUG
+        setError(err instanceof Error ? err.message : 'Failed to load objectives');
+        setObjectives([]);
+        setLoading(false);
+      }
+    };
+
+    fetchTeamObjectives();
+  }, [token, refreshKey]);
+
+  return objectives;
 }

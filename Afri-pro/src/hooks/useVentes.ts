@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import apiClient from '../services/api/client';
 import { API_ENDPOINTS } from '../services/api/endpoints';
+import { normalizeDateInput } from '../utils/constants';
 import { Vente } from '../types';
 
 export function useVentes(refreshKey = 0) {
@@ -23,15 +24,15 @@ export function useVentes(refreshKey = 0) {
         clientId: v.client_id,
         commercial: v.commercial_nom || '',
         produit: v.produit || '',
-        dateVente: v.date_vente,
+        dateVente: normalizeDateInput(v.date_vente),
         typeVente: v.type_vente,
         noPolice: v.no_police || '',
         noAttestation: v.no_attestation || '',
         noCarteRose: v.no_carte_rose || '',
         primeNette: Number(v.prime_nette) || 0,
         accessoires: Number(v.accessoires) || 0,
-        dateEffet: v.date_effet,
-        dateEcheance: v.date_echeance,
+        dateEffet: normalizeDateInput(v.date_effet),
+        dateEcheance: normalizeDateInput(v.date_echeance),
       })) : [];
 
       // Filter by role and user

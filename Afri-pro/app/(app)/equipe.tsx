@@ -5,7 +5,7 @@ import { userService } from '../../src/services/auth.service';
 import { colors, spacing, radius } from '../../src/config/theme';
 import { User } from '../../src/types/auth.types';
 
-const TEAM_ROLES = ['manager', 'manager_adj', 'chef', 'admin'];
+const TEAM_ROLES = ['manager', 'manager_adj', 'chef_agence', 'admin'];
 
 export default function EquipeScreen() {
   const { user } = useAuth();

@@ -51,15 +51,16 @@ interface NewProspectionModalProps {
   visible: boolean;
   onClose: () => void;
   onSubmit?: (data: ProspectionFormData, isEdit?: boolean, prospectionId?: number, options?: { refreshOnly?: boolean }) => void;
-  editProspection?: any; // For editing
+  editProspection?: any;
 }
 
-const STEP_LABELS  = ['Client', 'Prospection', 'Cotation', 'Vente'];
-const CLIENT_TYPES = ['Particulier', 'PME', 'Entreprise', 'Autre'];
-const ACTIVITIES   = ['Chef d\'entreprise', 'Salarié', 'Indépendant', 'Autre'];
+const STEP_LABELS = ['Client', 'Prospection', 'Cotation', 'Vente'];
+const CLIENT_TYPES = ['Particulier','PME','Entreprise','Autre'];
+const ACTIVITIES = ['chef_agence d\'entreprise', 'Salarié', 'Indépendant', 'Autre'];
 
 const normalizeDate = (value: string) => {
   if (!value) return '';
+  if (value.includes('T')) return value.split('T')[0];
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
   const parts = value.split(/[\/\.-]/);
   if (parts.length === 3) {
@@ -71,24 +72,25 @@ const normalizeDate = (value: string) => {
 
 const normalizeProbability = (value: number) => {
   if (typeof value !== 'number' || Number.isNaN(value)) return 0;
-  return value > 1 ? Math.min(Math.max(value, 0), 100) / 100 : Math.min(Math.max(value, 0), 1);
+  return Math.min(Math.max(value / 100, 0.1), 1);
 };
 
-const PRODUCTS     = [
+const PRODUCTS = [
   'Afrilife étude', 'Afrilife retraite individuelle', 'Afrilife retraite plus',
   'Afrilife libre retraite', 'Afrilife Pension', 'Afrilife prévoyance individuelle',
   'Afrilife Prévoyance groupe', 'Afrilife retraite complémentaire',
   'Afrilife Indemnité de fin de carrière', 'Assurance Santé Groupe',
   'Assurance Maritime', 'Automobile', 'Flotte Automobile', 'Assurance Voyage',
   'Caution de soumission', 'Individuelle Accident', 'Individuelle Accident Groupe',
-  'Multirisque Habitation', 'Responsabilité Civile Chef Entreprise',
+  'Multirisque Habitation', 'Responsabilité Civile chef_agence Entreprise',
   'Transport Marchandise', 'Autre',
 ];
-const STATUSES   = ['Premier contact', 'En discussion', 'Proposition envoyée', 'Négociation', 'Autre'];
-const SALE_TYPES = ['Nouvelle vente (NouVe)', 'Transfert', 'Augmentation', 'Autre'];
-const RISKS      = ['— Non coté —', 'Standard', 'Surcoté', 'Refusé'];
 
-// ─── SelectField ─────────────────────────────────────────────────────────────
+const STATUSES = ['Premier contact', 'En discussion', 'Proposition envoyée', 'Négociation', 'Autre'];
+const SALE_TYPES = ['Nouvelle vente (NouVe)', 'Transfert', 'Augmentation', 'Autre'];
+const RISKS = ['— Non coté —', 'Standard', 'Surcoté', 'Refusé'];
+
+// ==================== SELECT FIELD ====================
 function SelectField({
   value, options, isOpen, onToggle, onSelect,
 }: {
@@ -120,22 +122,10 @@ function SelectField({
       </TouchableOpacity>
 
       {isOpen && (
-        <Modal
-          transparent
-          visible={isOpen}
-          animationType="none"
-          onRequestClose={onToggle}
-        >
-          {/* Invisible backdrop to close on outside tap */}
-          <TouchableOpacity style={[sf.modalBackdrop, { pointerEvents: 'auto' }]} onPress={onToggle} activeOpacity={1}>
-            <View
-              style={[sf.list, { top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }]}
-            >
-              <ScrollView
-                nestedScrollEnabled
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-              >
+        <Modal transparent visible={isOpen} animationType="none" onRequestClose={onToggle}>
+          <TouchableOpacity style={sf.modalBackdrop} onPress={onToggle} activeOpacity={1}>
+            <View style={[sf.list, { top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }]}>
+              <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 {options.map(item => (
                   <TouchableOpacity
                     key={item}
@@ -143,8 +133,10 @@ function SelectField({
                     onPress={() => { onSelect(item); onToggle(); }}
                     activeOpacity={0.7}
                   >
-                    <Text style={[sf.itemText, item === value && sf.itemTextActive]}>{item}</Text>
-                    {item === value && <Text style={sf.checkmark}>✓</Text>}
+                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Text style={[sf.itemText, item === value && sf.itemTextActive]}>{item}</Text>
+                      {item === value && <Text style={sf.checkmark}>✓</Text>}
+                    </View>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
@@ -167,37 +159,24 @@ const sf = StyleSheet.create({
   triggerOpen: { borderColor: colors.violet },
   triggerText: { flex: 1, fontSize: 14, color: colors.gray800 },
   caret: { fontSize: 9, color: colors.gray400, marginLeft: 6 },
-
-  // Full-screen backdrop
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
-
-  // Dropdown panel — positioned absolutely in window coords
+  modalBackdrop: { flex: 1, backgroundColor: 'transparent' },
   list: {
-    position: 'absolute',
-    maxHeight: 200,
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.violet,
-    borderRadius: radius.sm,
-    elevation: 20,
-    boxShadow: '0px 4px 8px rgba(0,0,0,0.15)',
-    overflow: 'hidden',
+    position: 'absolute', maxHeight: 200, backgroundColor: colors.white,
+    borderWidth: 1, borderColor: colors.violet, borderRadius: radius.sm,
+    elevation: 20, overflow: 'hidden',
   },
   item: {
     flexDirection: 'row', alignItems: 'center',
     paddingVertical: 10, paddingHorizontal: spacing.md,
     borderBottomWidth: 1, borderBottomColor: colors.gray100,
   },
-  itemActive:      { backgroundColor: colors.violetPale },
-  itemText:        { flex: 1, fontSize: 13, color: colors.gray800 },
-  itemTextActive:  { fontWeight: '600', color: colors.violet },
-  checkmark:       { fontSize: 12, color: colors.violet, fontWeight: '700' },
+  itemActive: { backgroundColor: colors.violetPale },
+  itemText: { flex: 1, fontSize: 13, color: colors.gray800 },
+  itemTextActive: { fontWeight: '600', color: colors.violet },
+  checkmark: { fontSize: 12, color: colors.violet, fontWeight: '700' },
 });
 
-// ─── Main component ───────────────────────────────────────────────────────────
+// ====================== MAIN COMPONENT ======================
 export function NewProspectionModal({ visible, onClose, onSubmit, editProspection }: NewProspectionModalProps) {
   const { user } = useAuth();
   const { clients } = useClients();
@@ -205,191 +184,186 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
   const { cotations } = useCotations();
   const { ventes } = useVentes();
 
-  // Helper functions
-  const getClient = (id: string) => clients.find(c => c.id === id);
-  const searchClientsByName = (query: string) => {
-    if (!query.trim()) return [];
-    const q = query.toLowerCase();
-    return clients.filter(c => c.nom.toLowerCase().includes(q));
-  };
-  const genClientId = () => `CLI${Date.now()}${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
-
   const [step, setStep] = useState(1);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const toggle = (name: string) => setOpenDropdown(prev => (prev === name ? null : name));
 
   const [form, setForm] = useState<ProspectionFormData>({
     clientId: '', clientName: '', phone: '', clientType: 'Particulier',
-    activity: 'Chef d\'entreprise',
+    activity: 'chef_agence d\'entreprise',
     prospectionDate: new Date().toISOString().split('T')[0],
     product: 'Afrilife étude', potentialCA: '', status: 'Premier contact',
     probability: 50, visitDate1: '', nextFollowUp: '', visitDate2: '',
     visitDate3: '', previousInsurer: '', previousContract: '', observations: '',
     ratedRisk: '— Non coté —', quotationDate: '', quotationAmount: '',
     validationDate: '', saleDate: '', saleType: 'Nouvelle vente (NouVe)',
-    policyNumber: '', attestationNumber: '', netPremiums: '', accessories: '',
+    policyNumber: '', attestationNumber: '', netPremiums: '', accessories: '1000',
     effectDate: '', expiryDate: '', carRoseNumber: '',
   });
+
   const [clientSearchResults, setClientSearchResults] = useState<Client[]>([]);
   const [clientSearchMessage, setClientSearchMessage] = useState<string>('');
   const [prospectionId, setProspectionId] = useState<number | null>(editProspection?.id ?? null);
   const [cotationId, setCotationId] = useState<number | null>(null);
+  const [venteId, setVenteId] = useState<number | null>(null);
+  const [isLoadingEditData, setIsLoadingEditData] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string>('');
   const [saveError, setSaveError] = useState<string>('');
-  const [savedSteps, setSavedSteps] = useState<{ client?: boolean; prospection?: boolean; cotation?: boolean }>({});
+  const [savedSteps, setSavedSteps] = useState<{ client?: boolean; prospection?: boolean; cotation?: boolean; vente?: boolean }>({});
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleSearchClient = () => {
-    const query = form.clientName.trim();
-    if (!query) {
-      setClientSearchResults([]);
-      setClientSearchMessage('Entrez un nom ou un identifiant de client pour rechercher.');
-      return;
+  // ==================== CLIENT LOGIC (ANTI-DUPLICATE) ====================
+  const getOrCreateClientId = async (): Promise<string> => {
+    const trimmedName = form.clientName.trim();
+    if (!trimmedName) {
+      setSaveError('Le nom du client est requis.');
+      throw new Error('Client name is required');
     }
 
-    const results = searchClientsByName(query);
-    setClientSearchResults(results);
-    setClientSearchMessage(results.length === 0 ? 'Aucun client trouvé dans la base.' : '');
-  };
-
-  const selectClient = (client: Client) => {
-    setForm(prev => ({
-      ...prev,
-      clientId: client.id,
-      clientName: client.nom,
-      phone: client.telephone || '',
-      clientType: client.type_client || 'Particulier',
-      activity: client.activite || '',
-    }));
-    setClientSearchResults([]);
-    setClientSearchMessage(`Client sélectionné : ${client.nom}`);
-  };
-
-  const getOrCreateClientId = () => {
-    const trimmedName = form.clientName.trim();
-    if (!trimmedName) return '';
-    if (form.clientId) return form.clientId;
-
-    const existing = clients.find(c => c.nom.trim().toLowerCase() === trimmedName.toLowerCase());
+    let existing = clients.find(c => c.nom.trim().toLowerCase() === trimmedName.toLowerCase());
     if (existing) {
       setForm(prev => ({ ...prev, clientId: existing.id }));
       return existing.id;
     }
 
-    const newClientId = genClientId();
+    try {
+      const response = await apiClient.get(API_ENDPOINTS.CLIENTS.LIST, {
+        params: { search: trimmedName, limit: 10 }
+      });
+      const serverExisting = (response.data || []).find((c: any) =>
+        c.nom?.trim().toLowerCase() === trimmedName.toLowerCase()
+      );
+      if (serverExisting) {
+        setForm(prev => ({ ...prev, clientId: serverExisting.id }));
+        return serverExisting.id;
+      }
+    } catch (err) {
+      console.warn('Server client search failed', err);
+    }
+
+    const newClientId = `CLI${Date.now()}${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
     setForm(prev => ({ ...prev, clientId: newClientId }));
     return newClientId;
   };
 
   const saveClientToDatabase = async (clientId: string): Promise<boolean> => {
+    if (!form.clientName?.trim()) {
+      setSaveError('Le nom du client est requis.');
+      return false;
+    }
+
+    const validClientTypes = ['Particulier', 'PME', 'Entreprise', 'Autre'];
+    const clientType = validClientTypes.includes(form.clientType?.trim() || '')
+      ? form.clientType.trim()
+      : 'Particulier';
+
+    const payload = {
+      nom: form.clientName.trim(),
+      telephone: form.phone?.trim() || '',
+      activite: form.activity?.trim() || '',
+      type_client: clientType,
+      email: '',
+      ville: '',
+    };
+
     try {
-      if (!clientId) {
-        setSaveError('Identifiant client manquant.');
-        return false;
-      }
+      if (clientId.startsWith('CLI')) {
+        try {
+          const checkRes = await apiClient.get(API_ENDPOINTS.CLIENTS.LIST, {
+            params: { nom: payload.nom, limit: 5 }
+          });
+          const duplicate = (checkRes.data || []).find((c: any) =>
+            c.nom?.trim().toLowerCase() === payload.nom.toLowerCase()
+          );
+          if (duplicate) {
+            setForm(prev => ({ ...prev, clientId: duplicate.id }));
+            return true;
+          }
+        } catch (e) { /* ignore */ }
 
-      if (!form.clientName || !form.clientName.trim()) {
-        setSaveError('Le nom du client est requis.');
-        return false;
-      }
-
-      const payload = {
-        nom: form.clientName.trim(),
-        telephone: form.phone?.trim() || '',
-        activite: form.activity?.trim() || '',
-        type_client: form.clientType || 'Particulier',
-        email: '',
-        ville: '',
-      };
-
-      let response: AxiosResponse<any>;
-      // Check if this is a new client (generated id)
-      const isNewClient = clientId.startsWith('CLI');
-
-      if (isNewClient) {
-        // Create new client
-        response = await apiClient.post(API_ENDPOINTS.CLIENTS.LIST, payload);
-        if (response?.data) {
+        const response = await apiClient.post(API_ENDPOINTS.CLIENTS.LIST, payload);
+        if (response?.data?.id) {
           setForm(prev => ({ ...prev, clientId: response.data.id }));
           return true;
         }
       } else {
-        // Update existing client
-        response = await apiClient.put(`${API_ENDPOINTS.CLIENTS.LIST}/${clientId}`, payload);
-        if (response?.data) {
-          return true;
-        }
+        await apiClient.put(`${API_ENDPOINTS.CLIENTS.LIST}/${clientId}`, payload);
+        return true;
       }
-
-      setSaveError('Réponse du serveur invalide.');
-      return false;
     } catch (error: any) {
-      console.error('Error saving client to database:', error);
-      const errorMsg = error?.response?.data?.error || 'Erreur lors de l\'enregistrement du client sur le serveur.';
-      setSaveError(errorMsg);
+      console.error('Client save error:', error?.response?.data);
+      const errorMsg = error?.response?.data?.error || 'Erreur lors de l\'enregistrement du client.';
+      setSaveError(errorMsg.toLowerCase().includes('duplicate') ? 'Un client avec ce nom existe déjà.' : errorMsg);
       return false;
     }
+    return false;
   };
 
+  const selectClient = (client: Client) => {
+    const validClientTypes = ['Particulier', 'PME', 'Entreprise', 'Autre'];
+    const clientType = validClientTypes.includes(client.type_client?.trim() || '')
+      ? client.type_client?.trim() ?? 'Particulier'
+      : 'Particulier';
+
+    setForm(prev => ({
+      ...prev,
+      clientId: client.id,
+      clientName: client.nom,
+      phone: client.telephone || prev.phone,
+      clientType,
+      activity: client.activite || prev.activity,
+    }));
+
+    setClientSearchResults([]);
+    setClientSearchMessage(`Client sélectionné : ${client.nom}`);
+  };
+
+  const dateOrNull = (value: string) => (!value || !value.trim() ? null : normalizeDate(value) || null);
+  const numOrNull = (value: string | number) => {
+    const num = Number(value);
+    return isNaN(num) || num === 0 ? null : num;
+  };
+
+  // ==================== SAVE FUNCTIONS ====================
   const saveProspectionToDatabase = async (): Promise<number | null> => {
     try {
-      const clientId = form.clientId || getOrCreateClientId();
-      if (!clientId) {
-        setSaveError('Client requis pour enregistrer la prospection.');
-        return null;
-      }
+      let clientId = form.clientId;
+      if (!clientId) clientId = await getOrCreateClientId();
+      if (!clientId) return null;
 
-      const payload = {
-        clientName: form.clientName,
-        phone: form.phone || '',
-        clientType: form.clientType,
-        activity: form.activity,
-        prospectionDate: normalizeDate(form.prospectionDate),
-        product: form.product,
-        potentialCA: Number(form.potentialCA) || 0,
-        status: form.status,
-        probability: normalizeProbability(form.probability),
-        visitDate1: normalizeDate(form.visitDate1 || ''),
-        nextFollowUp: normalizeDate(form.nextFollowUp || ''),
-        visitDate2: normalizeDate(form.visitDate2 || ''),
-        visitDate3: normalizeDate(form.visitDate3 || ''),
-        previousInsurer: form.previousInsurer || '',
-        previousContract: normalizeDate(form.previousContract || ''),
-        observations: form.observations || '',
-        ratedRisk: form.ratedRisk,
-        quotationDate: normalizeDate(form.quotationDate || ''),
-        quotationAmount: form.quotationAmount || '',
-        validationDate: normalizeDate(form.validationDate || ''),
-        saleDate: normalizeDate(form.saleDate || ''),
-        saleType: form.saleType,
-        policyNumber: form.policyNumber || '',
-        attestationNumber: form.attestationNumber || '',
-        netPremiums: form.netPremiums || '',
-        accessories: form.accessories || '',
-        effectDate: normalizeDate(form.effectDate || ''),
-        expiryDate: normalizeDate(form.expiryDate || ''),
-        carRoseNumber: form.carRoseNumber || '',
+      const validClientTypes = ['Particulier', 'PME', 'Entreprise', 'Autre'];
+      const clientType = validClientTypes.includes(form.clientType?.trim() || '') ? form.clientType.trim() : 'Particulier';
+
+      const payload: any = {
+        clientId, clientName: form.clientName.trim(), phone: form.phone?.trim() || '',
+        clientType, activity: form.activity?.trim() || '',
+        prospectionDate: dateOrNull(form.prospectionDate),
+        product: form.product, potentialCA: numOrNull(form.potentialCA),
+        status: form.status, probability: normalizeProbability(form.probability),
+        visitDate1: dateOrNull(form.visitDate1), nextFollowUp: dateOrNull(form.nextFollowUp),
+        visitDate2: dateOrNull(form.visitDate2), visitDate3: dateOrNull(form.visitDate3),
+        previousInsurer: form.previousInsurer || '', previousContract: dateOrNull(form.previousContract),
+        observations: form.observations || '', ratedRisk: form.ratedRisk,
+        quotationDate: dateOrNull(form.quotationDate), quotationAmount: numOrNull(form.quotationAmount),
+        validationDate: dateOrNull(form.validationDate), saleDate: dateOrNull(form.saleDate),
+        saleType: form.saleType, policyNumber: form.policyNumber || '',
+        attestationNumber: form.attestationNumber || '', netPremiums: numOrNull(form.netPremiums),
+        accessories: numOrNull(form.accessories), effectDate: dateOrNull(form.effectDate),
+        expiryDate: dateOrNull(form.expiryDate), carRoseNumber: form.carRoseNumber || '',
       };
 
       let response: AxiosResponse<any>;
       if (prospectionId) {
-        // Update existing prospection
-        response = await apiClient.put(`${API_ENDPOINTS.PROSPECTIONS.LIST}/${prospectionId}`, {
-          clientId,
-          product: form.product,
-          prospectionDate: normalizeDate(form.prospectionDate),
-          potentialCA: Number(form.potentialCA) || 0,
-          probability: normalizeProbability(form.probability),
-          status: form.status,
-          visitDate1: normalizeDate(form.visitDate1 || ''),
-          visitDate2: normalizeDate(form.visitDate2 || ''),
-          visitDate3: normalizeDate(form.visitDate3 || ''),
-          nextFollowUp: normalizeDate(form.nextFollowUp || ''),
-          observations: form.observations,
-          previousInsurer: form.previousInsurer,
-          previousContract: normalizeDate(form.previousContract || ''),
-        });
+        const updatePayload = {
+          clientId, product: form.product, prospectionDate: dateOrNull(form.prospectionDate),
+          potentialCA: numOrNull(form.potentialCA), probability: normalizeProbability(form.probability),
+          status: form.status, visitDate1: dateOrNull(form.visitDate1),
+          visitDate2: dateOrNull(form.visitDate2), visitDate3: dateOrNull(form.visitDate3),
+          nextFollowUp: dateOrNull(form.nextFollowUp), observations: form.observations || '',
+          previousInsurer: form.previousInsurer || '', previousContract: dateOrNull(form.previousContract),
+        };
+        response = await apiClient.put(`${API_ENDPOINTS.PROSPECTIONS.LIST}/${prospectionId}`, updatePayload);
       } else {
-        // Create new prospection
         response = await apiClient.post(API_ENDPOINTS.PROSPECTIONS.CREATE, payload);
       }
 
@@ -400,266 +374,192 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
       setSaveError('Erreur lors de l\'enregistrement de la prospection.');
       return null;
     } catch (error: any) {
-      console.error('Error saving prospection:', error);
-      const errorMsg = error?.response?.data?.error || 'Erreur lors de l\'enregistrement de la prospection.';
-      setSaveError(errorMsg);
+      console.error('Prospection save error:', error);
+      setSaveError('Erreur lors de l\'enregistrement de la prospection.');
       return null;
     }
   };
 
-  const saveCotationToDatabase = async (prospectionId: number): Promise<number | null> => {
+  const saveCotationToDatabase = async (prospectionIdParam: number): Promise<number | null> => {
     try {
-      if (!prospectionId || !form.quotationAmount) {
-        return null;
-      }
-
-      const clientId = form.clientId || getOrCreateClientId();
+      let clientId = form.clientId;
+      if (!clientId) clientId = await getOrCreateClientId();
       if (!clientId) {
         setSaveError('Client requis pour enregistrer la cotation.');
         return null;
       }
 
       const payload = {
-        prospection_id: prospectionId,
+        prospection_id: prospectionIdParam,
         client_id: clientId,
         risque_cote: form.ratedRisk,
-        date_cotation: form.quotationDate,
-        montant: Number(form.quotationAmount) || 0,
+        date_cotation: dateOrNull(form.quotationDate),
+        montant: numOrNull(form.quotationAmount),
+        date_validation: dateOrNull(form.validationDate),
       };
 
-      const response: AxiosResponse<any> = await apiClient.post(API_ENDPOINTS.COTATIONS.LIST, payload);
+      let response: AxiosResponse<any>;
+      if (cotationId) {
+        response = await apiClient.put(`${API_ENDPOINTS.COTATIONS.UPDATE}/${cotationId}`, payload);
+      } else {
+        response = await apiClient.post(API_ENDPOINTS.COTATIONS.LIST, payload);
+      }
+
       if (response?.data?.id) {
         setCotationId(response.data.id);
         return response.data.id;
       }
       return null;
     } catch (error: any) {
-      console.error('Error saving cotation:', error);
+      console.error('Cotation save error:', error);
+      setSaveError('Erreur lors de l\'enregistrement de la cotation.');
       return null;
     }
   };
 
-  const saveVenteToDatabase = async (prospectionId: number, cotationId?: number): Promise<number | null> => {
+  const saveVenteToDatabase = async (prospectionIdParam: number, cotationIdParam?: number): Promise<number | null> => {
     try {
-      if (!prospectionId || !form.saleDate || !form.policyNumber) {
+      if (!form.saleDate) {
+        setSaveError('La date de vente est requise.');
         return null;
       }
 
-      const clientId = form.clientId || getOrCreateClientId();
+      let clientId = form.clientId;
+      if (!clientId) clientId = await getOrCreateClientId();
       if (!clientId) {
         setSaveError('Client requis pour enregistrer la vente.');
         return null;
       }
 
+      const clientSaved = await saveClientToDatabase(clientId);
+      if (!clientSaved) return null;
+
+      const mapSaleType = (type: string): string => type.includes('Nouvelle') ? 'NouVe' : 'VenRec';
+
       const payload = {
-        prospection_id: prospectionId,
-        cotation_id: cotationId || null,
+        prospection_id: prospectionIdParam,
+        cotation_id: cotationIdParam || cotationId || null,
         client_id: clientId,
-        date_vente: form.saleDate,
-        type_vente: form.saleType,
-        numero_police: form.policyNumber,
-        numero_attestation: form.attestationNumber || '',
-        prime_nette: Number(form.netPremiums) || 0,
-        accessoires: Number(form.accessories) || 0,
+        commercial_id: user?.id,
+        date_vente: dateOrNull(form.saleDate),
+        type_vente: mapSaleType(form.saleType),
+        produit: form.product,
+        numero_police: form.policyNumber || null,
+        numero_attestation: form.attestationNumber || null,
+        no_carte_rose: form.carRoseNumber || null,
+        prime_nette: numOrNull(form.netPremiums),
+        accessoires: numOrNull(form.accessories),
+        date_effet: dateOrNull(form.effectDate),
+        date_echeance: dateOrNull(form.expiryDate),
       };
 
-      const response: AxiosResponse<any> = await apiClient.post(API_ENDPOINTS.VENTES.LIST, payload);
+      let response: AxiosResponse<any>;
+      if (venteId) {
+        response = await apiClient.put(`${API_ENDPOINTS.VENTES.UPDATE}/${venteId}`, payload);
+      } else {
+        response = await apiClient.post(API_ENDPOINTS.VENTES.LIST, payload);
+      }
+
       if (response?.data?.id) {
+        setVenteId(response.data.id);
         return response.data.id;
       }
       return null;
     } catch (error: any) {
-      console.error('Error saving vente:', error);
+      console.error('Vente save error:', error);
+      setSaveError('Erreur lors de l\'enregistrement de la vente.');
       return null;
     }
   };
 
-  // const handleLocalSave = (message: string, savedProspectionId?: number) => {
-  //   const clientId = getOrCreateClientId();
-  //   if (!clientId) {
-  //     setSaveError('Veuillez sélectionner ou créer un client avant de sauvegarder.');
-  //     return null;
-  //   }
-
-  //   const record = {
-  //     clientId,
-  //     commercial: user?.name || 'commercial',
-  //     produit: form.product,
-  //     potentielCA: Number(form.potentialCA) || 0,
-  //     chance: form.probability,
-  //     statut: form.status as any,
-  //     dateContact: form.prospectionDate,
-  //     dateRelance: form.nextFollowUp,
-  //     dateV1: form.visitDate1,
-  //     dateV2: form.visitDate2,
-  //     dateV3: form.visitDate3,
-  //     observations: form.observations,
-  //     ancienAssureur: form.previousInsurer,
-  //     dateAncienEch: form.previousContract,
-  //   };
-
-  //   if (prospectionId) {
-  //     const idx = prospections.findIndex(p => p.id === prospectionId);
-  //     if (idx >= 0) {
-  //       prospections[idx] = { ...prospections[idx], ...record } as any;
-  //       return prospectionId;
-  //     }
-  //   }
-
-  //   const nextId = getNextId(prospections);
-  //   const newProspection = { id: nextId, ...record } as any;
-  //   // prospections.unshift(newProspection); // Removed: data will be refetched
-  //   setProspectionId(nextId);
-  //   return nextId;
-  // };
-
-  // const saveCotationLocal = (savedProspectionId: number) => {
-  //   if (!form.quotationDate && !form.quotationAmount && form.ratedRisk === '— Non coté —') {
-  //     return null;
-  //   }
-
-  //   const clientId = getOrCreateClientId();
-  //   if (!clientId) {
-  //     setSaveError('Veuillez sélectionner ou créer un client avant de sauvegarder la cotation.');
-  //     return null;
-  //   }
-
-  //   const nextId = getNextId(cotations);
-  //   const newCotation = {
-  //     id: nextId,
-  //     noCot: nextId,
-  //     prospId: savedProspectionId,
-  //     clientId,
-  //     commercial: user?.name || 'commercial',
-  //     risqueCote: form.ratedRisk,
-  //     dateCotation: form.quotationDate,
-  //     montant: Number(form.quotationAmount) || 0,
-  //     dateValidation: form.validationDate,
-  //     statut: form.validationDate ? 'Validée' : 'En attente',
-  //   } as any;
-  //   // cotations.unshift(newCotation); // Removed: data will be refetched
-  //   setCotationId(nextId);
-
-  //   // const pi = prospections.findIndex(p => p.id === savedProspectionId);
-  //   // if (pi >= 0) prospections[pi].statut = 'Cotation envoyée'; // Removed: will be updated via API
-
-  //   return nextId;
-  // };
-
-  // const saveVenteLocal = (savedProspectionId: number, savedCotationId?: number | null) => {
-  //   if (!form.saleDate) {
-  //     setSaveError('Veuillez renseigner la date de vente avant de sauvegarder.');
-  //     return null;
-  //   }
-
-  //   const clientId = getOrCreateClientId();
-  //   if (!clientId) {
-  //     setSaveError('Veuillez sélectionner ou créer un client avant de sauvegarder la vente.');
-  //     return null;
-  //   }
-
-  //   const nextId = getNextId(ventes);
-  //   const newVente = {
-  //     id: nextId,
-  //     prospId: savedProspectionId,
-  //     clientId,
-  //     commercial: user?.name || 'commercial',
-  //     produit: form.product,
-  //     dateVente: form.saleDate,
-  //     typeVente: form.saleType.includes('Nouvelle') ? 'NouVe' : 'VenRec',
-  //     noPolice: form.policyNumber,
-  //     noAttestation: form.attestationNumber,
-  //     noCarteRose: form.carRoseNumber,
-  //     primeNette: Number(form.netPremiums) || 0,
-  //     accessoires: Number(form.accessories) || 0,
-  //     dateEffet: form.effectDate,
-  //     dateEcheance: form.expiryDate,
-  //   } as any;
-  //   // ventes.unshift(newVente); // Removed: data will be refetched
-
-  //   // const pi = prospections.findIndex(p => p.id === savedProspectionId);
-  //   // if (pi >= 0) prospections[pi].statut = 'Contrat conclu'; // Removed: will be updated via API
-  //   // if (savedCotationId) {
-  //   //   const ci = cotations.findIndex(c => c.id === savedCotationId);
-  //   //   if (ci >= 0) cotations[ci].statut = 'Convertie en vente'; // Removed: will be updated via API
-  //   // }
-
-  //   return nextId;
-  // };
-
-  const handleLocalSave = (message: string, savedProspectionId?: number) => {
-    setSaveMessage(message);
-    setSaveError('');
-    if (onSubmit) onSubmit(form, !!editProspection, savedProspectionId, { refreshOnly: true });
-  };
-
+  // ==================== MAIN SAVE HANDLER ====================
   const handleSaveCurrentStep = async () => {
+    if (isSaving) return false;
+
+    setIsSaving(true);
     setSaveError('');
     setSaveMessage('');
 
-    // Step 1: Save client to database first
-    if (step === 1) {
-      const clientId = getOrCreateClientId();
-      if (!clientId) {
-        setSaveError('Veuillez sélectionner ou créer un client avant de sauvegarder.');
-        return false;
+    try {
+      if (step === 1) {
+        const clientId = await getOrCreateClientId();
+        const success = await saveClientToDatabase(clientId);
+        if (!success) return false;
+
+        setSavedSteps(prev => ({ ...prev, client: true }));
+        setSaveMessage('Client enregistré avec succès.');
+        return true;
       }
-      const success = await saveClientToDatabase(clientId);
-      if (!success) return false;
-      setSaveMessage('Client enregistré.');
-      setSavedSteps(prev => ({ ...prev, client: true }));
-      return true;
-    }
 
-    // Step 2+: Validate that client was saved first
-    if (!savedSteps.client) {
-      setSaveError('Veuillez d\'abord enregistrer le client (Étape 1).');
+      if (step === 2) {
+        if (!savedSteps.client) {
+          const clientId = await getOrCreateClientId();
+          const clientSaved = await saveClientToDatabase(clientId);
+          if (!clientSaved) return false;
+          setSavedSteps(prev => ({ ...prev, client: true }));
+        }
+
+        const savedId = await saveProspectionToDatabase();
+        if (!savedId) return false;
+
+        setSavedSteps(prev => ({ ...prev, prospection: true }));
+        setSaveMessage('Prospection enregistrée avec succès.');
+        if (onSubmit) onSubmit(form, !!editProspection, savedId, { refreshOnly: true });
+        return true;
+      }
+
+      if (step === 3) {
+        if (!savedSteps.prospection) {
+          const savedId = await saveProspectionToDatabase();
+          if (!savedId) {
+            setSaveError('Veuillez d\'abord enregistrer la prospection (Étape 2).');
+            return false;
+          }
+          setProspectionId(savedId);
+          setSavedSteps(prev => ({ ...prev, prospection: true }));
+        }
+        if (form.quotationDate || form.quotationAmount) {
+          if (!prospectionId) {
+            setSaveError('ID de prospection manquant.');
+            return false;
+          }
+          await saveCotationToDatabase(prospectionId);
+        }
+        setSavedSteps(prev => ({ ...prev, cotation: true }));
+        setSaveMessage('Cotation traitée.');
+        return true;
+      }
+
+      if (step === 4) {
+        if (!savedSteps.prospection) {
+          const savedId = await saveProspectionToDatabase();
+          if (!savedId) {
+            setSaveError('Veuillez d\'abord enregistrer la prospection (Étape 2).');
+            return false;
+          }
+          setProspectionId(savedId);
+          setSavedSteps(prev => ({ ...prev, prospection: true }));
+        }
+        if (form.saleDate || form.policyNumber) {
+          if (!prospectionId) {
+            setSaveError('ID de prospection manquant.');
+            return false;
+          }
+          await saveVenteToDatabase(prospectionId, cotationId || undefined);
+        }
+        setSavedSteps(prev => ({ ...prev, vente: true }));
+        setSaveMessage('Vente traitée.');
+        if (onSubmit) onSubmit(form, !!editProspection, prospectionId || undefined, { refreshOnly: true });
+        return true;
+      }
       return false;
-    }
-
-    // Step 2: Save prospection to database
-    const savedProspectionId = await saveProspectionToDatabase();
-    if (!savedProspectionId) {
-      setSaveError('Erreur lors de l\'enregistrement de la prospection.');
+    } catch (error) {
+      console.error('Save step error:', error);
+      setSaveError('Une erreur inattendue est survenue.');
       return false;
+    } finally {
+      setIsSaving(false);
     }
-    setSavedSteps(prev => ({ ...prev, prospection: true }));
-
-    if (step === 2) {
-      setSaveMessage('Prospection enregistrée.');
-      return true;
-    }
-
-    // Step 3: Validate that prospection was saved
-    if (!savedSteps.prospection) {
-      setSaveError('Veuillez d\'abord enregistrer la prospection (Étape 2).');
-      return false;
-    }
-
-    // Step 3: Save cotation to database
-    const savedCotId = await saveCotationToDatabase(savedProspectionId);
-    setSavedSteps(prev => ({ ...prev, cotation: true }));
-
-    if (step === 3) {
-      setSaveMessage('Cotation enregistrée.');
-      return true;
-    }
-
-    // Step 4: Validate that cotation step was saved
-    if (!savedSteps.cotation) {
-      setSaveError('Veuillez d\'abord enregistrer la cotation (Étape 3).');
-      return false;
-    }
-
-    // Step 4: Save vente to database
-    const savedVenteId = await saveVenteToDatabase(savedProspectionId, savedCotId || undefined);
-
-    if (!savedVenteId) {
-      setSaveError('Erreur lors de l\'enregistrement de la vente.');
-      return false;
-    }
-    setSaveMessage('Prospection, cotation et vente enregistrées.');
-    return true;
   };
 
   const handleSaveAndClose = async () => {
@@ -667,49 +567,58 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
     if (saved) onClose();
   };
 
-  // If editing, populate form
+  const formatSaleTypeToLabel = (type: string) => {
+    if (type === 'NouVe') return 'Nouvelle vente (NouVe)';
+    if (type === 'VenRec') return 'Transfert';
+    return 'Autre';
+  };
+
+  const mapEditProspectionToForm = (data: any): ProspectionFormData => {
+    const rawChance = Number((data.chance_realisation ?? data.chance) || 0);
+    const probability = rawChance > 1 ? Math.min(Math.max(rawChance, 0), 100) : Math.min(Math.max(rawChance * 100, 0), 100);
+
+    return {
+      clientId: data.client_id || '',
+      clientName: data.client_nom || '',
+      phone: data.client_tel || '',
+      clientType: data.type_client || 'Particulier',
+      activity: data.activite || 'chef_agence d\'entreprise',
+      prospectionDate: normalizeDate(data.date_prospection) || new Date().toISOString().split('T')[0],
+      product: data.risque_prospecte || 'Afrilife étude',
+      potentialCA: data.potentiel_ca != null ? String(data.potentiel_ca) : '',
+      status: data.statut || 'Premier contact',
+      probability,
+      visitDate1: normalizeDate(data.date_visite_1) || '',
+      nextFollowUp: normalizeDate(data.date_relance) || '',
+      visitDate2: normalizeDate(data.date_visite_2) || '',
+      visitDate3: normalizeDate(data.date_visite_3) || '',
+      previousInsurer: data.ancien_assureur || '',
+      previousContract: normalizeDate(data.date_echeance_ancien) || '',
+      observations: data.observations || '',
+      ratedRisk: data.risque_cote || '— Non coté —',
+      quotationDate: normalizeDate(data.date_cotation) || '',
+      quotationAmount: data.montant != null ? String(data.montant) : '',
+      validationDate: normalizeDate(data.date_validation) || '',
+      saleDate: normalizeDate(data.date_vente) || '',
+      saleType: formatSaleTypeToLabel(data.type_vente || ''),
+      policyNumber: data.no_police || '',
+      attestationNumber: data.no_attestation || '',
+      netPremiums: data.prime_nette != null ? String(data.prime_nette) : '',
+      accessories: data.accessoires != null ? String(data.accessoires) : '',
+      effectDate: normalizeDate(data.date_effet) || '',
+      expiryDate: normalizeDate(data.date_echeance) || '',
+      carRoseNumber: data.no_carte_rose || '',
+    };
+  };
+
+  // ==================== EDIT MODE ====================
   React.useEffect(() => {
-    if (editProspection && visible) {
-      const client = getClient(editProspection.clientId);
-      setForm({
-        clientId: editProspection.clientId || '',
-        clientName: client?.nom || '',
-        phone: client?.telephone || '',
-        clientType: client?.type_client || 'Particulier',
-        activity: client?.activite || 'Chef d\'entreprise',
-        prospectionDate: editProspection.dateContact || new Date().toISOString().split('T')[0],
-        product: editProspection.produit || 'Afrilife étude',
-        potentialCA: String(editProspection.potentielCA || ''),
-        status: editProspection.statut || 'Premier contact',
-        probability: editProspection.chance || 50,
-        visitDate1: editProspection.dateV1 || '',
-        nextFollowUp: editProspection.dateRelance || '',
-        visitDate2: editProspection.dateV2 || '',
-        visitDate3: editProspection.dateV3 || '',
-        previousInsurer: editProspection.ancienAssureur || '',
-        previousContract: editProspection.dateAncienEch || '',
-        observations: editProspection.observations || '',
-        ratedRisk: '— Non coté —',
-        quotationDate: '',
-        quotationAmount: '',
-        validationDate: '',
-        saleDate: '',
-        saleType: 'Nouvelle vente (NouVe)',
-        policyNumber: '',
-        attestationNumber: '',
-        netPremiums: '',
-        accessories: '',
-        effectDate: editProspection.dateAncienEch || '',
-        expiryDate: '',
-        carRoseNumber: '',
-      });
-      setProspectionId(editProspection.id || null);
-    } else if (!editProspection && visible) {
+    const initNewForm = () => {
       setStep(1);
-      setSavedSteps({}); // Reset saved steps for new prospection
+      setSavedSteps({});
       setForm({
         clientId: '', clientName: '', phone: '', clientType: 'Particulier',
-        activity: 'Chef d\'entreprise',
+        activity: 'chef_agence d\'entreprise',
         prospectionDate: new Date().toISOString().split('T')[0],
         product: 'Afrilife étude', potentialCA: '', status: 'Premier contact',
         probability: 50, visitDate1: '', nextFollowUp: '', visitDate2: '',
@@ -720,11 +629,49 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
         effectDate: '', expiryDate: '', carRoseNumber: '',
       });
       setProspectionId(null);
-      setOpenDropdown(null);
-      setClientSearchResults([]);
-      setClientSearchMessage('');
+      setCotationId(null);
+      setVenteId(null);
+      setIsLoadingEditData(false);
+    };
+
+    const loadEditProspection = async () => {
+      if (!editProspection?.id) {
+        initNewForm();
+        return;
+      }
+
+      setIsLoadingEditData(true);
+      setStep(1);
+      setProspectionId(editProspection.id);
+
+      try {
+        const response = await apiClient.get(`${API_ENDPOINTS.PROSPECTIONS.LIST}/${editProspection.id}`);
+        const data = response.data;
+        setForm(mapEditProspectionToForm(data));
+        setCotationId(data.cotation_id ?? null);
+        setVenteId(data.vente_id ?? null);
+        setSavedSteps({
+          client: true,
+          prospection: true,
+          cotation: !!data.cotation_id,
+          vente: !!data.vente_id,
+        });
+      } catch (error) {
+        console.error('Failed to load prospection for edit:', error);
+        initNewForm();
+      } finally {
+        setIsLoadingEditData(false);
+      }
+    };
+
+    if (visible) {
+      if (editProspection) {
+        loadEditProspection();
+      } else {
+        initNewForm();
+      }
     }
-    setCotationId(null);
+
     setSaveMessage('');
     setSaveError('');
   }, [editProspection, visible]);
@@ -732,11 +679,24 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
   const upd = (field: keyof ProspectionFormData, value: any) =>
     setForm(prev => ({ ...prev, [field]: value }));
 
+  const handleSearchClient = () => {
+    const query = form.clientName.trim();
+    if (!query) {
+      setClientSearchResults([]);
+      setClientSearchMessage('Entrez un nom pour rechercher.');
+      return;
+    }
+    const results = clients.filter(c => c.nom.toLowerCase().includes(query.toLowerCase()));
+    setClientSearchResults(results);
+    setClientSearchMessage(results.length === 0 ? 'Aucun client trouvé.' : '');
+  };
+
+  // ==================== RENDER STEPS ====================
   const renderStepIndicator = () => (
     <View style={styles.stepContainer}>
       {STEP_LABELS.map((label, idx) => {
         const n = idx + 1;
-        const isActive    = step === n;
+        const isActive = step === n;
         const isCompleted = step > n;
         return (
           <TouchableOpacity
@@ -757,13 +717,7 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
   );
 
   const renderStep1 = () => (
-    <ScrollView
-      style={styles.formScroll}
-      contentContainerStyle={styles.formContent}
-      showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-      nestedScrollEnabled
-    >
+    <ScrollView style={styles.formScroll} contentContainerStyle={styles.formContent} keyboardShouldPersistTaps="handled">
       <Text style={styles.subtitle}>Identification du client</Text>
       <Text style={styles.hint}>Tapez le nom pour rechercher un client existant</Text>
 
@@ -773,29 +727,22 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
           style={[styles.input, styles.searchInput]}
           placeholder="Tapez pour rechercher ou créer..."
           value={form.clientName}
-          onChangeText={v => {
-            upd('clientName', v);
-            setClientSearchResults([]);
-            setClientSearchMessage('');
-          }}
+          onChangeText={v => { upd('clientName', v); setClientSearchResults([]); setClientSearchMessage(''); }}
           placeholderTextColor={colors.gray400}
         />
-        <TouchableOpacity style={styles.searchButton} onPress={handleSearchClient} activeOpacity={0.8}>
+        <TouchableOpacity style={styles.searchButton} onPress={handleSearchClient}>
           <Text style={styles.searchButtonText}>Rechercher</Text>
         </TouchableOpacity>
       </View>
-      <Text style={styles.helperText}>Le système cherche dans la base clients après validation.</Text>
+
       {clientSearchMessage ? <Text style={styles.searchMessage}>{clientSearchMessage}</Text> : null}
+
       {clientSearchResults.length > 0 && (
         <View style={styles.searchResults}>
           {clientSearchResults.map(client => (
-            <TouchableOpacity
-              key={client.id}
-              style={styles.resultItem}
-              onPress={() => selectClient(client)}
-            >
+            <TouchableOpacity key={client.id} style={styles.resultItem} onPress={() => selectClient(client)}>
               <Text style={styles.resultName}>{client.nom}</Text>
-              <Text style={styles.resultMeta}>{client.id} · {client.activite}</Text>
+              <Text style={styles.resultMeta}>{client.id}{client.activite ? ` · ${client.activite}` : ''}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -804,15 +751,13 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
       <View style={styles.row}>
         <View style={styles.half}>
           <Text style={styles.label}>Téléphone</Text>
-          <TextInput
-            style={styles.input} placeholder="6XX XXX XXX" value={form.phone}
-            onChangeText={v => upd('phone', v)} placeholderTextColor={colors.gray400}
-          />
+          <TextInput style={styles.input} placeholder="6XX XXX XXX" value={form.phone} onChangeText={v => upd('phone', v)} placeholderTextColor={colors.gray400} />
         </View>
         <View style={styles.half}>
           <Text style={styles.label}>Type de client</Text>
           <SelectField
-            value={form.clientType} options={CLIENT_TYPES}
+            value={form.clientType}
+            options={CLIENT_TYPES}
             isOpen={openDropdown === 'clientType'}
             onToggle={() => toggle('clientType')}
             onSelect={v => upd('clientType', v)}
@@ -823,7 +768,8 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
       <View>
         <Text style={styles.label}>Activité</Text>
         <SelectField
-          value={form.activity} options={ACTIVITIES}
+          value={form.activity}
+          options={ACTIVITIES}
           isOpen={openDropdown === 'activity'}
           onToggle={() => toggle('activity')}
           onSelect={v => upd('activity', v)}
@@ -833,20 +779,15 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
   );
 
   const renderStep2 = () => (
-    <ScrollView
-      style={styles.formScroll}
-      contentContainerStyle={styles.formContent}
-      showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-      nestedScrollEnabled
-    >
+    <ScrollView style={styles.formScroll} contentContainerStyle={styles.formContent} keyboardShouldPersistTaps="handled">
       <Text style={styles.subtitle}>Détails de la prospection</Text>
 
       <View style={styles.row}>
         <View style={styles.half}>
           <Text style={styles.label}>Produit / Risque visé *</Text>
           <SelectField
-            value={form.product} options={PRODUCTS}
+            value={form.product}
+            options={PRODUCTS}
             isOpen={openDropdown === 'product'}
             onToggle={() => toggle('product')}
             onSelect={v => upd('product', v)}
@@ -855,7 +796,8 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
         <View style={styles.half}>
           <Text style={styles.label}>Statut *</Text>
           <SelectField
-            value={form.status} options={STATUSES}
+            value={form.status}
+            options={STATUSES}
             isOpen={openDropdown === 'status'}
             onToggle={() => toggle('status')}
             onSelect={v => upd('status', v)}
@@ -863,74 +805,84 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
         </View>
       </View>
 
-      <Text style={styles.label}>Chance de réalisation (%)</Text>
-      <View style={styles.probabilityContainer}>
-        <TextInput
-          style={styles.probabilityInput} placeholder="0"
-          value={String(form.probability)}
-          onChangeText={(v: string) => {
-            const num = parseInt(v) || 0;
-            upd('probability', Math.min(Math.max(num, 0), 100));
-          }}
-          keyboardType="numeric" maxLength={3} placeholderTextColor={colors.gray400}
-        />
-        <View style={styles.probabilityBadge}>
-          <Text style={styles.probabilityText}>{form.probability}%</Text>
+      <View style={styles.row}>
+        <View style={styles.half}>
+          <Text style={styles.label}>Potentiel CA (FCFA)</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Ex: 250000"
+            value={form.potentialCA}
+            onChangeText={v => upd('potentialCA', v.replace(/[^0-9]/g, ''))}
+            keyboardType="numeric"
+            placeholderTextColor={colors.gray400}
+          />
+        </View>
+        <View style={styles.half}>
+          <Text style={styles.label}>Chance de réalisation (%)</Text>
+          <View style={styles.probabilityContainer}>
+            <TextInput
+              style={styles.probabilityInput}
+              placeholder="0"
+              value={String(form.probability)}
+              onChangeText={(v) => {
+                const num = parseInt(v) || 0;
+                upd('probability', Math.min(Math.max(num, 0), 100));
+              }}
+              keyboardType="numeric"
+              maxLength={3}
+              placeholderTextColor={colors.gray400}
+            />
+            <View style={styles.probabilityBadge}>
+              <Text style={styles.probabilityText}>{form.probability}%</Text>
+            </View>
+          </View>
         </View>
       </View>
 
       <Text style={styles.label}>Date visite 1</Text>
-      <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.visitDate1}
-        onChangeText={v => upd('visitDate1', v)} placeholderTextColor={colors.gray400} />
+      <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.visitDate1} onChangeText={v => upd('visitDate1', v)} placeholderTextColor={colors.gray400} />
 
       <View style={styles.row}>
         <View style={styles.half}>
           <Text style={styles.label}>Prochaine relance</Text>
-          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.nextFollowUp}
-            onChangeText={v => upd('nextFollowUp', v)} placeholderTextColor={colors.gray400} />
+          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.nextFollowUp} onChangeText={v => upd('nextFollowUp', v)} placeholderTextColor={colors.gray400} />
           <Text style={styles.helperText}>Alerte automatique à cette date</Text>
         </View>
         <View style={styles.half}>
           <Text style={styles.label}>Date visite 2</Text>
-          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.visitDate2}
-            onChangeText={v => upd('visitDate2', v)} placeholderTextColor={colors.gray400} />
+          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.visitDate2} onChangeText={v => upd('visitDate2', v)} placeholderTextColor={colors.gray400} />
         </View>
       </View>
 
       <Text style={styles.label}>Date visite 3</Text>
-      <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.visitDate3}
-        onChangeText={v => upd('visitDate3', v)} placeholderTextColor={colors.gray400} />
+      <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.visitDate3} onChangeText={v => upd('visitDate3', v)} placeholderTextColor={colors.gray400} />
 
       <View style={styles.row}>
         <View style={styles.half}>
           <Text style={styles.label}>Ancien assureur</Text>
-          <TextInput style={styles.input} placeholder="Nom compagnie" value={form.previousInsurer}
-            onChangeText={v => upd('previousInsurer', v)} placeholderTextColor={colors.gray400} />
+          <TextInput style={styles.input} placeholder="Nom compagnie" value={form.previousInsurer} onChangeText={v => upd('previousInsurer', v)} placeholderTextColor={colors.gray400} />
         </View>
         <View style={styles.half}>
-          <Text style={styles.label}>Échange ancien contrat</Text>
-          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.previousContract}
-            onChangeText={v => upd('previousContract', v)} placeholderTextColor={colors.gray400} />
+          <Text style={styles.label}>Échéance ancien contrat</Text>
+          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.previousContract} onChangeText={v => upd('previousContract', v)} placeholderTextColor={colors.gray400} />
         </View>
       </View>
 
       <Text style={styles.label}>Observations</Text>
       <TextInput
-        style={[styles.input, styles.textarea]} placeholder="Notes supplémentaires..."
-        value={form.observations} onChangeText={v => upd('observations', v)}
-        placeholderTextColor={colors.gray400} multiline numberOfLines={3}
+        style={[styles.input, styles.textarea]}
+        placeholder="Notes supplémentaires..."
+        value={form.observations}
+        onChangeText={v => upd('observations', v)}
+        placeholderTextColor={colors.gray400}
+        multiline
+        numberOfLines={3}
       />
     </ScrollView>
   );
 
   const renderStep3 = () => (
-    <ScrollView
-      style={styles.formScroll}
-      contentContainerStyle={styles.formContent}
-      showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-      nestedScrollEnabled
-    >
+    <ScrollView style={styles.formScroll} contentContainerStyle={styles.formContent} keyboardShouldPersistTaps="handled">
       <Text style={styles.subtitle}>Cotation (optionnel)</Text>
       <View style={styles.infoBox}>
         <Text style={styles.infoIcon}>📋</Text>
@@ -943,7 +895,8 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
         <View style={styles.half}>
           <Text style={styles.label}>Risque coté</Text>
           <SelectField
-            value={form.ratedRisk} options={RISKS}
+            value={form.ratedRisk}
+            options={RISKS}
             isOpen={openDropdown === 'ratedRisk'}
             onToggle={() => toggle('ratedRisk')}
             onSelect={v => upd('ratedRisk', v)}
@@ -951,34 +904,25 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
         </View>
         <View style={styles.half}>
           <Text style={styles.label}>Date de cotation</Text>
-          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.quotationDate}
-            onChangeText={v => upd('quotationDate', v)} placeholderTextColor={colors.gray400} />
+          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.quotationDate} onChangeText={v => upd('quotationDate', v)} placeholderTextColor={colors.gray400} />
         </View>
       </View>
 
       <View style={styles.row}>
         <View style={styles.half}>
           <Text style={styles.label}>Montant de la cotation (FCFA)</Text>
-          <TextInput style={styles.input} placeholder="Ex: 105 000" value={form.quotationAmount}
-            onChangeText={v => upd('quotationAmount', v)} placeholderTextColor={colors.gray400} />
+          <TextInput style={styles.input} placeholder="Ex: 105 000" value={form.quotationAmount} onChangeText={v => upd('quotationAmount', v)} placeholderTextColor={colors.gray400} />
         </View>
         <View style={styles.half}>
           <Text style={styles.label}>Date de validation</Text>
-          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.validationDate}
-            onChangeText={v => upd('validationDate', v)} placeholderTextColor={colors.gray400} />
+          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.validationDate} onChangeText={v => upd('validationDate', v)} placeholderTextColor={colors.gray400} />
         </View>
       </View>
     </ScrollView>
   );
 
   const renderStep4 = () => (
-    <ScrollView
-      style={styles.formScroll}
-      contentContainerStyle={styles.formContent}
-      showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-      nestedScrollEnabled
-    >
+    <ScrollView style={styles.formScroll} contentContainerStyle={styles.formContent} keyboardShouldPersistTaps="handled">
       <Text style={styles.subtitle}>Vente conclue (optionnel)</Text>
       <View style={[styles.infoBox, styles.successInfo]}>
         <Text style={styles.infoIcon}>✓</Text>
@@ -990,13 +934,13 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
       <View style={styles.row}>
         <View style={styles.half}>
           <Text style={styles.label}>Date de vente</Text>
-          <TextInput style={styles.input} placeholder="dd/mm/yyyy" value={form.saleDate}
-            onChangeText={v => upd('saleDate', v)} placeholderTextColor={colors.gray400} />
+          <TextInput style={styles.input} placeholder="dd/mm/yyyy" value={form.saleDate} onChangeText={v => upd('saleDate', v)} placeholderTextColor={colors.gray400} />
         </View>
         <View style={styles.half}>
           <Text style={styles.label}>Type de vente</Text>
           <SelectField
-            value={form.saleType} options={SALE_TYPES}
+            value={form.saleType}
+            options={SALE_TYPES}
             isOpen={openDropdown === 'saleType'}
             onToggle={() => toggle('saleType')}
             onSelect={v => upd('saleType', v)}
@@ -1007,45 +951,38 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
       <View style={styles.row}>
         <View style={styles.half}>
           <Text style={styles.label}>N° Police EXCEL/ORASS</Text>
-          <TextInput style={styles.input} placeholder="Numéro de police" value={form.policyNumber}
-            onChangeText={v => upd('policyNumber', v)} placeholderTextColor={colors.gray400} />
+          <TextInput style={styles.input} placeholder="Numéro de police" value={form.policyNumber} onChangeText={v => upd('policyNumber', v)} placeholderTextColor={colors.gray400} />
         </View>
         <View style={styles.half}>
           <Text style={styles.label}>N° Attestation</Text>
-          <TextInput style={styles.input} placeholder="Numéro attestation" value={form.attestationNumber}
-            onChangeText={v => upd('attestationNumber', v)} placeholderTextColor={colors.gray400} />
+          <TextInput style={styles.input} placeholder="Numéro attestation" value={form.attestationNumber} onChangeText={v => upd('attestationNumber', v)} placeholderTextColor={colors.gray400} />
         </View>
       </View>
 
       <View style={styles.row}>
         <View style={styles.half}>
           <Text style={styles.label}>Primes nettes (FCFA)</Text>
-          <TextInput style={styles.input} placeholder="Ex: 100 000" value={form.netPremiums}
-            onChangeText={v => upd('netPremiums', v)} placeholderTextColor={colors.gray400} />
+          <TextInput style={styles.input} placeholder="Ex: 100 000" value={form.netPremiums} onChangeText={v => upd('netPremiums', v)} placeholderTextColor={colors.gray400} />
         </View>
         <View style={styles.half}>
           <Text style={styles.label}>Accessoires (FCFA)</Text>
-          <TextInput style={styles.input} placeholder="Ex: 5 000" value={form.accessories}
-            onChangeText={v => upd('accessories', v)} placeholderTextColor={colors.gray400} />
+          <TextInput style={styles.input} placeholder="Ex: 5 000" value={form.accessories} onChangeText={v => upd('accessories', v)} placeholderTextColor={colors.gray400} />
         </View>
       </View>
 
       <View style={styles.row}>
         <View style={styles.half}>
           <Text style={styles.label}>Date d'effet</Text>
-          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.effectDate}
-            onChangeText={v => upd('effectDate', v)} placeholderTextColor={colors.gray400} />
+          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.effectDate} onChangeText={v => upd('effectDate', v)} placeholderTextColor={colors.gray400} />
         </View>
         <View style={styles.half}>
           <Text style={styles.label}>Date d'échéance</Text>
-          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.expiryDate}
-            onChangeText={v => upd('expiryDate', v)} placeholderTextColor={colors.gray400} />
+          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.expiryDate} onChangeText={v => upd('expiryDate', v)} placeholderTextColor={colors.gray400} />
         </View>
       </View>
 
       <Text style={styles.label}>N° Carte rose (automobile)</Text>
-      <TextInput style={styles.input} placeholder="Numéro carte rose" value={form.carRoseNumber}
-        onChangeText={v => upd('carRoseNumber', v)} placeholderTextColor={colors.gray400} />
+      <TextInput style={styles.input} placeholder="Numéro carte rose" value={form.carRoseNumber} onChangeText={v => upd('carRoseNumber', v)} placeholderTextColor={colors.gray400} />
     </ScrollView>
   );
 
@@ -1061,6 +998,7 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
         </View>
 
         {renderStepIndicator()}
+
         {saveMessage ? <Text style={styles.saveMessage}>{saveMessage}</Text> : null}
         {saveError ? <Text style={styles.saveError}>{saveError}</Text> : null}
 
@@ -1077,30 +1015,35 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
               ← Précédent
             </Text>
           </TouchableOpacity>
+
           <View style={styles.footerActions}>
-            {step === 1 && (
-              <TouchableOpacity style={styles.saveButton} onPress={handleSaveCurrentStep} activeOpacity={0.8}>
-                <Text style={styles.saveButtonText}>Enregistrer</Text>
+            {step !== 4 && (
+              <TouchableOpacity
+                style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
+                onPress={handleSaveCurrentStep}
+                disabled={isSaving}
+              >
+                <Text style={styles.saveButtonText}>{isSaving ? 'Enregistrement...' : 'Enregistrer'}</Text>
               </TouchableOpacity>
             )}
-            {step > 1 && step < 4 && (
-              <TouchableOpacity style={styles.saveButton} onPress={handleSaveCurrentStep} activeOpacity={0.8}>
-                <Text style={styles.saveButtonText}>Enregistrer</Text>
-              </TouchableOpacity>
-            )}
+
             <TouchableOpacity
               onPress={async () => {
                 if (step === 4) {
                   await handleSaveAndClose();
-                } else {
-                  // For steps 1-3, require saving first
-                  const saved = await handleSaveCurrentStep();
-                  if (saved) setStep(step + 1);
+                  return;
+                }
+                const saved = await handleSaveCurrentStep();
+                if (saved) {
+                  setStep(prev => prev + 1);
                 }
               }}
-              style={[styles.nextButton, step === 4 && styles.submitButton]}
+              style={[styles.nextButton, step === 4 && styles.submitButton, isSaving && styles.nextButtonDisabled]}
+              disabled={isSaving}
             >
-              <Text style={styles.nextButtonText}>{step === 4 ? 'Enregistrer ✓' : 'Suivant →'}</Text>
+              <Text style={styles.nextButtonText}>
+                {isSaving ? 'Enregistrement...' : step === 4 ? 'Enregistrer ✓' : 'Suivant →'}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1111,6 +1054,7 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
   if (Platform.OS === 'web') {
     return visible ? <View style={styles.webContainer}>{modalContent}</View> : null;
   }
+
   return (
     <Modal visible={visible} transparent animationType="fade">
       {modalContent}
@@ -1118,60 +1062,65 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
   );
 }
 
+// ====================== STYLES ======================
 const styles = StyleSheet.create({
-  webContainer:         { ...StyleSheet.absoluteFillObject, zIndex: 999, position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
-  backdrop:             { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center' },
-  backdropPress:        { ...StyleSheet.absoluteFillObject, pointerEvents: 'auto' },
-  modal:                { width: '90%', maxWidth: 900, maxHeight: '90%', backgroundColor: colors.white, borderRadius: radius.lg, flexDirection: 'column', overflow: 'hidden' },
-  header:               { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.gray100 },
-  title:                { fontSize: 18, fontWeight: '700', color: colors.violetDark },
-  closeButton:          { fontSize: 22, color: colors.gray400 },
-  stepContainer:        { flexDirection: 'row', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, gap: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.gray100 },
-  stepBox:              { flex: 1, paddingVertical: spacing.md, paddingHorizontal: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.gray200, backgroundColor: colors.white, alignItems: 'center' },
-  stepBoxActive:        { backgroundColor: colors.violet, borderColor: colors.violet },
-  stepBoxCompleted:     { backgroundColor: colors.violetPale, borderColor: colors.violetPale },
-  stepNumber:           { fontSize: 16, fontWeight: '700', color: colors.gray600, marginBottom: 2 },
-  stepNumberActive:     { color: colors.white },
-  stepLabel:            { fontSize: 12, color: colors.gray600, fontWeight: '500' },
-  stepLabelActive:      { color: colors.white },
-  formArea:             { flex: 1, minHeight: 0 },
-  formScroll:           { flex: 1, minHeight: 0 },
-  formContent:          { paddingHorizontal: spacing.xl, paddingVertical: spacing.lg },
-  subtitle:             { fontSize: 16, fontWeight: '700', color: colors.violetDark, marginBottom: spacing.sm },
-  hint:                 { fontSize: 13, color: colors.gray400, marginBottom: spacing.lg },
-  label:                { fontSize: 13, fontWeight: '600', color: colors.gray800, marginBottom: spacing.sm, marginTop: spacing.md },
-  input:                { borderWidth: 1, borderColor: colors.gray200, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: 14, color: colors.gray800, backgroundColor: colors.white, minHeight: 40 },
-  textarea:             { minHeight: 80, paddingTop: spacing.sm, textAlignVertical: 'top' },
-  helperText:           { fontSize: 12, color: colors.gray400, marginTop: 4 },
-  searchRow:            { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },
-  searchInput:          { flex: 1 },
-  searchButton:         { backgroundColor: colors.violet, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.sm, marginLeft: spacing.sm, minHeight: 40, justifyContent: 'center', alignItems: 'center' },
-  searchButtonText:     { color: colors.white, fontWeight: '700', fontSize: 14 },
-  searchResults:        { marginTop: spacing.sm, borderWidth: 1, borderColor: colors.gray200, borderRadius: radius.sm, overflow: 'hidden', backgroundColor: colors.white },
-  resultItem:           { padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.gray100 },
-  resultName:           { fontSize: 14, fontWeight: '600', color: colors.gray800 },
-  resultMeta:           { fontSize: 12, color: colors.gray400, marginTop: 4 },
-  searchMessage:        { fontSize: 12, color: colors.gray400, marginTop: spacing.sm },
-  row:                  { flexDirection: 'row', gap: spacing.md, marginVertical: spacing.sm },
-  half:                 { flex: 1 },
+  webContainer: { ...StyleSheet.absoluteFillObject, zIndex: 999 },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center' },
+  backdropPress: { ...StyleSheet.absoluteFillObject },
+  modal: { width: '90%', maxWidth: 900, maxHeight: '90%', backgroundColor: colors.white, borderRadius: radius.lg, overflow: 'hidden' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.gray100 },
+  title: { fontSize: 18, fontWeight: '700', color: colors.violetDark },
+  closeButton: { fontSize: 22, color: colors.gray400 },
+  stepContainer: { flexDirection: 'row', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, gap: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.gray100 },
+  stepBox: { flex: 1, paddingVertical: spacing.md, paddingHorizontal: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.gray200, backgroundColor: colors.white, alignItems: 'center' },
+  stepBoxActive: { backgroundColor: colors.violet, borderColor: colors.violet },
+  stepBoxCompleted: { backgroundColor: colors.violetPale, borderColor: colors.violetPale },
+  stepNumber: { fontSize: 16, fontWeight: '700', color: colors.gray600, marginBottom: 2 },
+  stepNumberActive: { color: colors.white },
+  stepLabel: { fontSize: 12, color: colors.gray600, fontWeight: '500' },
+  stepLabelActive: { color: colors.white },
+  formArea: { flex: 1, minHeight: 0 },
+  formScroll: { flex: 1 },
+  formContent: { paddingHorizontal: spacing.xl, paddingVertical: spacing.lg },
+  subtitle: { fontSize: 16, fontWeight: '700', color: colors.violetDark, marginBottom: spacing.sm },
+  hint: { fontSize: 13, color: colors.gray400, marginBottom: spacing.lg },
+  label: { fontSize: 13, fontWeight: '600', color: colors.gray800, marginBottom: spacing.sm, marginTop: spacing.md },
+  input: { borderWidth: 1, borderColor: colors.gray200, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: 14, color: colors.gray800, backgroundColor: colors.white, minHeight: 40 },
+  textarea: { minHeight: 80, paddingTop: spacing.sm, textAlignVertical: 'top' },
+  helperText: { fontSize: 12, color: colors.gray400, marginTop: 4 },
+  searchRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },
+  searchInput: { flex: 1 },
+  searchButton: { backgroundColor: colors.violet, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.sm, marginLeft: spacing.sm, minHeight: 40, justifyContent: 'center', alignItems: 'center' },
+  searchButtonText: { color: colors.white, fontWeight: '700', fontSize: 14 },
+  searchResults: { marginTop: spacing.sm, borderWidth: 1, borderColor: colors.gray200, borderRadius: radius.sm, overflow: 'hidden', backgroundColor: colors.white },
+  resultItem: { padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.gray100 },
+  resultName: { fontSize: 14, fontWeight: '600', color: colors.gray800 },
+  resultMeta: { fontSize: 12, color: colors.gray400, marginTop: 4 },
+  searchMessage: { fontSize: 12, color: colors.gray400, marginTop: spacing.sm },
+  row: { flexDirection: 'row', gap: spacing.md, marginVertical: spacing.md },
+  half: { flex: 1 },
   probabilityContainer: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.lg },
-  probabilityInput:     { flex: 1, borderWidth: 1, borderColor: colors.gray200, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: 14, color: colors.gray800, backgroundColor: colors.white },
-  probabilityBadge:     { backgroundColor: colors.violet, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: 20, minWidth: 60, alignItems: 'center' },
-  probabilityText:      { fontSize: 12, fontWeight: '700', color: colors.white },
-  infoBox:              { flexDirection: 'row', backgroundColor: colors.infoBg, borderLeftWidth: 3, borderLeftColor: colors.info, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.md, marginBottom: spacing.lg, gap: spacing.md },
-  successInfo:          { backgroundColor: colors.successBg, borderLeftColor: colors.success },
-  infoIcon:             { fontSize: 16 },
-  infoText:             { flex: 1, fontSize: 13, color: colors.info, lineHeight: 18 },
-  successText:          { color: colors.success },
-  footer:               { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, borderTopWidth: 1, borderTopColor: colors.gray100 },
-  footerActions:        { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  saveButton:           { backgroundColor: colors.violet, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderRadius: radius.sm },
-  saveButtonText:       { color: colors.white, fontWeight: '700', fontSize: 14 },
-  saveMessage:          { fontSize: 13, color: colors.violetDark, paddingHorizontal: spacing.xl, paddingTop: spacing.sm },
-  saveError:            { fontSize: 13, color: colors.danger, paddingHorizontal: spacing.xl, paddingTop: spacing.sm },
-  prevButton:           { fontSize: 14, fontWeight: '600', color: colors.gray400, paddingVertical: spacing.md, paddingHorizontal: spacing.lg },
-  prevButtonDisabled:   { color: colors.gray200 },
-  nextButton:           { backgroundColor: colors.orange, paddingHorizontal: spacing.xl, paddingVertical: spacing.md, borderRadius: radius.sm },
-  submitButton:         { backgroundColor: colors.success },
-  nextButtonText:       { fontSize: 14, fontWeight: '600', color: colors.white },
+  probabilityInput: { flex: 1, borderWidth: 1, borderColor: colors.gray200, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: 14, color: colors.gray800, backgroundColor: colors.white },
+  probabilityBadge: { backgroundColor: colors.violet, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: 20, minWidth: 60, alignItems: 'center' },
+  probabilityText: { fontSize: 12, fontWeight: '700', color: colors.white },
+  infoBox: { flexDirection: 'row', backgroundColor: colors.infoBg, borderLeftWidth: 3, borderLeftColor: colors.info, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.md, marginBottom: spacing.lg, gap: spacing.md },
+  successInfo: { backgroundColor: colors.successBg, borderLeftColor: colors.success },
+  infoIcon: { fontSize: 16 },
+  infoText: { flex: 1, fontSize: 13, color: colors.info, lineHeight: 18 },
+  successText: { color: colors.success },
+  footer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, borderTopWidth: 1, borderTopColor: colors.gray100 },
+  footerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  saveButton: { backgroundColor: colors.violet, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderRadius: radius.sm },
+  saveButtonDisabled: { backgroundColor: colors.gray200 },
+  saveButtonText: { color: colors.white, fontWeight: '700', fontSize: 14 },
+  saveMessage: { fontSize: 13, color: colors.violetDark, paddingHorizontal: spacing.xl, paddingTop: spacing.sm },
+  saveError: { fontSize: 13, color: colors.danger, paddingHorizontal: spacing.xl, paddingTop: spacing.sm },
+  prevButton: { fontSize: 14, fontWeight: '600', color: colors.gray400, paddingVertical: spacing.md, paddingHorizontal: spacing.lg },
+  prevButtonDisabled: { color: colors.gray200 },
+  nextButton: { backgroundColor: colors.orange, paddingHorizontal: spacing.xl, paddingVertical: spacing.md, borderRadius: radius.sm },
+  nextButtonDisabled: { backgroundColor: colors.gray200 },
+  submitButton: { backgroundColor: colors.success },
+  nextButtonText: { fontSize: 14, fontWeight: '600', color: colors.white },
 });
+
+export default NewProspectionModal;

@@ -14,7 +14,7 @@ export default function ClientsScreen() {
   const { user } = useAuth();
   const { clients, loading, refetch } = useClients();
   const role = user?.role ?? 'commercial';
-  const allowed = ['admin', 'chef', 'commercial'];
+  const allowed = ['admin', 'chef_agence', 'commercial'];
   const [showClientModal, setShowClientModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createError, setCreateError] = useState('');

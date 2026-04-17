@@ -49,7 +49,8 @@ export default function VentesScreen() {
   const totalAcc    = list.reduce((s: number, v: any) => s + (v.accessoires || 0), 0);
   const totalCA     = totalPrimes + totalAcc;
 
-  const deleteVente = (v: Vente) => {
+  const deleteVente = async (v: Vente) => {
+    console.log('DELETE BUTTON PRESSED', v.id);
     Alert.alert(
       'Supprimer la vente',
       `Êtes-vous sûr de vouloir supprimer cette vente de ${getClient(v.clientId)?.nom || v.clientId} ?`,
@@ -58,12 +59,15 @@ export default function VentesScreen() {
         {
           text: 'Supprimer',
           style: 'destructive',
-          onPress: () => {
-            const idx = ventes.findIndex(ve => ve.id === v.id);
-            if (idx >= 0) {
-              ventes.splice(idx, 1);
-              setRefreshing(true);
-              setTimeout(() => setRefreshing(false), 100);
+          onPress: async () => {
+            try {
+              const response = await apiClient.delete(`${API_ENDPOINTS.VENTES.LIST}/${v.id}`);
+              console.log('Delete response:', response.data);
+              await refetch();
+              Alert.alert('✅ Supprimé', 'La vente a bien été supprimée de la base de données.');
+            } catch (error: any) {
+              console.error('Delete error:', error?.response?.data || error?.message || error);
+              Alert.alert('❌ Erreur', error?.response?.data?.error || 'Une erreur est survenue lors de la suppression.');
             }
           }
         }

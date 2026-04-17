@@ -7,14 +7,16 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/hooks/useAuth';
 import { useCotations } from '../../src/hooks/useCotations';
 import { useClients } from '../../src/hooks/useClients';
-import { fmt, fmtDate, STATUTS_COT } from '../../src/utils/constants';
+import { fmt, fmtDate, STATUTS_COT, STORAGE_KEYS } from '../../src/utils/constants';
 import { colors, spacing, radius, STATUT_BADGE_COLORS } from '../../src/config/theme';
 import { Badge, EmptyState, ClientIdBadge, StatCard } from '../../src/components/common/Button';
 import { Header } from '../../src/components/common/Header';
 import { Cotation } from '../../src/types';
 import { NewCotationModal } from '../../src/components/modals/NewCotationModal';
+import { NewVenteModal } from '../../src/components/modals/NewVenteModal';
 import apiClient from '../../src/services/api/client';
 import { API_ENDPOINTS } from '../../src/services/api/endpoints';
+import { storageService } from '../../src/services/storage.service';
 
 export default function CotationsScreen() {
   const { user } = useAuth();
@@ -26,6 +28,8 @@ export default function CotationsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [showNewCotationModal, setShowNewCotationModal] = useState(false);
   const [editingCotation, setEditingCotation] = useState<Cotation | null>(null);
+  const [cotationToConvert, setCotationToConvert] = useState<Cotation | null>(null);
+  const [showNewVenteModal, setShowNewVenteModal] = useState(false);
 
   const name = user?.name ?? '';
   const role = user?.role ?? 'commercial';
@@ -93,6 +97,7 @@ export default function CotationsScreen() {
   };
 
   const deleteCotation = async (cot: Cotation) => {
+    console.log('DELETE BUTTON PRESSED', cot.id, cot.noCot);
     Alert.alert(
       'Supprimer la cotation',
       `Êtes-vous sûr de vouloir supprimer COT-${String(cot.noCot).padStart(3,'0')} ?`,
@@ -103,11 +108,24 @@ export default function CotationsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await apiClient.delete(`${API_ENDPOINTS.COTATIONS.LIST}/${cot.id}`);
-              refetch();
-            } catch (error) {
-              console.error('Error deleting cotation:', error);
-              Alert.alert('Erreur', 'Une erreur est survenue lors de la suppression.');
+              // DEBUG: log the exact headers being sent
+              const token = await storageService.getSecure(STORAGE_KEYS.AUTH_TOKEN);
+              console.log('=== DELETE DEBUG ===');
+              console.log('Token found:', !!token);
+              console.log('Token value:', token ? `${token.substring(0, 20)}...` : 'none');
+              console.log('URL:', `${API_ENDPOINTS.COTATIONS.LIST}/${cot.id}`);
+
+              const response = await apiClient.delete(`${API_ENDPOINTS.COTATIONS.LIST}/${cot.id}`);
+              console.log('Delete response:', response.data);
+              await refetch();
+              Alert.alert('✅ Supprimé', 'La cotation a bien été supprimée de la base de données.');
+            } catch (error: any) {
+              console.log('=== DELETE ERROR ===');
+              console.log('Status:', error?.response?.status);
+              console.log('Error data:', error?.response?.data);
+              console.log('Headers sent:', error?.config?.headers);
+              console.error('Delete error:', error?.response?.data || error?.message || error);
+              Alert.alert('❌ Erreur', error?.response?.data?.error || 'Une erreur est survenue lors de la suppression.');
             }
           }
         }
@@ -184,20 +202,13 @@ export default function CotationsScreen() {
 
         {/* Actions */}
         <View style={styles.actions}>
-          {c.statut === 'En attente' && (
-            <>
-              <TouchableOpacity style={[styles.actionBtn, styles.actionValidate]} onPress={() => validerCotation(c)}>
-                <Text style={styles.actionBtnText}>✓ Valider</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.actionBtn, styles.actionRefuse]} onPress={() => refuserCotation(c)}>
-                <Text style={[styles.actionBtnText, { color: colors.danger }]}>Refuser</Text>
-              </TouchableOpacity>
-            </>
-          )}
           {c.statut === 'Validée' && (
             <TouchableOpacity
               style={[styles.actionBtn, styles.actionConvert]}
-              onPress={() => router.push(`/(app)/ventes/new?cotId=${c.id}` as any)}
+              onPress={() => {
+                setCotationToConvert(c);
+                setShowNewVenteModal(true);
+              }}
             >
               <Text style={styles.actionBtnText}>→ Convertir en vente</Text>
             </TouchableOpacity>
@@ -207,9 +218,6 @@ export default function CotationsScreen() {
           </TouchableOpacity>
           <TouchableOpacity style={[styles.actionBtn, styles.actionDelete]} onPress={() => deleteCotation(c)}>
             <Text style={[styles.actionBtnText, { color: colors.danger }]}>🗑️ Supprimer</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionBtn, styles.actionView]} onPress={() => router.push(`/(app)/cotations/${c.id}` as any)}>
-            <Text style={[styles.actionBtnText, { color: colors.violet }]}>👁️ Détail</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -293,16 +301,23 @@ export default function CotationsScreen() {
         ListEmptyComponent={<EmptyState icon="💼" title="Aucune cotation trouvée" sub="Les cotations apparaissent ici une fois saisies" />}
       />
 
-      {/* FAB */}
-      <TouchableOpacity style={styles.fab} onPress={() => router.push('/cotations/new' as any)}>
-        <Text style={styles.fabText}>+</Text>
-      </TouchableOpacity>
+     
 
       <NewCotationModal
         visible={!!editingCotation}
         onClose={() => setEditingCotation(null)}
         onSubmit={handleCotationSubmit}
         editCotation={editingCotation as any}
+      />
+
+      <NewVenteModal
+        visible={showNewVenteModal}
+        onClose={() => {
+          setShowNewVenteModal(false);
+          setCotationToConvert(null);
+        }}
+        onSubmit={handleCotationSubmit}
+        fromCotation={cotationToConvert as any}
       />
     </View>
   );

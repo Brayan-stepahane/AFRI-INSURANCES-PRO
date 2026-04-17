@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View, Text, Modal, StyleSheet, TextInput, TouchableOpacity,
   ScrollView, Platform, Pressable, Alert,
 } from 'react-native';
 import { useAuth } from '../../hooks/useAuth';
 import { useClients } from '../../hooks/useClients';
+import { useProspections } from '../../hooks/useProspections';
+import { normalizeDateInput } from '../../utils/constants';
 import { colors, spacing, radius } from '../../config/theme';
 import type { Vente } from '../../types';
 import apiClient from '../../services/api/client';
@@ -28,6 +30,7 @@ interface NewVenteModalProps {
   onClose: () => void;
   onSubmit?: (data: VenteFormData, isEdit?: boolean, venteId?: number, options?: { refreshOnly?: boolean }) => void;
   editVente?: Vente;
+  fromCotation?: any; // Cotation data to pre-populate from
 }
 
 const PRODUCTS = [
@@ -37,7 +40,7 @@ const PRODUCTS = [
   'Afrilife Indemnité de fin de carrière', 'Assurance Santé Groupe',
   'Assurance Maritime', 'Automobile', 'Flotte Automobile', 'Assurance Voyage',
   'Caution de soumission', 'Individuelle Accident', 'Individuelle Accident Groupe',
-  'Multirisque Habitation', 'Responsabilité Civile Chef Entreprise',
+  'Multirisque Habitation', 'Responsabilité Civile chef_agence Entreprise',
   'Transport Marchandise', 'Autre',
 ];
 const SALE_TYPES = ['Nouvelle vente (NouVe)', 'Transfert', 'Augmentation', 'Autre'];
@@ -48,11 +51,24 @@ function SelectField({
   value: string; options: string[]; isOpen: boolean;
   onToggle: () => void; onSelect: (v: string) => void;
 }) {
+  const triggerRef = useRef<View>(null);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
+
+  const measureAndOpen = () => {
+    if (!isOpen && triggerRef.current) {
+      triggerRef.current.measureInWindow((x, y, width, height) => {
+        setDropdownPos({ top: y + height, left: x, width });
+      });
+    }
+    onToggle();
+  };
+
   return (
     <View style={sf.wrapper}>
       <TouchableOpacity
+        ref={triggerRef}
         style={[sf.trigger, isOpen && sf.triggerOpen]}
-        onPress={onToggle}
+        onPress={measureAndOpen}
         activeOpacity={0.8}
       >
         <Text style={sf.triggerText} numberOfLines={1}>{value}</Text>
@@ -66,9 +82,15 @@ function SelectField({
           animationType="none"
           onRequestClose={onToggle}
         >
-          <TouchableOpacity style={sf.modalBackdrop} onPress={onToggle} activeOpacity={1}>
-            <View style={[sf.list, { maxHeight: 250 }]}>
-              <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <TouchableOpacity style={[sf.modalBackdrop, { pointerEvents: 'auto' }]} onPress={onToggle} activeOpacity={1}>
+            <View
+              style={[sf.list, { top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }]}
+            >
+              <ScrollView
+                nestedScrollEnabled
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
                 {options.map(item => (
                   <TouchableOpacity
                     key={item}
@@ -89,15 +111,20 @@ function SelectField({
   );
 }
 
-export function NewVenteModal({ visible, onClose, onSubmit, editVente }: NewVenteModalProps) {
+export function NewVenteModal({ visible, onClose, onSubmit, editVente, fromCotation }: NewVenteModalProps) {
   const { user } = useAuth();
   const { clients } = useClients();
+  const { prospections } = useProspections();
 
   const getClient = (id: string) => clients.find(c => c.id === id);
   const [venteId, setVenteId] = useState<number | null>(editVente?.id ?? null);
+  const [cotationId, setCotationId] = useState<number | null>(fromCotation?.id ?? null);
+  const [clientId, setClientId] = useState<string>(fromCotation?.clientId ?? '');
+  const [prospectionId, setProspectionId] = useState<string>(fromCotation?.prospId ? String(fromCotation.prospId) : '');
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string>('');
   const [saveError, setSaveError] = useState<string>('');
+  const [isSaving, setIsSaving] = useState<boolean>(false);
 
   const toggle = (name: string) => setOpenDropdown(prev => (prev === name ? null : name));
 
@@ -117,23 +144,47 @@ export function NewVenteModal({ visible, onClose, onSubmit, editVente }: NewVent
   const upd = (field: keyof VenteFormData, value: any) =>
     setForm(prev => ({ ...prev, [field]: value }));
 
-  // Populate form on edit
+  // Populate form on edit or from cotation
   React.useEffect(() => {
-    if (editVente && visible) {
+    if (fromCotation && visible) {
+      // Pre-populate from cotation conversion
+      setCotationId(fromCotation.id);
+      setClientId(fromCotation.clientId);
+      setProspectionId(String(fromCotation.prospId || ''));
+      setForm({
+        produit: fromCotation.risqueCote || 'Afrilife étude',
+        dateVente: new Date().toISOString().split('T')[0],
+        typeVente: 'Nouvelle vente (NouVe)',
+        noPolice: '',
+        noAttestation: '',
+        noCarteRose: '',
+        primeNette: String(fromCotation.montant || 0),
+        accessories: '1000',
+        dateEffet: '',
+        dateEcheance: '',
+      });
+      setVenteId(null);
+    } else if (editVente && visible) {
+      setCotationId(null);
+      setClientId(editVente.clientId);
+      setProspectionId(String(editVente.prospId || ''));
       setForm({
         produit: editVente.produit || 'Afrilife étude',
-        dateVente: editVente.dateVente || new Date().toISOString().split('T')[0],
+        dateVente: normalizeDateInput(editVente.dateVente || new Date().toISOString()),
         typeVente: editVente.typeVente === 'NouVe' ? 'Nouvelle vente (NouVe)' : 'Transfert',
         noPolice: editVente.noPolice || '',
         noAttestation: editVente.noAttestation || '',
         noCarteRose: editVente.noCarteRose || '',
         primeNette: String(editVente.primeNette || ''),
         accessories: String(editVente.accessoires || ''),
-        dateEffet: editVente.dateEffet || '',
-        dateEcheance: editVente.dateEcheance || '',
+        dateEffet: normalizeDateInput(editVente.dateEffet || ''),
+        dateEcheance: normalizeDateInput(editVente.dateEcheance || ''),
       });
       setVenteId(editVente.id);
-    } else if (!editVente && visible) {
+    } else if (!editVente && !fromCotation && visible) {
+      setCotationId(null);
+      setClientId('');
+      setProspectionId('');
       setForm({
         produit: 'Afrilife étude',
         dateVente: new Date().toISOString().split('T')[0],
@@ -150,51 +201,91 @@ export function NewVenteModal({ visible, onClose, onSubmit, editVente }: NewVent
     }
     setSaveMessage('');
     setSaveError('');
-  }, [editVente, visible]);
+  }, [editVente, fromCotation, visible]);
 
   const handleSaveCurrentStep = async () => {
+    if (isSaving) {
+      return false;
+    }
+    setIsSaving(true);
     setSaveError('');
     setSaveMessage('');
 
     if (!form.dateVente) {
       setSaveError('Veuillez renseigner la date de vente.');
+      setIsSaving(false);
+      return false;
+    }
+
+    if (!clientId) {
+      setSaveError('Le client est requis pour enregistrer la vente.');
+      setIsSaving(false);
+      return false;
+    }
+
+    if (fromCotation && !fromCotation.prospId) {
+      setSaveError('Impossible de convertir cette cotation en vente : prospection introuvable.');
+      setIsSaving(false);
+      return false;
+    }
+
+    if (!fromCotation && !prospectionId) {
+      setSaveError('Veuillez sélectionner une prospection liée.');
+      setIsSaving(false);
       return false;
     }
 
     try {
       const record = {
+        client_id: clientId,
+        cotation_id: cotationId || null,
+        prospection_id: fromCotation?.prospId || prospectionId || null,
+        commercial_id: fromCotation?.commercialId || user?.id,
         produit: form.produit,
         date_vente: form.dateVente,
         type_vente: form.typeVente.includes('Nouvelle') ? 'NouVe' : 'VenRec',
-        numero_police: form.noPolice,
-        numero_attestation: form.noAttestation,
-        no_carte_rose: form.noCarteRose,
+        numero_police: form.noPolice || null,
+        numero_attestation: form.noAttestation || null,
+        no_carte_rose: form.noCarteRose || null,
         prime_nette: Number(form.primeNette) || 0,
         accessoires: Number(form.accessories) || 0,
-        date_effet: form.dateEffet,
-        date_echeance: form.dateEcheance,
+        date_effet: form.dateEffet || null,
+        date_echeance: form.dateEcheance || null,
       };
 
+      let createdVenteId: number | null = null;
       if (venteId) {
-        // Update existing vente
         await apiClient.put(`${API_ENDPOINTS.VENTES.UPDATE}/${venteId}`, record);
       } else {
-        // Create new vente via API
         const response = await apiClient.post(API_ENDPOINTS.VENTES.CREATE, record);
         if (response?.data) {
-          setVenteId(response.data.id);
+          createdVenteId = response.data.id;
+          setVenteId(createdVenteId);
         }
       }
 
       setSaveMessage('Vente enregistrée.');
-      if (onSubmit) onSubmit(form, !!editVente, venteId || undefined, { refreshOnly: true });
+      if (onSubmit) onSubmit(form, !!editVente, createdVenteId || venteId || undefined, { refreshOnly: true });
       return true;
     } catch (error) {
       console.error('Error saving vente:', error);
-      setSaveError('Erreur lors de l\'enregistrement de la vente.');
+      const err = error as any;
+      const serverMsg = err?.response?.data?.error;
+      setSaveError(serverMsg || 'Erreur lors de l\'enregistrement de la vente.');
       return false;
+    } finally {
+      setIsSaving(false);
     }
   };
+
+  const selectedProspection = prospections.find(p => String(p.id) === prospectionId);
+  const prospectionLabel = selectedProspection
+    ? `${getClient(selectedProspection.clientId)?.nom || selectedProspection.clientId} — ${selectedProspection.statut}`
+    : 'Sélectionner une prospection';
+  const prospectionOptions = prospections.map(p => {
+    const clientName = getClient(p.clientId)?.nom || p.clientId;
+    return `${clientName} — ${p.statut}`;
+  });
 
   const handleSubmit = async () => {
     const saved = await handleSaveCurrentStep();
@@ -208,7 +299,7 @@ export function NewVenteModal({ visible, onClose, onSubmit, editVente }: NewVent
       <Pressable style={styles.backdropPress} onPress={onClose} />
       <View style={styles.modal}>
         <View style={styles.header}>
-          <Text style={styles.title}>{editVente ? 'Modifier vente' : 'Nouvelle vente'}</Text>
+          <Text style={styles.title}>{fromCotation ? 'Convertir en vente' : editVente ? 'Modifier vente' : 'Nouvelle vente'}</Text>
           <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Text style={styles.closeButton}>✕</Text>
           </TouchableOpacity>
@@ -219,6 +310,30 @@ export function NewVenteModal({ visible, onClose, onSubmit, editVente }: NewVent
 
           {saveMessage ? <Text style={styles.saveMessage}>{saveMessage}</Text> : null}
           {saveError ? <Text style={styles.saveError}>{saveError}</Text> : null}
+
+          {!fromCotation && (
+            <View style={styles.row}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>Prospection liée *</Text>
+                <SelectField
+                  value={prospectionLabel}
+                  options={prospectionOptions}
+                  isOpen={openDropdown === 'prospection'}
+                  onToggle={() => toggle('prospection')}
+                  onSelect={v => {
+                    const found = prospections.find(p => {
+                      const clientName = getClient(p.clientId)?.nom || p.clientId;
+                      return `${clientName} — ${p.statut}` === v;
+                    });
+                    if (found) {
+                      setProspectionId(String(found.id));
+                      if (!clientId) setClientId(found.clientId);
+                    }
+                  }}
+                />
+              </View>
+            </View>
+          )}
 
           <View style={styles.row}>
             <View style={styles.half}>
@@ -339,11 +454,8 @@ export function NewVenteModal({ visible, onClose, onSubmit, editVente }: NewVent
         </ScrollView>
 
         <View style={styles.footer}>
-          <TouchableOpacity onPress={onClose} style={styles.cancelButton}>
-            <Text style={styles.cancelButtonText}>Annuler</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleSubmit} style={styles.submitButton}>
-            <Text style={styles.submitButtonText}>Enregistrer ✓</Text>
+          <TouchableOpacity onPress={handleSubmit} style={[styles.submitButton, isSaving && styles.submitButtonDisabled]} disabled={isSaving}>
+            <Text style={styles.submitButtonText}>Enregistrer</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -371,12 +483,20 @@ const sf = StyleSheet.create({
   triggerOpen: { borderColor: colors.violet },
   triggerText: { flex: 1, fontSize: 14, color: colors.gray800 },
   caret: { fontSize: 9, color: colors.gray400, marginLeft: 6 },
-  modalBackdrop: { flex: 1, backgroundColor: 'transparent' },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
   list: {
-    position: 'absolute', backgroundColor: colors.white,
-    borderWidth: 1, borderColor: colors.violet, borderRadius: radius.sm,
-    elevation: 20, boxShadow: '0px 4px 8px rgba(0,0,0,0.15)',
-    overflow: 'hidden', top: 50, width: '100%',
+    position: 'absolute',
+    maxHeight: 200,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.violet,
+    borderRadius: radius.sm,
+    elevation: 20,
+    boxShadow: '0px 4px 8px rgba(0,0,0,0.15)',
+    overflow: 'hidden',
   },
   item: {
     flexDirection: 'row', alignItems: 'center',
@@ -398,17 +518,18 @@ const styles = StyleSheet.create({
   title: { fontSize: 18, fontWeight: '700', color: colors.violetDark },
   closeButton: { fontSize: 22, color: colors.gray400 },
   formScroll: { flex: 1 },
-  formContent: { paddingHorizontal: spacing.xl, paddingVertical: spacing.lg },
+  formContent: { paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, overflow: 'visible' },
   subtitle: { fontSize: 16, fontWeight: '700', color: colors.violetDark, marginBottom: spacing.lg },
   label: { fontSize: 13, fontWeight: '600', color: colors.gray800, marginBottom: spacing.sm },
   input: { borderWidth: 1, borderColor: colors.gray200, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: 14, color: colors.gray800, backgroundColor: colors.white, minHeight: 40 },
-  row: { flexDirection: 'row', gap: spacing.md, marginVertical: spacing.md },
+  row: { flexDirection: 'row', gap: spacing.md, marginVertical: spacing.md, zIndex: 1, overflow: 'visible' },
   half: { flex: 1 },
   saveMessage: { fontSize: 13, color: colors.violetDark, marginBottom: spacing.md },
   saveError: { fontSize: 13, color: colors.danger, marginBottom: spacing.md },
-  footer: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.md, paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, borderTopWidth: 1, borderTopColor: colors.gray100 },
+  footer: { flexDirection: 'row', justifyContent: 'center', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, borderTopWidth: 1, borderTopColor: colors.gray100 },
   cancelButton: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
   cancelButtonText: { fontSize: 14, fontWeight: '600', color: colors.gray600 },
   submitButton: { backgroundColor: colors.success, paddingHorizontal: spacing.xl, paddingVertical: spacing.md, borderRadius: radius.sm },
+  submitButtonDisabled: { opacity: 0.6 },
   submitButtonText: { fontSize: 14, fontWeight: '600', color: colors.white },
 });

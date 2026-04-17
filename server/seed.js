@@ -45,7 +45,7 @@ const seedDatabase = async () => {
       { nom: 'ONANA', prenom: 'Roger', identifiant: 'onana', role: 'manager_adjoint', equipe: 'A', objectif: 0 },
       // Manager
       { nom: 'NGONO', prenom: 'Sophie', identifiant: 'ngono', role: 'manager', equipe: 'ALL', objectif: 0 },
-      // Chef agence
+      // chef_agence agence
       { nom: 'DJEUKEU', prenom: 'Albert', identifiant: 'djeukeu', role: 'chef_agence', equipe: 'ALL', objectif: 0 },
       // Admin
       { nom: 'ADMIN', prenom: 'Système', identifiant: 'admin', role: 'admin', equipe: 'ALL', objectif: 0 },

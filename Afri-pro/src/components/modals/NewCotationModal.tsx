@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View, Text, Modal, StyleSheet, TextInput, TouchableOpacity,
   ScrollView, Platform, Pressable, Alert,
@@ -31,11 +31,24 @@ function SelectField({
   value: string; options: string[]; isOpen: boolean;
   onToggle: () => void; onSelect: (v: string) => void;
 }) {
+  const triggerRef = useRef<View>(null);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
+
+  const measureAndOpen = () => {
+    if (!isOpen && triggerRef.current) {
+      triggerRef.current.measureInWindow((x, y, width, height) => {
+        setDropdownPos({ top: y + height, left: x, width });
+      });
+    }
+    onToggle();
+  };
+
   return (
     <View style={sf.wrapper}>
       <TouchableOpacity
+        ref={triggerRef}
         style={[sf.trigger, isOpen && sf.triggerOpen]}
-        onPress={onToggle}
+        onPress={measureAndOpen}
         activeOpacity={0.8}
       >
         <Text style={sf.triggerText} numberOfLines={1}>{value}</Text>
@@ -49,8 +62,10 @@ function SelectField({
           animationType="none"
           onRequestClose={onToggle}
         >
-          <TouchableOpacity style={sf.modalBackdrop} onPress={onToggle} activeOpacity={1}>
-            <View style={[sf.list, { maxHeight: 200 }]}>
+          <TouchableOpacity style={[sf.modalBackdrop, { pointerEvents: 'auto' }]} onPress={onToggle} activeOpacity={1}>
+            <View
+              style={[sf.list, { top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width, maxHeight: 200 }]}
+            >
               <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 {options.map(item => (
                   <TouchableOpacity
@@ -263,7 +278,7 @@ const sf = StyleSheet.create({
     position: 'absolute', backgroundColor: colors.white,
     borderWidth: 1, borderColor: colors.violet, borderRadius: radius.sm,
     elevation: 20, boxShadow: '0px 4px 8px rgba(0,0,0,0.15)',
-    overflow: 'hidden', top: 50, width: '100%',
+    overflow: 'hidden',
   },
   item: {
     flexDirection: 'row', alignItems: 'center',

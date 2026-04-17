@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import apiClient from '../services/api/client';
 import { API_ENDPOINTS } from '../services/api/endpoints';
+import { normalizeDateInput } from '../utils/constants';
 import { Cotation } from '../types';
 
 export function useCotations(refreshKey = 0) {
@@ -22,11 +23,12 @@ export function useCotations(refreshKey = 0) {
         noCot: c.numero || 0,
         prospId: c.prospection_id,
         clientId: c.client_id,
+        commercialId: c.commercial_id,
         commercial: c.commercial_nom || '',
         risqueCote: c.risque_cote || '',
-        dateCotation: c.date_cotation,
+        dateCotation: normalizeDateInput(c.date_cotation),
         montant: Number(c.montant) || 0,
-        dateValidation: c.date_validation,
+        dateValidation: normalizeDateInput(c.date_validation),
         statut: c.statut,
       })) : [];
 

@@ -40,11 +40,8 @@ interface ObjProps {
     reporte: number;
     pct: number;
     reste: number;
-    contractsCompletedThisMonth: number;
-    estimatedContractTarget: number;
-    contractsRemaining: number;
-    contractsReported: number;
-    contractsNew: number;
+    loading?: boolean;
+    error?: string | null;
   };
 }
 
@@ -56,11 +53,6 @@ export function ObjectiveBox({ objective }: ObjProps) {
     reporte,
     pct,
     reste,
-    contractsCompletedThisMonth,
-    estimatedContractTarget,
-    contractsRemaining,
-    contractsReported,
-    contractsNew,
   } = objective;
 
   const now = new Date();
@@ -79,13 +71,13 @@ export function ObjectiveBox({ objective }: ObjProps) {
         </View>
       </View>
 
-      {/* Contract display row */}
+      {/* Monetary objective display row */}
       <View style={objStyles.contractRow}>
         <View style={objStyles.contractDisplay}>
-          <Text style={objStyles.contractIcon}>{contractsCompletedThisMonth}</Text>
-          <Text style={objStyles.contractCount}>/ {estimatedContractTarget}</Text>
+          <Text style={objStyles.contractIcon}>{fmt(ca)} FCFA</Text>
+          <Text style={objStyles.contractCount}>/ {fmt(total)} FCFA</Text>
         </View>
-        <Text style={objStyles.subtext}>contrats à conclure</Text>
+        <Text style={objStyles.subtext}>Chiffre d'affaires réalisé</Text>
       </View>
 
       {/* Progress bar */}
@@ -93,19 +85,13 @@ export function ObjectiveBox({ objective }: ObjProps) {
         <ProgressBar value={pct} color={pct >= 100 ? colors.success : colors.orange} />
       </View>
 
-      {/* Details text box - dynamic content */}
+      {/* Details text box - monetary objective content */}
       <View style={objStyles.detailsBox}>
         <Text style={objStyles.detailsText}>
-          💼  
-          {contractsReported > 0 ? `${contractsReported} reportés du mois précédent + ` : ''}
-          <Text style={objStyles.textRed}>{contractsNew} nouveaux</Text>
-          {' = '}
-          <Text style={objStyles.textRed}>{estimatedContractTarget} ce mois</Text>
-          {'. Il vous reste '}
-          <Text style={objStyles.textRed}>{contractsRemaining} contrat{contractsRemaining !== 1 ? 's' : ''}</Text>
-          {' à conclure d\'ici le '}
-          <Text style={objStyles.textRed}>{monthEnd}</Text>
-          {'.'}
+          💼  <Text style={objStyles.textRed}>{fmt(reporte)} FCFA</Text> reportés du mois précédent + <Text style={objStyles.textRed}>{fmt(mensuel)} FCFA</Text> ce mois = <Text style={objStyles.textRed}>{fmt(total)} FCFA</Text>.
+        </Text>
+        <Text style={objStyles.detailsText}>
+          Il vous reste <Text style={objStyles.textRed}>{fmt(reste)} FCFA</Text> à réaliser d'ici le <Text style={objStyles.textRed}>{monthEnd}</Text>.
         </Text>
       </View>
     </View>
@@ -140,7 +126,7 @@ export function Pipeline({ steps }: { steps: PipelineStep[] }) {
       <Text style={pStyles.title}>Pipeline commercial</Text>
       <View style={pStyles.row}>
         {steps.map((s, i) => (
-          <View key={i} style={[pStyles.step, s.status === 'active' && pStyles.stepActive, s.status === 'done' && pStyles.stepDone]}>
+          <View key={`${s.label}-${i}`} style={[pStyles.step, s.status === 'active' && pStyles.stepActive, s.status === 'done' && pStyles.stepDone]}>
             <Text style={[pStyles.count, s.status === 'active' && { color: colors.orange }, s.status === 'done' && { color: colors.violet }]}>{s.count}</Text>
             <Text style={[pStyles.label, s.status === 'active' && { color: colors.white }, s.status === 'done' && { color: colors.violet }]}>{s.label}</Text>
           </View>

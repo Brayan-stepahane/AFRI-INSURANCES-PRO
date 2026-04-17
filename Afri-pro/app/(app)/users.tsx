@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Modal } from 'react-native';
 import { useAuth } from '../../src/hooks/useAuth';
 import { useRouter } from 'expo-router';
@@ -10,21 +10,41 @@ export default function UsersScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const role = user?.role ?? 'unknown';
-  const ALLOWED_USER_ROLES: UserRole[] = ['commercial', 'manager_adj', 'manager', 'chef', 'admin'];
 
   const [users, setUsers] = useState<User[]>([]);
-  const [formData, setFormData] = useState<{ name: string; surname: string; email: string; role: UserRole; phone: string; password: string }>({
+  const [formData, setFormData] = useState({
     name: '',
     surname: '',
     email: '',
     role: 'commercial' as UserRole,
     phone: '',
     password: '',
+    parentId: '', 
+    objectif_mensuel: 5000000 as number,          // number for consistent calculations
   });
+
   const [message, setMessage] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [roleOpen, setRoleOpen] = useState(false);
-  const ROLE_OPTIONS: UserRole[] = ['commercial', 'manager_adj', 'manager', 'chef', 'admin'];
+  const [parentOpen, setParentOpen] = useState(false);
+
+  const ROLE_OPTIONS: UserRole[] = ['commercial', 'manager_adj', 'manager', 'chef_agence', 'admin'];
+
+  // Filter possible parents based on selected role
+  const isManagerAdjointRole = (role?: string) => role === 'manager_adj' || role === 'manager_adjoint';
+
+  const possibleParents = useMemo(() => {
+    switch (formData.role) {
+      case 'commercial':
+        return users.filter(u => isManagerAdjointRole(u.role));
+      case 'manager_adj':
+        return users.filter(u => u.role === 'manager');
+      case 'manager':
+        return users.filter(u => u.role === 'chef_agence');
+      default:
+        return [];
+    }
+  }, [users, formData.role]);
 
   useEffect(() => {
     const loadUsers = async () => {
@@ -49,21 +69,68 @@ export default function UsersScreen() {
       return;
     }
 
-    if (!ALLOWED_USER_ROLES.includes(formData.role)) {
-      setError('Le rôle doit être commercial, manager_adj, manager, chef ou admin.');
+    // Hierarchy validation (only for roles that need a parent)
+    if (['commercial', 'manager_adj', 'manager'].includes(formData.role) && !formData.parentId) {
+      let required = '';
+      if (formData.role === 'commercial') required = 'un manager adjoint';
+      else if (formData.role === 'manager_adj') required = 'un manager';
+      else if (formData.role === 'manager') required = 'un chef_agence d\'agence';
+      
+      setError(`Veuillez sélectionner ${required}.`);
       return;
     }
 
     try {
-      const newUser = await userService.createUser(formData);
+      // Prepare data for backend - convert parentId correctly
+      const createData = {
+        name: formData.name.trim(),
+        surname: formData.surname.trim(),
+        email: formData.email.trim(),
+        role: formData.role,
+        phone: formData.phone.trim() || undefined,
+        password: formData.password,
+        parentId: formData.parentId ? Number(formData.parentId) : null,
+        objectifMensuel: formData.objectif_mensuel || undefined,
+      };
+
+      // Validation
+      if (formData.role === 'commercial' && formData.objectif_mensuel <= 4900000) {
+        setError('Objectif mensuel doit être supérieur à 5M FCFA pour un commercial.');
+        return;
+      }
+
+      const newUser = await userService.createUser(createData);
+
       setUsers((prev) => [newUser, ...prev]);
-      setMessage(`Utilisateur ${newUser.name} créé.`);
-      setFormData({ name: '', surname: '', email: '', role: 'commercial', phone: '', password: '' });
-    } catch (err) {
-      setError((err as Error).message);
+      setMessage(`Utilisateur ${newUser.name} créé avec succès.`);
+
+      // Reset form
+      setFormData({
+        name: '',
+        surname: '',
+        email: '',
+        role: 'commercial',
+        phone: '',
+        password: '',
+        parentId: '',
+        objectif_mensuel: 0,
+      });
+    } catch (err: any) {
+      console.error('Create user error:', err);
+      setError(err.message || 'Une erreur est survenue lors de la création de l\'utilisateur.');
     }
   };
 
+  const getParentLabel = () => {
+    switch (formData.role) {
+      case 'commercial': return 'Manager Adjoint';
+      case 'manager_adj': return 'Manager';
+      case 'manager': return 'chef_agence d\'Agence';
+      default: return '';
+    }
+  };
+
+  // Only admins can access this screen
   if (role !== 'admin') {
     return (
       <View style={styles.container}>
@@ -86,6 +153,7 @@ export default function UsersScreen() {
 
       <View style={styles.box}>
         <Text style={styles.subTitle}>Créer un nouvel utilisateur</Text>
+
         <TextInput
           style={styles.input}
           placeholder="Nom"
@@ -93,14 +161,13 @@ export default function UsersScreen() {
           onChangeText={(t) => setFormData((prev) => ({ ...prev, name: t }))}
           placeholderTextColor={colors.gray400}
         />
-         <TextInput
+        <TextInput
           style={styles.input}
-          placeholder="prenom"
+          placeholder="Prénom"
           value={formData.surname}
           onChangeText={(t) => setFormData((prev) => ({ ...prev, surname: t }))}
           placeholderTextColor={colors.gray400}
         />
-        
         <TextInput
           style={styles.input}
           placeholder="Email"
@@ -125,10 +192,19 @@ export default function UsersScreen() {
           onChangeText={(t) => setFormData((prev) => ({ ...prev, phone: t }))}
           placeholderTextColor={colors.gray400}
         />
-        <TouchableOpacity style={[styles.input, styles.dropdownTrigger]} onPress={() => setRoleOpen(true)} activeOpacity={0.8}>
-          <Text style={styles.inputText}>{formData.role || 'Sélectionnez un rôle'}</Text>
+
+       
+
+        {/* Role Selector */}
+        <TouchableOpacity 
+          style={[styles.input, styles.dropdownTrigger]} 
+          onPress={() => setRoleOpen(true)} 
+          activeOpacity={0.8}
+        >
+          <Text style={styles.inputText}>{formData.role}</Text>
           <Text style={styles.dropdownCaret}>▾</Text>
         </TouchableOpacity>
+
         <Modal transparent visible={roleOpen} animationType="fade" onRequestClose={() => setRoleOpen(false)}>
           <TouchableOpacity style={styles.modalOverlay} onPress={() => setRoleOpen(false)} activeOpacity={1}>
             <View style={styles.dropdownBox}>
@@ -137,7 +213,7 @@ export default function UsersScreen() {
                   key={roleOption}
                   style={styles.dropdownItem}
                   onPress={() => {
-                    setFormData((prev) => ({ ...prev, role: roleOption }));
+                    setFormData((prev) => ({ ...prev, role: roleOption, parentId: '' }));
                     setRoleOpen(false);
                   }}
                 >
@@ -147,18 +223,87 @@ export default function UsersScreen() {
             </View>
           </TouchableOpacity>
         </Modal>
+
+        {/* Parent Selector - only for roles that need hierarchy */}
+        {['commercial', 'manager_adj', 'manager'].includes(formData.role) && (
+          <>
+            <Text style={styles.parentLabel}>{getParentLabel()}</Text>
+            
+            <TouchableOpacity 
+              style={[styles.input, styles.dropdownTrigger]}
+              onPress={() => possibleParents.length > 0 && setParentOpen(true)}
+              activeOpacity={0.8}
+              disabled={possibleParents.length === 0}
+            >
+              <Text style={styles.inputText}>
+                {formData.parentId 
+                  ? users.find(u => String(u.id) === formData.parentId)?.name || 'Sélectionné'
+                  : possibleParents.length > 0 
+                    ? `Sélectionnez ${getParentLabel().toLowerCase()}`
+                    : `Aucun ${getParentLabel().toLowerCase()} disponible`
+                }
+              </Text>
+              <Text style={styles.dropdownCaret}>▾</Text>
+            </TouchableOpacity>
+
+            <Modal transparent visible={parentOpen} animationType="fade" onRequestClose={() => setParentOpen(false)}>
+              <TouchableOpacity style={styles.modalOverlay} onPress={() => setParentOpen(false)} activeOpacity={1}>
+                <View style={styles.dropdownBox}>
+                  {possibleParents.map((parent) => (
+                    <TouchableOpacity
+                      key={parent.id}
+                      style={styles.dropdownItem}
+                      onPress={() => {
+                        setFormData((prev) => ({ ...prev, parentId: String(parent.id) })); // store as string
+                        setParentOpen(false);
+                      }}
+                    >
+                      <Text style={styles.dropdownItemText}>
+                        {parent.name} {parent.surname ? `(${parent.surname})` : ''} - {parent.role}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </TouchableOpacity>
+            </Modal>
+          </>
+        )}
+
+
+{formData.role === 'commercial' && (
+        <>
+        <Text style={styles.subTitle}>Objectif mensuel (FCFA)</Text>
+          <TextInput
+            style={styles.input}
+            placeholder={formData.objectif_mensuel === 0 ? "Objectif mensuel (FCFA)" : ''}
+            value={formData.objectif_mensuel.toString()}
+            onChangeText={(t) => setFormData((prev) => ({ ...prev, objectif_mensuel: parseFloat(t.replace(/[^0-9.]/g, '')) || 0 }))}
+            keyboardType="numeric"
+            placeholderTextColor={colors.gray400}
+          />
+           
+        </>
+      )}
+
         <TouchableOpacity style={styles.createButton} onPress={handleCreateUser} activeOpacity={0.85}>
+          
           <Text style={styles.createButtonText}>Créer l'utilisateur</Text>
         </TouchableOpacity>
       </View>
 
       <Text style={styles.subTitle}>Liste des utilisateurs</Text>
-      {users.map((u) => (
-        <View key={u.id} style={styles.userRow}>
-          <Text style={styles.userText}>{u.name} ({u.surname})</Text>
-          <Text style={styles.userMeta}>{u.role ? u.role.toUpperCase() : 'UNKNOWN'}</Text>
-        </View>
-      ))}
+      {users.length === 0 ? (
+        <Text style={styles.text}>Aucun utilisateur trouvé.</Text>
+      ) : (
+        users.map((u) => (
+          <View key={u.id} style={styles.userRow}>
+            <Text style={styles.userText}>
+              {u.name} {u.surname ? `(${u.surname})` : ''}
+            </Text>
+            <Text style={styles.userMeta}>{u.role?.toUpperCase()}</Text>
+          </View>
+        ))
+      )}
     </ScrollView>
   );
 }
@@ -169,14 +314,27 @@ const styles = StyleSheet.create({
   subTitle: { fontSize: 16, fontWeight: '700', color: colors.violetDark, marginVertical: spacing.sm },
   text: { fontSize: 14, color: colors.gray600, marginBottom: spacing.sm },
   box: { backgroundColor: colors.white, borderRadius: radius.md, borderWidth: 1, borderColor: colors.gray200, padding: spacing.lg, marginVertical: spacing.sm },
-  input: { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.gray200, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, marginBottom: spacing.sm, color: colors.gray800 },
+  input: { 
+    backgroundColor: colors.white, 
+    borderWidth: 1, 
+    borderColor: colors.gray200, 
+    borderRadius: radius.sm, 
+    paddingHorizontal: spacing.md, 
+    paddingVertical: spacing.sm, 
+    marginBottom: spacing.sm, 
+    color: colors.gray800 
+  },
+  
   button: { marginTop: spacing.xs, backgroundColor: colors.violet, paddingVertical: spacing.sm, borderRadius: radius.sm, alignItems: 'center' },
   buttonText: { color: colors.white, fontWeight: '700' },
+  
   createButton: { marginTop: spacing.lg, backgroundColor: colors.orange, paddingVertical: spacing.sm, borderRadius: radius.sm, alignItems: 'center' },
   createButtonText: { color: colors.white, fontWeight: '700' },
+
   userRow: { backgroundColor: colors.white, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.gray100, padding: spacing.sm, marginBottom: spacing.xs },
   userText: { fontSize: 13, color: colors.gray800, fontWeight: '600' },
-  userMeta: { fontSize: 11, color: colors.gray100 },
+  userMeta: { fontSize: 11, color: colors.gray400 },
+
   dropdownTrigger: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -188,17 +346,42 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     marginBottom: spacing.sm,
-    alignSelf: 'flex-start',
     minWidth: 220,
-    maxWidth: 280,
   },
   inputText: { fontSize: 14, color: colors.gray800 },
   dropdownCaret: { fontSize: 16, color: colors.gray400 },
+
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', padding: spacing.xl },
   dropdownBox: { backgroundColor: colors.white, borderRadius: radius.md, borderWidth: 1, borderColor: colors.gray200, overflow: 'hidden', minWidth: 220, maxWidth: 280, alignSelf: 'center' },
   dropdownItem: { paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.gray100 },
   dropdownItemText: { fontSize: 14, color: colors.gray800 },
-  errorText: { color: colors.danger, fontWeight: '600', marginBottom: spacing.sm },
-  successText: { color: colors.teal, fontWeight: '600', marginBottom: spacing.sm },
+
+  errorText: { 
+    color: '#B91C1C', 
+    backgroundColor: '#FEE2E2', 
+    padding: 12, 
+    borderRadius: radius.sm, 
+    borderLeftWidth: 4, 
+    borderLeftColor: '#EF4444',
+    fontWeight: '600', 
+    marginBottom: spacing.sm 
+  },
+  successText: { 
+    color: '#065F46', 
+    backgroundColor: '#D1FAE5', 
+    padding: 12, 
+    borderRadius: radius.sm, 
+    borderLeftWidth: 4, 
+    borderLeftColor: '#10B981',
+    fontWeight: '600', 
+    marginBottom: spacing.sm 
+  },
+
+  parentLabel: { 
+    fontSize: 14, 
+    fontWeight: '600', 
+    color: colors.violetDark, 
+    marginTop: spacing.sm, 
+    marginBottom: spacing.xs 
+  },
 });
- 

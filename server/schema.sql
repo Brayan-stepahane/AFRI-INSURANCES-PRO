@@ -55,8 +55,8 @@ CREATE TABLE clients (
   nom           VARCHAR(150) NOT NULL,
   telephone     VARCHAR(25),
   activite      VARCHAR(100),
-  type_client   VARCHAR(20)  NOT NULL DEFAULT 'Particulier'
-                CHECK (type_client IN ('Particulier','PME','Entreprise','Autre')),
+  type_client   VARCHAR(20)  NOT NULL DEFAULT 'Tous'
+                CHECK (type_client IN ('Particulier','PME','Entreprise','Autre','Tous')),
   email         VARCHAR(150),
   ville         VARCHAR(100),
   created_at    TIMESTAMP    DEFAULT NOW(),
@@ -89,7 +89,7 @@ CREATE TABLE produits (
   garantie_cotee VARCHAR(150),                  -- Guaranties cotées
   categorie     VARCHAR(50),                    -- 'Vie', 'Non-vie', 'Caution'
   type_client   VARCHAR(20)  DEFAULT 'Tous'
-                CHECK (type_client IN ('Particulier','Corporate','Personnel','Tous')),
+                CHECK ( type_client IN ('Particulier','Corporate','Personnel','Tous')),
   actif         BOOLEAN      DEFAULT true,
   created_at    TIMESTAMP    DEFAULT NOW()
 );
@@ -184,9 +184,11 @@ CREATE TABLE ventes (
   cotation_id       INT          REFERENCES cotations(id),
   client_id         VARCHAR(10)  NOT NULL REFERENCES clients(id),
   commercial_id     INT          NOT NULL REFERENCES users(id),
+  produit_id        INT          REFERENCES produits(id),          -- Foreign key to produits table
   date_vente        DATE,                       -- Dates de Vente
   type_vente        VARCHAR(10)
                     CHECK (type_vente IN ('NouVe','VenRec')),
+  produit           VARCHAR(150),               -- Legacy: Produit/Risque vendu (deprecated, use produit_id)
   no_police         VARCHAR(100),               -- N° Police EXCEL/ORASS
   prime_nette       DECIMAL(15,2),              -- Primes Nettes
   accessoires       DECIMAL(15,2) DEFAULT 0,    -- Accessoires
@@ -206,6 +208,9 @@ CREATE INDEX idx_ventes_client       ON ventes(client_id);
 CREATE INDEX idx_ventes_date_vente   ON ventes(date_vente);
 CREATE INDEX idx_ventes_type_vente   ON ventes(type_vente);
 CREATE INDEX idx_ventes_prospection  ON ventes(prospection_id);
+CREATE INDEX idx_ventes_cotation     ON ventes(cotation_id);
+CREATE INDEX idx_ventes_produit_id   ON ventes(produit_id);
+CREATE INDEX idx_ventes_produit      ON ventes(produit);
 
 -- =============================================================================
 -- TABLE 7 : offres_services
@@ -334,7 +339,7 @@ INSERT INTO produits (nom, garantie_cotee, categorie, type_client) VALUES
 ('Individuelle Accident',                'Individuelle Accident',                'Non-vie', 'Tous'),
 ('Individuelle Accident Groupe',         'Individuelle Accident Groupe',         'Non-vie', 'Tous'),
 ('Multirisque Habitation',               'Multirisque Habitation',               'Non-vie', 'Tous'),
-('Responsabilité Civile Chef Entreprise','Rsponsabilité Civile Chef Entreprise', 'Non-vie', 'Corporate'),
+('Responsabilité Civile chef_agence Entreprise','Rsponsabilité Civile chef_agence Entreprise', 'Non-vie', 'Corporate'),
 ('Transport Marchandise',                'Transport Marchandise',                'Non-vie', 'Tous'),
 ('Tous Risques Chantiers',               'Tous Risques Chantiers',               'Non-vie', 'Corporate'),
 ('Vol',                                  'Vol',                                  'Non-vie', 'Tous'),
@@ -359,12 +364,12 @@ INSERT INTO produits (nom, garantie_cotee, categorie, type_client) VALUES
 SELECT setval('client_seq',1,false);
 
 INSERT INTO clients (id, nom, telephone, activite, type_client) VALUES
-('CLI-0001', 'DJEUKEU JUSTIN',    '699971760', 'Chef d''entreprise', 'Particulier'),
-('CLI-0002', 'DJIFO CALVIN',      '675139113', 'Chef d''entreprise', 'Particulier'),
+('CLI-0001', 'DJEUKEU JUSTIN',    '699971760', 'chef_agence d''entreprise', 'Particulier'),
+('CLI-0002', 'DJIFO CALVIN',      '675139113', 'chef_agence d''entreprise', 'Particulier'),
 ('CLI-0003', 'AJANG ROLAND',      '677382783', 'Enseignant',          'Particulier'),
-('CLI-0004', 'DHASSI',            '694642943', 'Chef d''entreprise', 'Particulier'),
-('CLI-0005', 'DZOYEM TASSE',      '',           'Chef d''entreprise', 'Particulier'),
-('CLI-0006', 'AF CONSULTING',     '699644745', 'Chef d''entreprise', 'Particulier'),
+('CLI-0004', 'DHASSI',            '694642943', 'chef_agence d''entreprise', 'Particulier'),
+('CLI-0005', 'DZOYEM TASSE',      '',           'chef_agence d''entreprise', 'Particulier'),
+('CLI-0006', 'AF CONSULTING',     '699644745', 'chef_agence d''entreprise', 'Particulier'),
 ('CLI-0007', 'OBAM MENDJO',       '683558017', 'Commissaire',         'Particulier'),
 ('CLI-0008', 'ABEGA NGONDA',      '681104479', 'Médecin',             'Particulier'),
 ('CLI-0009', 'NANFACK PAUL',      '699821138', 'Homme d''affaire',   'Particulier'),
@@ -454,7 +459,16 @@ VALUES
 (9,  11, 11, 'CLI-0016', 2, '2025-11-28', 'NouVe', '',  25000,  1000,  '', '', NULL,          NULL),
 (10, 12, 12, 'CLI-0017', 2, '2025-12-01', 'NouVe', '', 450000,  1000,  '', '', NULL,          NULL),
 (11, 13, 13, 'CLI-0015', 3, '2026-02-10', 'NouVe', '',  15000,     0,  '', '', NULL,          NULL),
-(12, 14, 14, 'CLI-0009', 4, '2025-12-30', 'NouVe', '', 335000,     0,  '', '', NULL,          NULL);
+(12, 14, 14, 'CLI-0009', 4, '2025-12-30', 'NouVe', '', 335000,     0,  '', '', NULL,          NULL),
+-- Avril 2026 nouvelles ventes (pour montrer la progression du mois courant)
+(13, 1,  NULL, 'CLI-0001', 1, '2026-04-05', 'NouVe', '', 150000, 10000, '', '', NULL,          NULL),
+(14, 2,  NULL, 'CLI-0002', 1, '2026-04-08', 'NouVe', '',  75000,  5000,  '', '', NULL,          NULL),
+(15, 10, NULL, 'CLI-0018', 5, '2026-04-10', 'NouVe', '', 120000, 15000, '', '', NULL,          NULL),
+(16, 3,  NULL, 'CLI-0003', 2, '2026-04-07', 'NouVe', '',  85000,  5000,  '', '', NULL,          NULL),
+(17, 7,  NULL, 'CLI-0012', 1, '2026-04-12', 'NouVe', '', 120000, 10000, '', '', NULL,          NULL),
+(18, 13, NULL, 'CLI-0015', 3, '2026-04-09', 'NouVe', '',  65000,  5000,  '', '', NULL,          NULL),
+(19, 14, NULL, 'CLI-0009', 4, '2026-04-11', 'NouVe', '', 180000, 15000, '', '', NULL,          NULL),
+(20, 6,  NULL, 'CLI-0011', 1, '2026-04-06', 'NouVe', '', 250000,  5000,  '', '', NULL,          NULL);
 
 
 -- =============================================================================
@@ -710,7 +724,7 @@ BEGIN
       UPPER(TRIM(p_client_name)),
       NULLIF(TRIM(p_phone), ''),
       NULLIF(TRIM(p_activity), ''),
-      COALESCE(p_client_type, 'Particulier')
+      COALESCE(p_client_type, '')
     );
   END IF;
 

@@ -28,6 +28,10 @@ router.get('/', auth, async (req, res) => {
 
 // POST /api/cotations
 router.post('/', auth, async (req, res) => {
+  if (req.user.role === 'admin') {
+    return res.status(403).json({ error: 'Administrateur non autorisé à créer une cotation' });
+  }
+
   const { prospection_id, client_id, risque_cote, date_cotation, montant } = req.body;
   const commercial_id = req.user.role === 'commercial' ? req.user.id : req.body.commercial_id;
   try {
@@ -65,6 +69,7 @@ router.put('/:id', auth, async (req, res) => {
 
 // DELETE /api/cotations/:id
 router.delete('/:id', auth, async (req, res) => {
+  console.log('DELETE /api/cotations/:id', { cotationId: req.params.id, user: req.user?.id });
   try {
     const { rows } = await pool.query(
       'DELETE FROM cotations WHERE id = $1 RETURNING *',
@@ -73,6 +78,7 @@ router.delete('/:id', auth, async (req, res) => {
     if (!rows[0]) return res.status(404).json({ error: 'Cotation introuvable' });
     res.json({ message: 'Cotation supprimée' });
   } catch (e) {
+    console.error('Failed to delete cotation:', e.message || e);
     res.status(500).json({ error: e.message });
   }
 });
