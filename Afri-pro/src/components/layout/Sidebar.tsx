@@ -37,7 +37,7 @@ type UserRole = 'commercial' | 'manager_adjoint' | 'manager' | 'chef_agence' | '
     commercial: 'Commercial',
     manager_adjoint: 'Manager adjoint',
     manager: 'Manager',
-    chef_agence: "chef_agence",
+    chef_agence: 'Chef d agence',
     admin: 'Administrateur',
   };
 
@@ -68,6 +68,7 @@ type UserRole = 'commercial' | 'manager_adjoint' | 'manager' | 'chef_agence' | '
     ],
     chef_agence: [
       { label: 'Vue globale', icon: '🏠', route: '/dashboard' },
+      { label: 'Toutes prospections', icon: '📋', route: '/prospections' },
       { label: 'Toutes cotations', icon: '💼', route: '/cotations' },
       { label: 'Toutes ventes', icon: '✅', route: '/ventes' },
       { label: 'Objectifs agence', icon: '🎯', route: '/objectifs' },

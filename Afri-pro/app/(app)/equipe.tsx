@@ -53,8 +53,11 @@ export default function EquipeScreen() {
             <Text style={styles.memberName}>{item.name}</Text>
             <Text style={styles.memberMeta}>Role: {item.role}</Text>
             <Text style={styles.memberMeta}>Email: {item.email}</Text>
-            {item.manager_adjoint_nom && (
+            {item.role === 'commercial' && item.manager_adjoint_nom && (
               <Text style={styles.memberMeta}>Manager Adjoint: {item.manager_adjoint_nom} {item.manager_adjoint_prenom || ''}</Text>
+            )}
+            {item.role === 'manager_adjoint' && item.manager_nom && (
+              <Text style={styles.memberMeta}>Manager: {item.manager_nom} {item.manager_prenom || ''}</Text>
             )}
           </View>
         )}

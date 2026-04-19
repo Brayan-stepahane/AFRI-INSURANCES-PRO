@@ -1,6 +1,28 @@
 const router = require('express').Router();
 const pool   = require('../db');
 const auth   = require('../middleware/auth');
+const { isManagerAdjointRole, buildHierarchyFilter, buildHierarchySubquery } = require('../utils/hierarchy');
+
+const normalizeProspectionStatus = statut => {
+  switch ((statut || '').trim()) {
+    case 'Premier contact':
+    case 'Relance 1':
+    case 'Relance 2':
+    case 'Cotation envoyée':
+    case 'En attente signature':
+    case 'Contrat conclu':
+    case 'Perdu':
+      return statut.trim();
+    case 'En discussion':
+      return 'Relance 1';
+    case 'Proposition envoyée':
+      return 'Cotation envoyée';
+    case 'Négociation':
+      return 'En attente signature';
+    default:
+      return 'Premier contact';
+  }
+};
 
 // GET /api/prospections  (filtre par rôle automatiquement)
 router.get('/', auth, async (req, res) => {
@@ -26,12 +48,15 @@ router.get('/', auth, async (req, res) => {
     if (user.role === 'commercial') {
       params.push(user.id);
       query += ` AND p.commercial_id = $${params.length}`;
-    } else if (user.role === 'manager_adj' || user.role === 'manager_adjoint') {
+    } else if (isManagerAdjointRole(user.role)) {
       // Voit les prospections des commerciaux sous lui
       params.push(user.id);
       query += ` AND u.manager_adjoint_id = $${params.length}`;
+    } else if (user.role === 'manager' || user.role === 'chef_agence') {
+      // Voit toute sa hiérarchie (commerciaux, managers adjoints et managers sous lui)
+      params.push(user.id);
+      query += ` AND ${buildHierarchyFilter('u', params.length)}`;
     }
-    // manager, chef_agence, admin voient tout
 
     if (statut) {
       params.push(statut);
@@ -59,6 +84,9 @@ router.get('/relances', auth, async (req, res) => {
     if (req.user.role === 'commercial') {
       params.push(req.user.id);
       query += ` AND commercial_id = $${params.length}`;
+    } else if (req.user.role === 'manager' || req.user.role === 'chef_agence') {
+      params.push(req.user.id);
+      query += ` AND commercial_id IN (${buildHierarchySubquery(params.length)})`;
     }
     const { rows } = await pool.query(query, params);
     res.json(rows);
@@ -70,11 +98,13 @@ router.get('/relances', auth, async (req, res) => {
 // GET /api/prospections/:id
 router.get('/:id', auth, async (req, res) => {
   try {
+    const user = req.user;
     const { rows } = await pool.query(
       `SELECT
          p.*, c.id AS client_id, c.nom AS client_nom, c.telephone AS client_tel,
          c.type_client, c.activite AS client_activite,
          u.id AS commercial_id, u.nom AS commercial_nom, u.equipe,
+         u.manager_id AS commercial_manager_id, u.manager_adjoint_id AS commercial_manager_adjoint_id,
          cot.id AS cotation_id, cot.risque_cote, cot.date_cotation, cot.montant AS cotation_montant,
          cot.date_validation, cot.statut AS cotation_statut,
          v.id AS vente_id, v.produit AS vente_produit, v.prime_nette, v.accessoires,
@@ -89,7 +119,28 @@ router.get('/:id', auth, async (req, res) => {
       [req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Prospection introuvable' });
-    res.json(rows[0]);
+
+    const prospection = rows[0];
+    if (user.role === 'commercial' && prospection.commercial_id !== user.id) {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+    if (isManagerAdjointRole(user.role) && prospection.commercial_manager_adjoint_id !== user.id) {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+    if (user.role === 'manager' && prospection.commercial_manager_id !== user.id) {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+    if (user.role === 'chef_agence') {
+      const teamCheck = await pool.query(
+        `SELECT 1 FROM users WHERE id = $1 AND $2 IN (${buildHierarchySubquery(1)})`,
+        [user.id, prospection.commercial_id]
+      );
+      if (teamCheck.rows.length === 0) {
+        return res.status(403).json({ error: 'Accès refusé' });
+      }
+    }
+
+    res.json(prospection);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -189,7 +240,7 @@ router.put('/:id', auth, async (req, res) => {
         date_visite_3=$9, date_relance=$10, observations=$11,
         ancien_assureur=$12, date_effet_ancien=$13, active=$14, updated_at=NOW()
        WHERE id=$15 RETURNING *`,
-      [clientId, product, prospectionDate, potentialCA, roundedProbability, status,
+      [clientId, product, prospectionDate, potentialCA, roundedProbability, normalizeProspectionStatus(status),
        visitDate1, visitDate2, visitDate3, nextFollowUp, observations,
        previousInsurer, previousContract, active, req.params.id]
     );

@@ -75,6 +75,12 @@ BEGIN
     WHEN 'En discussion'         THEN 'Relance 1'
     WHEN 'Proposition envoyée'   THEN 'Cotation envoyée'
     WHEN 'Négociation'           THEN 'En attente signature'
+    WHEN 'Relance 1'             THEN 'Relance 1'
+    WHEN 'Relance 2'             THEN 'Relance 2'
+    WHEN 'Cotation envoyée'      THEN 'Cotation envoyée'
+    WHEN 'En attente signature'   THEN 'En attente signature'
+    WHEN 'Contrat conclu'         THEN 'Contrat conclu'
+    WHEN 'Perdu'                 THEN 'Perdu'
     ELSE 'Premier contact'
   END;
 

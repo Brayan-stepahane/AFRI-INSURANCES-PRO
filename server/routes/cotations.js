@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const pool   = require('../db');
 const auth   = require('../middleware/auth');
+const { isManagerAdjointRole, buildHierarchyFilter } = require('../utils/hierarchy');
 
 // GET /api/cotations
 router.get('/', auth, async (req, res) => {
@@ -16,9 +17,12 @@ router.get('/', auth, async (req, res) => {
     if (req.user.role === 'commercial') {
       params.push(req.user.id);
       query += ` AND c.commercial_id = $${params.length}`;
-    } else if (req.user.role === 'manager_adj' || req.user.role === 'manager_adjoint') {
+    } else if (isManagerAdjointRole(req.user.role)) {
       params.push(req.user.id);
       query += ` AND u.manager_adjoint_id = $${params.length}`;
+    } else if (req.user.role === 'manager' || req.user.role === 'chef_agence') {
+      params.push(req.user.id);
+      query += ` AND ${buildHierarchyFilter('u', params.length)}`;
     }
     query += ' ORDER BY c.date_cotation DESC';
 
@@ -57,7 +61,23 @@ router.post('/', auth, async (req, res) => {
 // PUT /api/cotations/:id
 router.put('/:id', auth, async (req, res) => {
   const { risque_cote, date_cotation, montant, date_validation, statut } = req.body;
+
   try {
+    const { rows: existingRows } = await pool.query(
+      'SELECT statut FROM cotations WHERE id = $1',
+      [req.params.id]
+    );
+    if (!existingRows[0]) {
+      return res.status(404).json({ error: 'Cotation introuvable' });
+    }
+
+    const currentStatus = existingRows[0].statut;
+    if (statut === 'Convertie en vente' && currentStatus !== 'Convertie en vente') {
+      return res.status(400).json({
+        error: 'La modification d\'une cotation ne peut pas la convertir en vente. Utilisez le bouton Convertir en vente pour créer une vente.'
+      });
+    }
+
     const { rows } = await pool.query(
       `UPDATE cotations SET risque_cote=$1, date_cotation=$2, montant=$3, date_validation=$4, statut=$5, updated_at=NOW()
        WHERE id=$6 RETURNING *`,

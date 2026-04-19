@@ -144,7 +144,7 @@ export function NewCotationModal({ visible, onClose, onSubmit, editCotation }: N
         date_cotation: form.dateCotation,
         montant: Number(form.montant) || 0,
         date_validation: form.dateValidation,
-        statut: form.dateValidation ? 'Validée' : 'En attente',
+        statut: editCotation?.statut === 'Convertie en vente' ? 'Convertie en vente' : (form.dateValidation ? 'Validée' : 'En attente'),
       };
 
       if (cotationId) {

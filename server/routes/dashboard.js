@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const pool   = require('../db');
 const auth   = require('../middleware/auth');
+const { isManagerAdjointRole, buildHierarchyFilter, buildHierarchySubquery } = require('../utils/hierarchy');
 
 // GET /api/dashboard  — données du tableau de bord selon le rôle
 router.get('/', auth, async (req, res) => {
@@ -15,6 +16,9 @@ router.get('/', auth, async (req, res) => {
     if (user.role === 'commercial') {
       caParams.push(user.id);
       caQuery += ` AND commercial_id = $2`;
+    } else if (user.role === 'manager' || user.role === 'chef_agence') {
+      caParams.push(user.id);
+      caQuery += ` AND commercial_id IN (${buildHierarchySubquery(caParams.length)})`;
     }
 
     // Objectifs du mois
@@ -70,6 +74,9 @@ router.get('/', auth, async (req, res) => {
       if (user.role === 'manager_adj' || user.role === 'manager_adjoint') {
         objParams.push(user.id);
         objQuery += ` AND u.manager_adjoint_id = $${objParams.length}`;
+      } else if (user.role === 'manager' || user.role === 'chef_agence') {
+        objParams.push(user.id);
+        objQuery += ` AND u.id IN (${buildHierarchyFilter('u', objParams.length)})`;
       }
     }
 
@@ -84,6 +91,9 @@ router.get('/', auth, async (req, res) => {
     if (user.role === 'commercial') {
       prospParams.push(user.id);
       prospQuery += ` AND commercial_id = $1`;
+    } else if (user.role === 'manager' || user.role === 'chef_agence') {
+      prospParams.push(user.id);
+      prospQuery += ` AND commercial_id IN (${buildHierarchySubquery(prospParams.length)})`;
     }
     prospQuery += ' GROUP BY statut ORDER BY nb DESC';
 
@@ -93,6 +103,9 @@ router.get('/', auth, async (req, res) => {
     if (user.role === 'commercial') {
       relanceParams.push(user.id);
       relanceQuery += ` AND commercial_id = $1`;
+    } else if (user.role === 'manager' || user.role === 'chef_agence') {
+      relanceParams.push(user.id);
+      relanceQuery += ` AND commercial_id IN (${buildHierarchySubquery(relanceParams.length)})`;
     }
 
     const [ca, objectifsResult, prospStatuts, relances] = await Promise.all([
@@ -172,6 +185,9 @@ router.get('/ca-historique', auth, async (req, res) => {
     if (req.user.role === 'commercial') {
       params.push(req.user.id);
       query += ` AND commercial_id = $1`;
+    } else if (req.user.role === 'manager' || req.user.role === 'chef_agence') {
+      params.push(req.user.id);
+      query += ` AND commercial_id IN (${buildHierarchySubquery(params.length)})`;
     }
     query += ' ORDER BY mois ASC';
 

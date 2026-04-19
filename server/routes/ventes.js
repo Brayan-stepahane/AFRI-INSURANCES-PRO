@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const pool   = require('../db');
 const auth   = require('../middleware/auth');
+const { isManagerAdjointRole, buildHierarchyFilter } = require('../utils/hierarchy');
 
 // GET /api/ventes
 router.get('/', auth, async (req, res) => {
@@ -19,9 +20,12 @@ router.get('/', auth, async (req, res) => {
     if (req.user.role === 'commercial') {
       params.push(req.user.id);
       query += ` AND v.commercial_id = $${params.length}`;
-    } else if (req.user.role === 'manager_adj' || req.user.role === 'manager_adjoint') {
+    } else if (isManagerAdjointRole(req.user.role)) {
       params.push(req.user.id);
       query += ` AND u.manager_adjoint_id = $${params.length}`;
+    } else if (req.user.role === 'manager' || req.user.role === 'chef_agence') {
+      params.push(req.user.id);
+      query += ` AND ${buildHierarchyFilter('u', params.length)}`;
     }
     if (mois) {
       params.push(mois); // format: 2026-03

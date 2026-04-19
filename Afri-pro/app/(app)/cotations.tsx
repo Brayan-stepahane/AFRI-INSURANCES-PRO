@@ -51,10 +51,15 @@ export default function CotationsScreen() {
   }
 
   const allCotations = cotations;
+  const isConvertedStatus = (status?: string) => {
+    const norm = status?.trim().toLowerCase();
+    return norm === 'convertie en vente' || norm === 'convertie en ventes';
+  };
+
   const totalCount = allCotations.length;
   const enAttente = allCotations.filter(c => c.statut === 'En attente').length;
   const validees = allCotations.filter(c => c.statut === 'Validée').length;
-  const converties = allCotations.filter(c => c.statut === 'Convertie en vente').length;
+  const converties = allCotations.filter(c => isConvertedStatus(c.statut)).length;
   const refusees = allCotations.filter(c => c.statut === 'Refusée').length;
 
   const filters = ['Tous', ...STATUTS_COT];
@@ -232,7 +237,7 @@ export default function CotationsScreen() {
 
         {/* Actions */}
         <View style={styles.actions}>
-          {c.statut === 'En attente' && (
+          {isConvertedStatus(c.statut) && (
             <TouchableOpacity
               style={[styles.actionBtn, styles.actionConvert]}
               onPress={() => {

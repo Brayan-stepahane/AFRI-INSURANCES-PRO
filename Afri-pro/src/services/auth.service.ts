@@ -76,6 +76,8 @@ export const userService = {
       active: apiUser.active,
       manager_adjoint_nom: apiUser.manager_adjoint_nom,
       manager_adjoint_prenom: apiUser.manager_adjoint_prenom,
+      manager_nom: apiUser.manager_nom,
+      manager_prenom: apiUser.manager_prenom,
     }));
   },
 

@@ -17,6 +17,8 @@ export interface User {
   active?: boolean;
   manager_adjoint_nom?: string;
   manager_adjoint_prenom?: string;
+  manager_nom?: string;
+  manager_prenom?: string;
 }
 
 

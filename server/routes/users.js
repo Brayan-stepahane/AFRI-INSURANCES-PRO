@@ -17,9 +17,11 @@ router.get('/', auth, managerOnly, async (req, res) => {
     const { rows } = await pool.query(
       `SELECT u.id, u.nom, u.prenom, u.identifiant, u.role, u.equipe, u.objectif_mensuel, u.active, u.created_at, 
               u.manager_id, u.manager_adjoint_id, u.parent_id,
-              ma.nom as manager_adjoint_nom, ma.prenom as manager_adjoint_prenom
+              ma.nom as manager_adjoint_nom, ma.prenom as manager_adjoint_prenom,
+              m.nom as manager_nom, m.prenom as manager_prenom
        FROM users u
        LEFT JOIN users ma ON u.manager_adjoint_id = ma.id
+       LEFT JOIN users m ON u.manager_id = m.id
        ORDER BY u.role, u.nom`
     );
     res.json(rows);
