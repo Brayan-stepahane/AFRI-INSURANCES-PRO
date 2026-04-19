@@ -4,7 +4,6 @@ import { AuthResponse, LoginPayload, RegisterPayload, User, UserRole, CreateUser
 
 const normalizeRole = (role?: string): UserRole | undefined => {
   if (!role) return undefined;
-  if (role === 'manager_adjoint') return 'manager_adj';
   return role as UserRole;
 };
 
@@ -62,13 +61,21 @@ export const userService = {
   getUsers: async (): Promise<User[]> => {
     const response = await apiClient.get(API_ENDPOINTS.USERS.LIST);
     return response.data.map((apiUser: any) => ({
-      id: apiUser.id,
+      id: apiUser.id.toString(),
       email: apiUser.identifiant,
       name: apiUser.name || `${[apiUser.nom, apiUser.prenom].filter(Boolean).join(' ')}`.trim() || apiUser.identifiant || '',
       surname: apiUser.prenom || '',
       phone: apiUser.phone,
       role: normalizeRole(apiUser.role),
+      equipe: apiUser.equipe,
+      objectifMensuel: apiUser.objectif_mensuel ?? apiUser.objectifMensuel,
       createdAt: apiUser.created_at || apiUser.createdAt || new Date().toISOString(),
+      manager_id: apiUser.manager_id,
+      manager_adjoint_id: apiUser.manager_adjoint_id,
+      parent_id: apiUser.parent_id,
+      active: apiUser.active,
+      manager_adjoint_nom: apiUser.manager_adjoint_nom,
+      manager_adjoint_prenom: apiUser.manager_adjoint_prenom,
     }));
   },
 
@@ -78,7 +85,7 @@ export const userService = {
       prenom: payload.surname,
       identifiant: payload.name.trim().toLowerCase().replace(/\s+/g, ''),
       mot_de_passe: payload.password,
-      role: payload.role,
+      role: payload.role === 'manager_adj' ? 'manager_adjoint' : payload.role,
       phone: payload.phone || null,
       objectif_mensuel: payload.objectifMensuel || 500000,
     };
@@ -88,7 +95,7 @@ export const userService = {
       const pid = Number(payload.parentId);
       if (payload.role === 'commercial') {
         body.manager_adjoint_id = pid;
-      } else if (payload.role === 'manager_adj') {
+      } else if (payload.role === 'manager_adjoint') {
         body.manager_id = pid;
       } else if (payload.role === 'manager') {
         body.manager_id = pid;

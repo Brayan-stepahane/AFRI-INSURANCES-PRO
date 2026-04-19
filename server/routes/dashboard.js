@@ -18,32 +18,66 @@ router.get('/', auth, async (req, res) => {
     }
 
     // Objectifs du mois
-    let objQuery = `
-      SELECT
-        id,
-        commercial_id,
-        commercial_nom,
-        mois,
-        montant_mensuel AS objectif_mensuel,
-        montant_reporte AS reporte,
-        total_objectif,
-        ca_realise,
-        montant_restant,
-        pct_atteint
-      FROM v_objectifs_realises
-      WHERE TO_CHAR(mois,'YYYY-MM') = $1`;
-    const objParams = [moisActuel];
+    const moisDate = `${moisActuel}-01`;
+    let objQuery;
+    const objParams = [moisDate];
 
     if (user.role === 'commercial') {
+      objQuery = `
+        SELECT
+          id,
+          commercial_id,
+          commercial_nom,
+          mois,
+          montant_mensuel AS objectif_mensuel,
+          montant_reporte AS reporte,
+          total_objectif,
+          ca_realise,
+          montant_restant,
+          pct_atteint
+        FROM v_objectifs_realises
+        WHERE TO_CHAR(mois,'YYYY-MM') = $1`;
       objParams.push(user.id);
       objQuery += ` AND commercial_id = $2`;
+    } else {
+      objQuery = `
+        SELECT
+          COALESCE(o.id, 0) AS id,
+          u.id AS commercial_id,
+          u.nom AS commercial_nom,
+          $1::date AS mois,
+          COALESCE(o.montant_mensuel, u.objectif_mensuel, 0) AS objectif_mensuel,
+          COALESCE(o.montant_reporte, 0) AS reporte,
+          COALESCE(o.montant_mensuel, u.objectif_mensuel, 0) + COALESCE(o.montant_reporte, 0) AS total_objectif,
+          COALESCE(v.ca_realise, 0) AS ca_realise,
+          GREATEST(0, COALESCE(o.montant_mensuel, u.objectif_mensuel, 0) + COALESCE(o.montant_reporte, 0) - COALESCE(v.ca_realise, 0)) AS montant_restant,
+          CASE
+            WHEN COALESCE(o.montant_mensuel, u.objectif_mensuel, 0) + COALESCE(o.montant_reporte, 0) = 0 THEN 0
+            ELSE LEAST(100, ROUND(COALESCE(v.ca_realise, 0) / (COALESCE(o.montant_mensuel, u.objectif_mensuel, 0) + COALESCE(o.montant_reporte, 0)) * 100, 1))
+          END AS pct_atteint
+        FROM users u
+        LEFT JOIN objectifs o
+          ON o.commercial_id = u.id
+          AND TO_CHAR(o.mois,'YYYY-MM') = TO_CHAR($1::date,'YYYY-MM')
+        LEFT JOIN (
+          SELECT commercial_id, COALESCE(SUM(ca), 0) AS ca_realise
+          FROM ventes
+          WHERE DATE_TRUNC('month', date_vente) = DATE_TRUNC('month', $1::date)
+          GROUP BY commercial_id
+        ) v ON v.commercial_id = u.id
+        WHERE u.role = 'commercial'`;
+
+      if (user.role === 'manager_adj' || user.role === 'manager_adjoint') {
+        objParams.push(user.id);
+        objQuery += ` AND u.manager_adjoint_id = $${objParams.length}`;
+      }
     }
 
     // Prospections en cours
     let prospQuery = `
       SELECT statut, COUNT(*) AS nb
       FROM prospections
-      WHERE (active IS NULL OR active = true)
+      WHERE (COALESCE(active, active) IS NULL OR COALESCE(active, active) = true)
         AND statut NOT IN ('Contrat conclu','Perdu')`;
     const prospParams = [];
 

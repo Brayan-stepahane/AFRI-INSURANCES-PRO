@@ -32,18 +32,7 @@ export function useCotations(refreshKey = 0) {
         statut: c.statut,
       })) : [];
 
-      // Filter by role and user
-      let filtered = transformed;
-
-      if (user?.role === 'commercial') {
-        const normalizedUserName = (user.name || '').trim().toLowerCase();
-        filtered = filtered.filter((c: Cotation) => {
-          const cCommercial = (c.commercial || '').trim().toLowerCase();
-          return cCommercial === normalizedUserName || normalizedUserName.includes(cCommercial) || cCommercial.includes(normalizedUserName);
-        });
-      }
-
-      setCotations(filtered);
+      setCotations(transformed);
     } catch (err) {
       console.error('Error fetching cotations:', err);
       setError(err instanceof Error ? err.message : 'Failed to load cotations');

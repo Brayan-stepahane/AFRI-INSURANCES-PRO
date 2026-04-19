@@ -10,12 +10,15 @@ router.get('/', auth, async (req, res) => {
       FROM cotations c
       JOIN clients cl ON c.client_id = cl.id
       JOIN users u ON c.commercial_id = u.id
-      WHERE 1=1`;
+      WHERE c.active = true`;
     const params = [];
 
     if (req.user.role === 'commercial') {
       params.push(req.user.id);
       query += ` AND c.commercial_id = $${params.length}`;
+    } else if (req.user.role === 'manager_adj' || req.user.role === 'manager_adjoint') {
+      params.push(req.user.id);
+      query += ` AND u.manager_adjoint_id = $${params.length}`;
     }
     query += ' ORDER BY c.date_cotation DESC';
 
@@ -72,13 +75,13 @@ router.delete('/:id', auth, async (req, res) => {
   console.log('DELETE /api/cotations/:id', { cotationId: req.params.id, user: req.user?.id });
   try {
     const { rows } = await pool.query(
-      'DELETE FROM cotations WHERE id = $1 RETURNING *',
+      'UPDATE cotations SET active = false, updated_at = NOW() WHERE id = $1 RETURNING *',
       [req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Cotation introuvable' });
-    res.json({ message: 'Cotation supprimée' });
+    res.json({ message: 'Cotation désactivée' });
   } catch (e) {
-    console.error('Failed to delete cotation:', e.message || e);
+    console.error('Failed to deactivate cotation:', e.message || e);
     res.status(500).json({ error: e.message });
   }
 });

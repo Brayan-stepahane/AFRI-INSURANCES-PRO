@@ -109,7 +109,7 @@ export default function ProfileScreen() {
 
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Statut</Text>
-            <Text style={[styles.infoValue, styles.statusActive]}>Actif</Text>
+            <Text style={[styles.infoValue, styles.statusActive]}>active</Text>
           </View>
 
           <View style={styles.divider} />

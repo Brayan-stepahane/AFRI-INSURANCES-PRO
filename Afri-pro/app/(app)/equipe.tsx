@@ -5,7 +5,7 @@ import { userService } from '../../src/services/auth.service';
 import { colors, spacing, radius } from '../../src/config/theme';
 import { User } from '../../src/types/auth.types';
 
-const TEAM_ROLES = ['manager', 'manager_adj', 'chef_agence', 'admin'];
+const TEAM_ROLES = ['manager', 'manager_adjoint', 'chef_agence', 'admin'];
 
 export default function EquipeScreen() {
   const { user } = useAuth();
@@ -25,7 +25,7 @@ export default function EquipeScreen() {
     loadUsers();
   }, []);
 
-  if (!TEAM_ROLES.includes(role)) {
+  if (!TEAM_ROLES.includes(role as string)) {
     return (
       <View style={styles.container}>
         <Text style={styles.title}>Accès refusé</Text>
@@ -34,7 +34,12 @@ export default function EquipeScreen() {
     );
   }
 
-  const members = users.filter((u: User) => u.role && u.role !== 'admin');
+  const members = users.filter((u: User) => {
+    if (role === 'manager_adjoint') {
+      return u.role === 'commercial' && u.manager_adjoint_id === parseInt(user?.id || '0');
+    }
+    return u.role && u.role !== 'admin';
+  });
 
   return (
     <View style={styles.container}>
@@ -48,6 +53,9 @@ export default function EquipeScreen() {
             <Text style={styles.memberName}>{item.name}</Text>
             <Text style={styles.memberMeta}>Role: {item.role}</Text>
             <Text style={styles.memberMeta}>Email: {item.email}</Text>
+            {item.manager_adjoint_nom && (
+              <Text style={styles.memberMeta}>Manager Adjoint: {item.manager_adjoint_nom} {item.manager_adjoint_prenom || ''}</Text>
+            )}
           </View>
         )}
         contentContainerStyle={styles.list}

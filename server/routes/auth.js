@@ -15,7 +15,7 @@ router.post('/login', async (req, res) => {
 
     // Get user from database
     const { rows } = await pool.query(
-      'SELECT id, nom, prenom, identifiant, mot_de_passe, role, equipe, objectif_mensuel, actif FROM users WHERE identifiant = $1',
+      'SELECT id, nom, prenom, identifiant, mot_de_passe, role, equipe, objectif_mensuel, active FROM users WHERE identifiant = $1',
       [identifiant]
     );
 
@@ -26,8 +26,8 @@ router.post('/login', async (req, res) => {
     const user = rows[0];
 
     // Check if user is active
-    if (!user.actif) {
-      return res.status(403).json({ error: 'Utilisateur inactif' });
+    if (!user.active) {
+      return res.status(403).json({ error: 'Utilisateur inactive' });
     }
 
     // Verify password
@@ -88,7 +88,7 @@ router.post('/register', async (req, res) => {
 
     // Insert user
     const { rows } = await pool.query(
-      'INSERT INTO users (nom, prenom, identifiant, mot_de_passe, role, equipe, objectif_mensuel, actif) VALUES ($1, $2, $3, $4, $5, $6, $7, true) RETURNING id, nom, prenom, identifiant, role, equipe',
+      'INSERT INTO users (nom, prenom, identifiant, mot_de_passe, role, equipe, objectif_mensuel, active) VALUES ($1, $2, $3, $4, $5, $6, $7, true) RETURNING id, nom, prenom, identifiant, role, equipe',
       [nom, prenom, identifiant, hashedPassword, role, equipe, objectif_mensuel]
     );
 
@@ -139,12 +139,12 @@ router.post('/refresh', auth, async (req, res) => {
 
     // Get updated user data
     const { rows } = await pool.query(
-      'SELECT id, nom, prenom, identifiant, role, equipe, objectif_mensuel, actif FROM users WHERE id = $1',
+      'SELECT id, nom, prenom, identifiant, role, equipe, objectif_mensuel, active FROM users WHERE id = $1',
       [user.id]
     );
 
-    if (rows.length === 0 || !rows[0].actif) {
-      return res.status(401).json({ error: 'Utilisateur introuvable ou inactif' });
+    if (rows.length === 0 || !rows[0].active) {
+      return res.status(401).json({ error: 'Utilisateur introuvable ou inactive' });
     }
 
     const updatedUser = rows[0];

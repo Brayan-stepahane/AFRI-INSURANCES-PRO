@@ -36,7 +36,7 @@ CREATE TABLE users (
                 )),
   equipe        VARCHAR(10),                    -- 'A', 'B', 'ALL'
   objectif_mensuel DECIMAL(15,2) DEFAULT 500000,
-  actif         BOOLEAN      DEFAULT true,
+  active         BOOLEAN      DEFAULT true,
   created_at    TIMESTAMP    DEFAULT NOW(),
   updated_at    TIMESTAMP    DEFAULT NOW()
 );
@@ -44,7 +44,7 @@ CREATE TABLE users (
 -- Index
 CREATE INDEX idx_users_role       ON users(role);
 CREATE INDEX idx_users_identifiant ON users(identifiant);
-CREATE INDEX idx_users_actif      ON users(actif);
+CREATE INDEX idx_users_active      ON users(active);
 
 -- =============================================================================
 -- TABLE 2 : clients
@@ -90,7 +90,7 @@ CREATE TABLE produits (
   categorie     VARCHAR(50),                    -- 'Vie', 'Non-vie', 'Caution'
   type_client   VARCHAR(20)  DEFAULT 'Tous'
                 CHECK ( type_client IN ('Particulier','Corporate','Personnel','Tous')),
-  actif         BOOLEAN      DEFAULT true,
+  active         BOOLEAN      DEFAULT true,
   created_at    TIMESTAMP    DEFAULT NOW()
 );
 

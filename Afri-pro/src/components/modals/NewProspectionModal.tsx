@@ -6,9 +6,6 @@ import {
 import { AxiosResponse } from 'axios';
 import { useAuth } from '../../hooks/useAuth';
 import { useClients } from '../../hooks/useClients';
-import { useProspections } from '../../hooks/useProspections';
-import { useCotations } from '../../hooks/useCotations';
-import { useVentes } from '../../hooks/useVentes';
 import { colors, spacing, radius } from '../../config/theme';
 import type { Client } from '../../types';
 import apiClient from '../../services/api/client';
@@ -180,9 +177,6 @@ const sf = StyleSheet.create({
 export function NewProspectionModal({ visible, onClose, onSubmit, editProspection }: NewProspectionModalProps) {
   const { user } = useAuth();
   const { clients } = useClients();
-  const { prospections } = useProspections();
-  const { cotations } = useCotations();
-  const { ventes } = useVentes();
 
   const [step, setStep] = useState(1);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);

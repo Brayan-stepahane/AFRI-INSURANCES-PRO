@@ -37,7 +37,7 @@ export default function ObjectifsScreen() {
     const d = new Date(v.dateVente);
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   });
-  const myProspActifs = prospections.filter(
+  const myProspactives = prospections.filter(
     p => p.commercial === name && !['Contrat conclu', 'Perdu'].includes(p.statut)
   );
 
@@ -107,9 +107,9 @@ export default function ObjectifsScreen() {
               {/* Prospects à conclure */}
               <View style={[styles.card, { flex: 1 }]}>
                 <Text style={styles.cardTitle}>🔄 À conclure</Text>
-                {myProspActifs.length === 0
+                {myProspactives.length === 0
                   ? <Text style={styles.emptyText}>Tous conclus ! 🎉</Text>
-                  : myProspActifs.map(p => (
+                  : myProspactives.map(p => (
                     <View key={p.id} style={styles.listRow}>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.listNom} numberOfLines={1}>{(p.produit || 'Produit').split(' ').slice(0, 2).join(' ')}</Text>

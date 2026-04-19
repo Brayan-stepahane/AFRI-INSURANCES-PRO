@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   View, Text, FlatList, StyleSheet, TextInput,
   TouchableOpacity, RefreshControl, ScrollView, Alert,
+  Platform,
 } from 'react-native';
 import { useAuth } from '../../src/hooks/useAuth';
 import { useVentes } from '../../src/hooks/useVentes';
@@ -51,23 +52,41 @@ export default function VentesScreen() {
 
   const deleteVente = async (v: Vente) => {
     console.log('DELETE BUTTON PRESSED', v.id);
+    const message = `Êtes-vous sûr de vouloir désactiver cette vente de ${getClient(v.clientId)?.nom || v.clientId} ?`;
+
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm(message);
+      console.log('web confirm result', confirmed, v.id);
+      if (!confirmed) return;
+      try {
+        const response = await apiClient.delete(`${API_ENDPOINTS.VENTES.LIST}/${v.id}`);
+        console.log('Delete response:', response.data);
+        await refetch();
+        Alert.alert('✅ Désactivé', 'La vente a bien été désactivée.');
+      } catch (error: any) {
+        console.error('Delete error:', error?.response?.data || error?.message || error);
+        Alert.alert('❌ Erreur', error?.response?.data?.error || 'Une erreur est survenue lors de la désactivation.');
+      }
+      return;
+    }
+
     Alert.alert(
-      'Supprimer la vente',
-      `Êtes-vous sûr de vouloir supprimer cette vente de ${getClient(v.clientId)?.nom || v.clientId} ?`,
+      'Désactiver la vente',
+      message,
       [
         { text: 'Annuler', style: 'cancel' },
         {
-          text: 'Supprimer',
+          text: 'Désactiver',
           style: 'destructive',
           onPress: async () => {
             try {
               const response = await apiClient.delete(`${API_ENDPOINTS.VENTES.LIST}/${v.id}`);
               console.log('Delete response:', response.data);
               await refetch();
-              Alert.alert('✅ Supprimé', 'La vente a bien été supprimée de la base de données.');
+              Alert.alert('✅ Désactivé', 'La vente a bien été désactivée.');
             } catch (error: any) {
               console.error('Delete error:', error?.response?.data || error?.message || error);
-              Alert.alert('❌ Erreur', error?.response?.data?.error || 'Une erreur est survenue lors de la suppression.');
+              Alert.alert('❌ Erreur', error?.response?.data?.error || 'Une erreur est survenue lors de la désactivation.');
             }
           }
         }
@@ -185,7 +204,7 @@ export default function VentesScreen() {
             <Text style={styles.actionBtnText}>✏️ Modifier</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.actionBtn, styles.actionDelete]} onPress={() => deleteVente(v)}>
-            <Text style={[styles.actionBtnText, { color: colors.danger }]}>🗑️ Supprimer</Text>
+            <Text style={[styles.actionBtnText, { color: colors.danger }]}>🗑️ Désactiver</Text>
           </TouchableOpacity>
         </View>
       </View>

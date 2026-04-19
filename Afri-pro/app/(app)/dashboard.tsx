@@ -94,7 +94,7 @@ export default function DashboardScreen() {
 
         <View style={styles.metricsGrid}>
           <View style={styles.metricCol}>
-            <MetricCard label="Prospects actifs" value={stats.activeProspects} subtext="en cours" valueColor={colors.violet} />
+            <MetricCard label="Prospects actives" value={stats.activeProspects} subtext="en cours" valueColor={colors.violet} />
           </View>
           <View style={styles.metricCol}>
             <MetricCard
@@ -127,11 +127,13 @@ export default function DashboardScreen() {
           </View>
         </View>
       </View>
-      <NewProspectionModal
-        visible={showNewProspectionModal}
-        onClose={() => setShowNewProspectionModal(false)}
-        onSubmit={handleNewProspectionSubmit}
-      />
+      {showNewProspectionModal && (
+        <NewProspectionModal
+          visible={showNewProspectionModal}
+          onClose={() => setShowNewProspectionModal(false)}
+          onSubmit={handleNewProspectionSubmit}
+        />
+      )}
     </ScrollView>
   );
 }

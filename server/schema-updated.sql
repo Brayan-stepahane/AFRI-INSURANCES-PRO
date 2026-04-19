@@ -39,7 +39,7 @@ CREATE TABLE users (
   manager_id        INTEGER      REFERENCES users(id) ON DELETE SET NULL,  -- ← NOUVEAU
   manager_adjoint_id INTEGER     REFERENCES users(id) ON DELETE SET NULL,  -- ← NOUVEAU  
   parent_id         INTEGER      REFERENCES users(id) ON DELETE SET NULL,  -- ← NOUVEAU
-  actif             BOOLEAN      DEFAULT true,
+  active             BOOLEAN      DEFAULT true,
   created_at        TIMESTAMP    DEFAULT NOW(),
   updated_at        TIMESTAMP    DEFAULT NOW()
 );
@@ -47,7 +47,7 @@ CREATE TABLE users (
 -- Indexes hiérarchie
 CREATE INDEX idx_users_role ON users(role);
 CREATE INDEX idx_users_identifiant ON users(identifiant);
-CREATE INDEX idx_users_actif ON users(actif);
+CREATE INDEX idx_users_active ON users(active);
 CREATE INDEX idx_users_manager_id ON users(manager_id);
 CREATE INDEX idx_users_manager_adjoint_id ON users(manager_adjoint_id);
 CREATE INDEX idx_users_parent_id ON users(parent_id);
@@ -82,7 +82,7 @@ CREATE TABLE produits (
   categorie     VARCHAR(50),
   type_client   VARCHAR(20)  DEFAULT 'Tous'
                 CHECK (type_client IN ('Particulier','Corporate','Personnel','Tous')),
-  actif         BOOLEAN      DEFAULT true,
+  active         BOOLEAN      DEFAULT true,
   created_at    TIMESTAMP    DEFAULT NOW()
 );
 
@@ -121,6 +121,7 @@ CREATE TABLE cotations (
   date_validation   DATE,
   statut            VARCHAR(30)  NOT NULL DEFAULT 'En attente'
                     CHECK (statut IN ('En attente','Validée','Refusée','Convertie en vente')),
+  active            BOOLEAN      DEFAULT true,
   created_at        TIMESTAMP    DEFAULT NOW(),
   updated_at        TIMESTAMP    DEFAULT NOW()
 );
@@ -144,6 +145,7 @@ CREATE TABLE ventes (
   no_carte_rose     VARCHAR(100),
   date_effet        DATE,
   date_echeance     DATE,
+  active            BOOLEAN      DEFAULT true,
   created_at        TIMESTAMP    DEFAULT NOW(),
   updated_at        TIMESTAMP    DEFAULT NOW()
 );

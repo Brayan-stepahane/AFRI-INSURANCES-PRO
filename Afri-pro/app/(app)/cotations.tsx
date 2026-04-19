@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   View, Text, FlatList, StyleSheet, TextInput,
   TouchableOpacity, RefreshControl, ScrollView, Alert,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/hooks/useAuth';
@@ -98,13 +99,42 @@ export default function CotationsScreen() {
 
   const deleteCotation = async (cot: Cotation) => {
     console.log('DELETE BUTTON PRESSED', cot.id, cot.noCot);
+    const message = `Êtes-vous sûr de vouloir désactiver COT-${String(cot.noCot).padStart(3,'0')} ?`;
+
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm(message);
+      console.log('web confirm result', confirmed, cot.id);
+      if (!confirmed) return;
+      try {
+        // DEBUG: log the exact headers being sent
+        const token = await storageService.getSecure(STORAGE_KEYS.AUTH_TOKEN);
+        console.log('=== DELETE DEBUG ===');
+        console.log('Token found:', !!token);
+        console.log('Token value:', token ? `${token.substring(0, 20)}...` : 'none');
+        console.log('URL:', `${API_ENDPOINTS.COTATIONS.LIST}/${cot.id}`);
+
+        const response = await apiClient.delete(`${API_ENDPOINTS.COTATIONS.LIST}/${cot.id}`);
+        console.log('Delete response:', response.data);
+        await refetch();
+        Alert.alert('✅ Désactivé', 'La cotation a bien été désactivée.');
+      } catch (error: any) {
+        console.log('=== DELETE ERROR ===');
+        console.log('Status:', error?.response?.status);
+        console.log('Error data:', error?.response?.data);
+        console.log('Headers sent:', error?.config?.headers);
+        console.error('Delete error:', error?.response?.data || error?.message || error);
+        Alert.alert('❌ Erreur', error?.response?.data?.error || 'Une erreur est survenue lors de la désactivation.');
+      }
+      return;
+    }
+
     Alert.alert(
-      'Supprimer la cotation',
-      `Êtes-vous sûr de vouloir supprimer COT-${String(cot.noCot).padStart(3,'0')} ?`,
+      'Désactiver la cotation',
+      message,
       [
         { text: 'Annuler', style: 'cancel' },
         {
-          text: 'Supprimer',
+          text: 'Désactiver',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -118,14 +148,14 @@ export default function CotationsScreen() {
               const response = await apiClient.delete(`${API_ENDPOINTS.COTATIONS.LIST}/${cot.id}`);
               console.log('Delete response:', response.data);
               await refetch();
-              Alert.alert('✅ Supprimé', 'La cotation a bien été supprimée de la base de données.');
+              Alert.alert('✅ Désactivé', 'La cotation a bien été désactivée.');
             } catch (error: any) {
               console.log('=== DELETE ERROR ===');
               console.log('Status:', error?.response?.status);
               console.log('Error data:', error?.response?.data);
               console.log('Headers sent:', error?.config?.headers);
               console.error('Delete error:', error?.response?.data || error?.message || error);
-              Alert.alert('❌ Erreur', error?.response?.data?.error || 'Une erreur est survenue lors de la suppression.');
+              Alert.alert('❌ Erreur', error?.response?.data?.error || 'Une erreur est survenue lors de la désactivation.');
             }
           }
         }
@@ -202,7 +232,7 @@ export default function CotationsScreen() {
 
         {/* Actions */}
         <View style={styles.actions}>
-          {c.statut === 'Validée' && (
+          {c.statut === 'En attente' && (
             <TouchableOpacity
               style={[styles.actionBtn, styles.actionConvert]}
               onPress={() => {
@@ -217,7 +247,7 @@ export default function CotationsScreen() {
             <Text style={styles.actionBtnText}>✏️ Modifier</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.actionBtn, styles.actionDelete]} onPress={() => deleteCotation(c)}>
-            <Text style={[styles.actionBtnText, { color: colors.danger }]}>🗑️ Supprimer</Text>
+            <Text style={[styles.actionBtnText, { color: colors.danger }]}>🗑️ Désactiver</Text>
           </TouchableOpacity>
         </View>
       </View>

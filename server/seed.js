@@ -52,7 +52,7 @@ const seedDatabase = async () => {
     ];
 
     const insertUserQuery = `
-      INSERT INTO users (nom, prenom, identifiant, mot_de_passe, role, equipe, objectif_mensuel, actif)
+      INSERT INTO users (nom, prenom, identifiant, mot_de_passe, role, equipe, objectif_mensuel, active)
       VALUES ($1, $2, $3, $4, $5, $6, $7, true)
       ON CONFLICT (identifiant) DO UPDATE
       SET mot_de_passe = EXCLUDED.mot_de_passe,

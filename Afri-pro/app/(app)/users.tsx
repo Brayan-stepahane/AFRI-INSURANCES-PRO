@@ -28,7 +28,7 @@ export default function UsersScreen() {
   const [roleOpen, setRoleOpen] = useState(false);
   const [parentOpen, setParentOpen] = useState(false);
 
-  const ROLE_OPTIONS: UserRole[] = ['commercial', 'manager_adj', 'manager', 'chef_agence', 'admin'];
+  const ROLE_OPTIONS: UserRole[] = ['commercial', 'manager_adjoint', 'manager', 'chef_agence', 'admin'];
 
   // Filter possible parents based on selected role
   const isManagerAdjointRole = (role?: string) => role === 'manager_adj' || role === 'manager_adjoint';
@@ -37,7 +37,7 @@ export default function UsersScreen() {
     switch (formData.role) {
       case 'commercial':
         return users.filter(u => isManagerAdjointRole(u.role));
-      case 'manager_adj':
+      case 'manager_adjoint':
         return users.filter(u => u.role === 'manager');
       case 'manager':
         return users.filter(u => u.role === 'chef_agence');
@@ -70,10 +70,10 @@ export default function UsersScreen() {
     }
 
     // Hierarchy validation (only for roles that need a parent)
-    if (['commercial', 'manager_adj', 'manager'].includes(formData.role) && !formData.parentId) {
+    if (['commercial', 'manager_adjoint', 'manager'].includes(formData.role) && !formData.parentId) {
       let required = '';
       if (formData.role === 'commercial') required = 'un manager adjoint';
-      else if (formData.role === 'manager_adj') required = 'un manager';
+      else if (formData.role === 'manager_adjoint') required = 'un manager';
       else if (formData.role === 'manager') required = 'un chef_agence d\'agence';
       
       setError(`Veuillez sélectionner ${required}.`);
@@ -124,7 +124,7 @@ export default function UsersScreen() {
   const getParentLabel = () => {
     switch (formData.role) {
       case 'commercial': return 'Manager Adjoint';
-      case 'manager_adj': return 'Manager';
+      case 'manager_adjoint': return 'Manager';
       case 'manager': return 'chef_agence d\'Agence';
       default: return '';
     }
@@ -225,7 +225,7 @@ export default function UsersScreen() {
         </Modal>
 
         {/* Parent Selector - only for roles that need hierarchy */}
-        {['commercial', 'manager_adj', 'manager'].includes(formData.role) && (
+        {['commercial', 'manager_adjoint', 'manager'].includes(formData.role) && (
           <>
             <Text style={styles.parentLabel}>{getParentLabel()}</Text>
             

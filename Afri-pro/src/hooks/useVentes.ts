@@ -35,18 +35,7 @@ export function useVentes(refreshKey = 0) {
         dateEcheance: normalizeDateInput(v.date_echeance),
       })) : [];
 
-      // Filter by role and user
-      let filtered = transformed;
-
-      if (user?.role === 'commercial') {
-        const normalizedUserName = (user.name || '').trim().toLowerCase();
-        filtered = filtered.filter((v: Vente) => {
-          const vCommercial = (v.commercial || '').trim().toLowerCase();
-          return vCommercial === normalizedUserName || normalizedUserName.includes(vCommercial) || vCommercial.includes(normalizedUserName);
-        });
-      }
-
-      setVentes(filtered);
+      setVentes(transformed);
     } catch (err) {
       console.error('Error fetching ventes:', err);
       setError(err instanceof Error ? err.message : 'Failed to load ventes');

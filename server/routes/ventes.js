@@ -13,12 +13,15 @@ router.get('/', auth, async (req, res) => {
       JOIN clients cl ON v.client_id = cl.id
       JOIN users u ON v.commercial_id = u.id
       LEFT JOIN produits p ON v.produit_id = p.id
-      WHERE 1=1`;
+      WHERE v.active = true`;
     const params = [];
 
     if (req.user.role === 'commercial') {
       params.push(req.user.id);
       query += ` AND v.commercial_id = $${params.length}`;
+    } else if (req.user.role === 'manager_adj' || req.user.role === 'manager_adjoint') {
+      params.push(req.user.id);
+      query += ` AND u.manager_adjoint_id = $${params.length}`;
     }
     if (mois) {
       params.push(mois); // format: 2026-03
@@ -131,9 +134,10 @@ router.post('/', auth, async (req, res) => {
       );
     }
     if (cotation_id) {
-      // Delete the cotation since it has been successfully converted to a vente
+      // Update the cotation status to 'Convertie en vente' instead of deleting
+      // This maintains referential integrity since ventes.cotation_id references cotations(id)
       await pool.query(
-        `DELETE FROM cotations WHERE id=$1`,
+        `UPDATE cotations SET statut='Convertie en vente', updated_at=NOW() WHERE id=$1`,
         [cotation_id]
       );
     }
@@ -209,11 +213,11 @@ router.put('/:id', auth, async (req, res) => {
 router.delete('/:id', auth, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      'DELETE FROM ventes WHERE id = $1 RETURNING *',
+      'UPDATE ventes SET active = false, updated_at = NOW() WHERE id = $1 RETURNING *',
       [req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Vente introuvable' });
-    res.json({ message: 'Vente supprimée' });
+    res.json({ message: 'Vente désactivée' });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

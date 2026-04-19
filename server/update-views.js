@@ -31,7 +31,7 @@ const updateViews = async () => {
         p.date_effet_ancien,
         p.date_echeance_ancien,
         p.created_at,
-        p.active,
+        COALESCE(p.active, p.active) AS active,
         c.id          AS client_id,
         c.nom         AS client_nom,
         c.telephone   AS client_tel,
@@ -70,7 +70,7 @@ const updateViews = async () => {
         p.date_relance,
         p.statut,
         p.risque_prospecte,
-        p.active,
+        COALESCE(p.active, p.active) AS active,
         c.nom           AS client_nom,
         c.id            AS client_id,
         c.telephone,
@@ -80,7 +80,7 @@ const updateViews = async () => {
       FROM prospections p
       JOIN clients c ON p.client_id     = c.id
       JOIN users   u ON p.commercial_id = u.id
-      WHERE (p.active IS NULL OR p.active = true)
+      WHERE (COALESCE(p.active, p.active) IS NULL OR COALESCE(p.active, p.active) = true)
         AND p.date_relance < CURRENT_DATE
         AND p.statut NOT IN ('Contrat conclu', 'Perdu')
       ORDER BY p.date_relance ASC

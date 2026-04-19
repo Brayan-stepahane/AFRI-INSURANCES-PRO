@@ -9,6 +9,8 @@ import {
   RefreshControl,
   ScrollView,
   Alert,
+  GestureResponderEvent,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/hooks/useAuth';
@@ -81,11 +83,7 @@ export default function ProspectionsScreen() {
     };
 
     return (
-      <TouchableOpacity
-        style={[styles.card, urgent && styles.cardUrgent]}
-        onPress={() => router.push(`/(app)/prospections/${p.id}` as any)}
-        activeOpacity={0.8}
-      >
+      <View style={[styles.card, urgent && styles.cardUrgent]}>
         <View style={styles.cardHeader}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>
@@ -94,7 +92,7 @@ export default function ProspectionsScreen() {
           </View>
 
           <View style={{ flex: 1 }}>
-            <Text style={styles.nom}>{cli?.nom || 'Client inconnu'}</Text>
+            <Text style={styles.nom}>{cli?.nom}</Text>
             <ClientIdBadge id={p.clientId} />
           </View>
 
@@ -130,21 +128,28 @@ export default function ProspectionsScreen() {
         <View style={styles.actions}>
           <TouchableOpacity
             style={[styles.actionBtn, styles.actionEdit]}
-            onPress={() => setEditingProspection(p)}
+            onPress={(event: GestureResponderEvent) => {
+              event.stopPropagation();
+              setEditingProspection(p);
+            }}
           >
             <Text style={styles.actionBtnText}>✏️ Modifier</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.actionBtn, styles.actionDelete]}
-            onPress={() => deleteProspection(p)}
+            onPress={(event: GestureResponderEvent) => {
+              event.stopPropagation();
+              console.log('Deactivate button pressed for prospection', p.id);
+              deactivateProspection(p);
+            }}
           >
             <Text style={[styles.actionBtnText, { color: colors.danger }]}>
               🗑️ Désactiver
             </Text>
           </TouchableOpacity>
         </View>
-      </TouchableOpacity>
+      </View>
     );
   };
 
@@ -174,31 +179,48 @@ export default function ProspectionsScreen() {
     }
   };
 
-  const deleteProspection = async (prospection: Prospection) => {
+  const performDeactivate = async (prospection: Prospection) => {
+    try {
+      await apiClient.delete(
+        `${API_ENDPOINTS.PROSPECTIONS.LIST}/${prospection.id}`
+      );
+      console.log('API request sent for deactivate', prospection.id);
+      await refetch();
+      Alert.alert('✅ Désactivé', 'La prospection a bien été désactivée.');
+    } catch (error: any) {
+      console.error('Deactivate error:', error);
+      Alert.alert(
+        '❌ Erreur',
+        error?.response?.data?.error || 'Une erreur est survenue lors de la désactivation'
+      );
+    }
+  };
+
+  const deactivateProspection = async (prospection: Prospection) => {
+    console.log('deactivateProspection() start', prospection.id);
+    const message = `Êtes-vous sûr de vouloir désactiver la prospection de ${
+      getClient(prospection.clientId)?.nom || prospection.clientId
+    } ?`;
+
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm(message);
+      console.log('web confirm result', confirmed, prospection.id);
+      if (!confirmed) return;
+      await performDeactivate(prospection);
+      return;
+    }
+
     Alert.alert(
       'Désactiver la prospection',
-      `Êtes-vous sûr de vouloir désactiver la prospection de ${
-        getClient(prospection.clientId)?.nom || prospection.clientId
-      } ?`,
+      message,
       [
         { text: 'Annuler', style: 'cancel' },
         {
           text: 'Désactiver',
           style: 'destructive',
           onPress: async () => {
-            try {
-              await apiClient.delete(
-                `${API_ENDPOINTS.PROSPECTIONS.LIST}/${prospection.id}`
-              );
-              await refetch();
-              Alert.alert('✅ Désactivé', 'La prospection a bien été désactivée.');
-            } catch (error: any) {
-              console.error('Delete error:', error);
-              Alert.alert(
-                '❌ Erreur',
-                error?.response?.data?.error || 'Une erreur est survenue lors de la désactivation'
-              );
-            }
+            console.log('Confirm deactivate for prospection', prospection.id);
+            await performDeactivate(prospection);
           },
         },
       ]
@@ -287,15 +309,17 @@ export default function ProspectionsScreen() {
         <View style={styles.noFabPlaceholder} />
       )}
 
-      <NewProspectionModal
-        visible={showNewProspectionModal || !!editingProspection}
-        onClose={() => {
-          setShowNewProspectionModal(false);
-          setEditingProspection(null);
-        }}
-        onSubmit={handleNewProspectionSubmit}
-        editProspection={editingProspection}
-      />
+      {(showNewProspectionModal || !!editingProspection) && (
+        <NewProspectionModal
+          visible={showNewProspectionModal || !!editingProspection}
+          onClose={() => {
+            setShowNewProspectionModal(false);
+            setEditingProspection(null);
+          }}
+          onSubmit={handleNewProspectionSubmit}
+          editProspection={editingProspection}
+        />
+      )}
     </View>
   );
 }

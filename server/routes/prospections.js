@@ -14,11 +14,11 @@ router.get('/', auth, async (req, res) => {
         c.nom as client_nom,
         u.nom as commercial_nom,
         u.equipe,
-        CASE WHEN p.active IS NULL THEN true ELSE p.active END as active
+        CASE WHEN COALESCE(p.active, p.active) IS NULL THEN true ELSE COALESCE(p.active, p.active) END as active
       FROM prospections p
       JOIN clients c ON p.client_id = c.id
       JOIN users u ON p.commercial_id = u.id
-      WHERE (p.active IS NULL OR p.active = true)
+      WHERE (p.active = true)
     `;
     const params = [];
 
@@ -27,9 +27,9 @@ router.get('/', auth, async (req, res) => {
       params.push(user.id);
       query += ` AND p.commercial_id = $${params.length}`;
     } else if (user.role === 'manager_adj' || user.role === 'manager_adjoint') {
-      // Voit son équipe
-      params.push(user.equipe);
-      query += ` AND u.equipe = $${params.length}`;
+      // Voit les prospections des commerciaux sous lui
+      params.push(user.id);
+      query += ` AND u.manager_adjoint_id = $${params.length}`;
     }
     // manager, chef_agence, admin voient tout
 
@@ -176,7 +176,7 @@ router.put('/:id', auth, async (req, res) => {
   const {
     clientId, product, prospectionDate, potentialCA, probability, status,
     visitDate1, visitDate2, visitDate3, nextFollowUp, observations,
-    previousInsurer, previousContract
+    previousInsurer, previousContract, active
   } = req.body;
   try {
     // Round probability to 1 decimal place and ensure it's within valid range
@@ -187,11 +187,11 @@ router.put('/:id', auth, async (req, res) => {
         client_id=$1, risque_prospecte=$2, date_prospection=$3, potentiel_ca=$4,
         chance_realisation=$5, statut=$6, date_visite_1=$7, date_visite_2=$8,
         date_visite_3=$9, date_relance=$10, observations=$11,
-        ancien_assureur=$12, date_effet_ancien=$13, updated_at=NOW()
-       WHERE id=$14 RETURNING *`,
+        ancien_assureur=$12, date_effet_ancien=$13, active=$14, updated_at=NOW()
+       WHERE id=$15 RETURNING *`,
       [clientId, product, prospectionDate, potentialCA, roundedProbability, status,
        visitDate1, visitDate2, visitDate3, nextFollowUp, observations,
-       previousInsurer, previousContract, req.params.id]
+       previousInsurer, previousContract, active, req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Prospection introuvable' });
     res.json(rows[0]);
