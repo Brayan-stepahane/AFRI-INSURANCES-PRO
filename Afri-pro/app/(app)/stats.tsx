@@ -9,7 +9,7 @@ type AggregatedData = { name: string; value: number }[];
 
 type ValueMap = Record<string, number>;
 
-const ADMIN_ROLES = ['manager', 'chef_agence', 'admin', 'manager_adj'];
+const ADMIN_ROLES = ['manager', 'chef_agence', 'admin', 'manager_adjoint'];
 
 const sortByValueDesc = (items: AggregatedData) => [...items].sort((a, b) => b.value - a.value);
 

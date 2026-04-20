@@ -13,12 +13,15 @@ router.get('/', auth, async (req, res) => {
     let caQuery = 'SELECT * FROM v_ca_mensuel WHERE TO_CHAR(mois,\'YYYY-MM\') = $1';
     const caParams = [moisActuel];
 
-    if (user.role === 'commercial') {
-      caParams.push(user.id);
-      caQuery += ` AND commercial_id = $2`;
-    } else if (user.role === 'manager' || user.role === 'chef_agence') {
-      caParams.push(user.id);
-      caQuery += ` AND commercial_id IN (${buildHierarchySubquery(caParams.length)})`;
+    // Admin has access to all CA data
+    if (user.role !== 'admin') {
+      if (user.role === 'commercial') {
+        caParams.push(user.id);
+        caQuery += ` AND commercial_id = $2`;
+      } else if (user.role === 'manager' || user.role === 'chef_agence' || user.role === 'manager_adjoint') {
+        caParams.push(user.id);
+        caQuery += ` AND commercial_id IN (${buildHierarchySubquery(caParams.length)})`;
+      }
     }
 
     // Objectifs du mois
@@ -69,43 +72,47 @@ router.get('/', auth, async (req, res) => {
           WHERE DATE_TRUNC('month', date_vente) = DATE_TRUNC('month', $1::date)
           GROUP BY commercial_id
         ) v ON v.commercial_id = u.id
-        WHERE u.role = 'commercial'`;
+        WHERE u.role IN ('commercial', 'manager_adjoint', 'manager', 'chef_agence')`;
 
-      if (user.role === 'manager_adj' || user.role === 'manager_adjoint') {
+      if (user.role === 'manager_adjoint' || user.role === 'manager' || user.role === 'chef_agence') {
         objParams.push(user.id);
-        objQuery += ` AND u.manager_adjoint_id = $${objParams.length}`;
-      } else if (user.role === 'manager' || user.role === 'chef_agence') {
-        objParams.push(user.id);
-        objQuery += ` AND u.id IN (${buildHierarchyFilter('u', objParams.length)})`;
+        objQuery += ` AND u.id IN (${buildHierarchySubquery(objParams.length)})`;
       }
+      // Admin has access to all objectives - no filters needed
     }
 
     // Prospections en cours
     let prospQuery = `
       SELECT statut, COUNT(*) AS nb
       FROM prospections
-      WHERE (COALESCE(active, active) IS NULL OR COALESCE(active, active) = true)
+      WHERE COALESCE(active::text, 'true') IN ('t','true','1')
         AND statut NOT IN ('Contrat conclu','Perdu')`;
     const prospParams = [];
 
-    if (user.role === 'commercial') {
-      prospParams.push(user.id);
-      prospQuery += ` AND commercial_id = $1`;
-    } else if (user.role === 'manager' || user.role === 'chef_agence') {
-      prospParams.push(user.id);
-      prospQuery += ` AND commercial_id IN (${buildHierarchySubquery(prospParams.length)})`;
+    // Admin has access to all prospections
+    if (user.role !== 'admin') {
+      if (user.role === 'commercial') {
+        prospParams.push(user.id);
+        prospQuery += ` AND commercial_id = $1`;
+      } else if (user.role === 'manager' || user.role === 'chef_agence' || user.role === 'manager_adjoint') {
+        prospParams.push(user.id);
+        prospQuery += ` AND commercial_id IN (${buildHierarchySubquery(prospParams.length)})`;
+      }
     }
     prospQuery += ' GROUP BY statut ORDER BY nb DESC';
 
     // Relances urgentes (en retard)
-    let relanceQuery = 'SELECT COUNT(*) AS nb FROM v_relances_urgentes WHERE (active IS NULL OR active = true)';
+    let relanceQuery = 'SELECT COUNT(*) AS nb FROM v_relances_urgentes WHERE COALESCE(active::text, \'true\') IN (\'t\',\'true\',\'1\')';
     const relanceParams = [];
-    if (user.role === 'commercial') {
-      relanceParams.push(user.id);
-      relanceQuery += ` AND commercial_id = $1`;
-    } else if (user.role === 'manager' || user.role === 'chef_agence') {
-      relanceParams.push(user.id);
-      relanceQuery += ` AND commercial_id IN (${buildHierarchySubquery(relanceParams.length)})`;
+    // Admin has access to all relances
+    if (user.role !== 'admin') {
+      if (user.role === 'commercial') {
+        relanceParams.push(user.id);
+        relanceQuery += ` AND commercial_id = $1`;
+      } else if (user.role === 'manager' || user.role === 'chef_agence' || user.role === 'manager_adjoint') {
+        relanceParams.push(user.id);
+        relanceQuery += ` AND commercial_id IN (${buildHierarchySubquery(relanceParams.length)})`;
+      }
     }
 
     const [ca, objectifsResult, prospStatuts, relances] = await Promise.all([
@@ -182,12 +189,15 @@ router.get('/ca-historique', auth, async (req, res) => {
       WHERE mois >= DATE_TRUNC('month', NOW() - INTERVAL '5 months')`;
     const params = [];
 
-    if (req.user.role === 'commercial') {
-      params.push(req.user.id);
-      query += ` AND commercial_id = $1`;
-    } else if (req.user.role === 'manager' || req.user.role === 'chef_agence') {
-      params.push(req.user.id);
-      query += ` AND commercial_id IN (${buildHierarchySubquery(params.length)})`;
+    // Admin has access to all historical CA data
+    if (req.user.role !== 'admin') {
+      if (req.user.role === 'commercial') {
+        params.push(req.user.id);
+        query += ` AND commercial_id = $1`;
+      } else if (req.user.role === 'manager' || req.user.role === 'chef_agence' || req.user.role === 'manager_adjoint') {
+        params.push(req.user.id);
+        query += ` AND commercial_id IN (${buildHierarchySubquery(params.length)})`;
+      }
     }
     query += ' ORDER BY mois ASC';
 

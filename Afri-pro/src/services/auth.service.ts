@@ -4,6 +4,7 @@ import { AuthResponse, LoginPayload, RegisterPayload, User, UserRole, CreateUser
 
 const normalizeRole = (role?: string): UserRole | undefined => {
   if (!role) return undefined;
+  if (role === 'manager_adjoint') return 'manager_adjoint';
   return role as UserRole;
 };
 
@@ -62,7 +63,8 @@ export const userService = {
     const response = await apiClient.get(API_ENDPOINTS.USERS.LIST);
     return response.data.map((apiUser: any) => ({
       id: apiUser.id.toString(),
-      email: apiUser.identifiant,
+      identifiant: apiUser.identifiant,
+      email: apiUser.email,
       name: apiUser.name || `${[apiUser.nom, apiUser.prenom].filter(Boolean).join(' ')}`.trim() || apiUser.identifiant || '',
       surname: apiUser.prenom || '',
       phone: apiUser.phone,
@@ -86,22 +88,15 @@ export const userService = {
       nom: payload.name,
       prenom: payload.surname,
       identifiant: payload.name.trim().toLowerCase().replace(/\s+/g, ''),
+      email: payload.email || null,
       mot_de_passe: payload.password,
-      role: payload.role === 'manager_adj' ? 'manager_adjoint' : payload.role,
+      role: payload.role === 'manager_adjoint' ? 'manager_adjoint' : payload.role,
       phone: payload.phone || null,
       objectif_mensuel: payload.objectifMensuel || 500000,
     };
 
-    // Map parentId to correct field by role
-    if (payload.parentId !== undefined && payload.parentId !== null) {
-      const pid = Number(payload.parentId);
-      if (payload.role === 'commercial') {
-        body.manager_adjoint_id = pid;
-      } else if (payload.role === 'manager_adjoint') {
-        body.manager_id = pid;
-      } else if (payload.role === 'manager') {
-        body.manager_id = pid;
-      }
+    if (payload.parentId && payload.parentId > 0) {
+      body.parentId = payload.parentId;
     }
 
     const response = await apiClient.post(API_ENDPOINTS.USERS.CREATE, body);

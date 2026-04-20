@@ -36,26 +36,29 @@ router.get('/', auth, async (req, res) => {
         c.nom as client_nom,
         u.nom as commercial_nom,
         u.equipe,
-        CASE WHEN COALESCE(p.active, p.active) IS NULL THEN true ELSE COALESCE(p.active, p.active) END as active
+        CASE WHEN COALESCE(p.active::text, 'true') IN ('t','true','1') THEN true ELSE false END AS active
       FROM prospections p
       JOIN clients c ON p.client_id = c.id
       JOIN users u ON p.commercial_id = u.id
-      WHERE (p.active = true)
+      WHERE COALESCE(p.active::text, 'true') IN ('t','true','1')
     `;
     const params = [];
 
-    // Un commercial ne voit que ses propres prospections
-    if (user.role === 'commercial') {
-      params.push(user.id);
-      query += ` AND p.commercial_id = $${params.length}`;
-    } else if (isManagerAdjointRole(user.role)) {
-      // Voit les prospections des commerciaux sous lui
-      params.push(user.id);
-      query += ` AND u.manager_adjoint_id = $${params.length}`;
-    } else if (user.role === 'manager' || user.role === 'chef_agence') {
-      // Voit toute sa hiérarchie (commerciaux, managers adjoints et managers sous lui)
-      params.push(user.id);
-      query += ` AND ${buildHierarchyFilter('u', params.length)}`;
+    // Admin has access to all prospections
+    if (user.role !== 'admin') {
+      // Un commercial ne voit que ses propres prospections
+      if (user.role === 'commercial') {
+        params.push(user.id);
+        query += ` AND p.commercial_id = $${params.length}`;
+      } else if (isManagerAdjointRole(user.role)) {
+        // Voit les prospections des commerciaux sous lui (direct reports via parent_id)
+        params.push(user.id);
+        query += ` AND u.parent_id = $${params.length}`;
+      } else if (user.role === 'manager' || user.role === 'chef_agence') {
+        // Voit toute sa hiérarchie (commerciaux, managers adjoints et managers sous lui)
+        params.push(user.id);
+        query += ` AND ${buildHierarchyFilter('u', params.length)}`;
+      }
     }
 
     if (statut) {
@@ -78,15 +81,18 @@ router.get('/', auth, async (req, res) => {
 // GET /api/prospections/relances  (relances urgentes)
 router.get('/relances', auth, async (req, res) => {
   try {
-    let query = 'SELECT * FROM v_relances_urgentes WHERE (active IS NULL OR active = true)';
+    let query = 'SELECT * FROM v_relances_urgentes WHERE COALESCE(active::text, \'true\') IN (\'t\',\'true\',\'1\')';
     const params = [];
 
-    if (req.user.role === 'commercial') {
-      params.push(req.user.id);
-      query += ` AND commercial_id = $${params.length}`;
-    } else if (req.user.role === 'manager' || req.user.role === 'chef_agence') {
-      params.push(req.user.id);
-      query += ` AND commercial_id IN (${buildHierarchySubquery(params.length)})`;
+    // Admin has access to all relances
+    if (req.user.role !== 'admin') {
+      if (req.user.role === 'commercial') {
+        params.push(req.user.id);
+        query += ` AND commercial_id = $${params.length}`;
+      } else if (req.user.role === 'manager' || req.user.role === 'chef_agence') {
+        params.push(req.user.id);
+        query += ` AND commercial_id IN (${buildHierarchySubquery(params.length)})`;
+      }
     }
     const { rows } = await pool.query(query, params);
     res.json(rows);
@@ -104,7 +110,7 @@ router.get('/:id', auth, async (req, res) => {
          p.*, c.id AS client_id, c.nom AS client_nom, c.telephone AS client_tel,
          c.type_client, c.activite AS client_activite,
          u.id AS commercial_id, u.nom AS commercial_nom, u.equipe,
-         u.manager_id AS commercial_manager_id, u.manager_adjoint_id AS commercial_manager_adjoint_id,
+         u.parent_id AS commercial_parent_id,
          cot.id AS cotation_id, cot.risque_cote, cot.date_cotation, cot.montant AS cotation_montant,
          cot.date_validation, cot.statut AS cotation_statut,
          v.id AS vente_id, v.produit AS vente_produit, v.prime_nette, v.accessoires,
@@ -121,22 +127,23 @@ router.get('/:id', auth, async (req, res) => {
     if (!rows[0]) return res.status(404).json({ error: 'Prospection introuvable' });
 
     const prospection = rows[0];
-    if (user.role === 'commercial' && prospection.commercial_id !== user.id) {
-      return res.status(403).json({ error: 'Accès refusé' });
-    }
-    if (isManagerAdjointRole(user.role) && prospection.commercial_manager_adjoint_id !== user.id) {
-      return res.status(403).json({ error: 'Accès refusé' });
-    }
-    if (user.role === 'manager' && prospection.commercial_manager_id !== user.id) {
-      return res.status(403).json({ error: 'Accès refusé' });
-    }
-    if (user.role === 'chef_agence') {
-      const teamCheck = await pool.query(
-        `SELECT 1 FROM users WHERE id = $1 AND $2 IN (${buildHierarchySubquery(1)})`,
-        [user.id, prospection.commercial_id]
-      );
-      if (teamCheck.rows.length === 0) {
+    // Admin has access to all prospections
+    if (user.role !== 'admin') {
+      if (user.role === 'commercial' && prospection.commercial_id !== user.id) {
         return res.status(403).json({ error: 'Accès refusé' });
+      }
+      if (isManagerAdjointRole(user.role) && prospection.commercial_parent_id !== user.id) {
+        return res.status(403).json({ error: 'Accès refusé' });
+      }
+      if (user.role === 'manager' || user.role === 'chef_agence') {
+        // Check if commercial is in their hierarchy
+        const teamCheck = await pool.query(
+          `SELECT 1 FROM users WHERE id = $1 AND $2 IN (${buildHierarchySubquery(1)})`,
+          [user.id, prospection.commercial_id]
+        );
+        if (teamCheck.rows.length === 0) {
+          return res.status(403).json({ error: 'Accès refusé' });
+        }
       }
     }
 

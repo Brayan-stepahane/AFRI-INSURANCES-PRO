@@ -2,7 +2,7 @@
 export { type UserRole, type User, type AuthResponse, type LoginPayload, type RegisterPayload } from './auth.types';
 
 // Dashboard types
-export type Role = 'commercial' | 'manager_adj' | 'manager' | 'chef_agence' | 'admin';
+export type Role = 'commercial' | 'manager_adjoint' | 'manager' | 'chef_agence' | 'admin';
 export type TypeClient = 'Particulier' | 'PME' | 'Entreprise' | 'Autre';
 export type StatutProspection =
   | 'Premier contact' | 'Relance 1' | 'Relance 2'

@@ -31,7 +31,7 @@ export default function UsersScreen() {
   const ROLE_OPTIONS: UserRole[] = ['commercial', 'manager_adjoint', 'manager', 'chef_agence', 'admin'];
 
   // Filter possible parents based on selected role
-  const isManagerAdjointRole = (role?: string) => role === 'manager_adj' || role === 'manager_adjoint';
+  const isManagerAdjointRole = (role?: string) => role === 'manager_adjoint' || role === 'manager_adjoint';
 
   const possibleParents = useMemo(() => {
     switch (formData.role) {
@@ -82,6 +82,14 @@ export default function UsersScreen() {
 
     try {
       // Prepare data for backend - convert parentId correctly
+      const parentIdNum = formData.parentId ? Number(formData.parentId) : null;
+      
+      // Verify parentId is valid for roles that require it
+      if (['commercial', 'manager_adjoint', 'manager'].includes(formData.role) && !parentIdNum) {
+        setError('Parent ID invalide. Veuillez sélectionner un parent valide.');
+        return;
+      }
+
       const createData = {
         name: formData.name.trim(),
         surname: formData.surname.trim(),
@@ -89,7 +97,7 @@ export default function UsersScreen() {
         role: formData.role,
         phone: formData.phone.trim() || undefined,
         password: formData.password,
-        parentId: formData.parentId ? Number(formData.parentId) : null,
+        parentId: parentIdNum,
         objectifMensuel: formData.objectif_mensuel || undefined,
       };
 
@@ -251,11 +259,16 @@ export default function UsersScreen() {
                 <View style={styles.dropdownBox}>
                   {possibleParents.map((parent) => (
                     <TouchableOpacity
-                      key={parent.id}
+                      key={parent.id || `parent-${Math.random()}`}
                       style={styles.dropdownItem}
                       onPress={() => {
-                        setFormData((prev) => ({ ...prev, parentId: String(parent.id) })); // store as string
-                        setParentOpen(false);
+                        const parentId = parent.id ? String(parent.id) : null;
+                        if (parentId && parentId !== 'undefined') {
+                          setFormData((prev) => ({ ...prev, parentId }));
+                          setParentOpen(false);
+                        } else {
+                          setError('Erreur : Parent ID invalide');
+                        }
                       }}
                     >
                       <Text style={styles.dropdownItemText}>

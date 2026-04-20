@@ -42,7 +42,7 @@ export interface RegisterPayload extends LoginPayload {
 export interface CreateUserPayload {
   name: string;
   surname: string;
-  email?: string;
+  email: string;
   role: UserRole;
   phone?: string;
   password: string;

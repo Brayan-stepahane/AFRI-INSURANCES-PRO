@@ -3,6 +3,10 @@ import { ScrollView, View, Text, StyleSheet, TouchableOpacity, RefreshControl, A
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/hooks/useAuth';
 import { useDashboardStats, useObjective } from '../../src/hooks/useDashboardStats';
+import { useProspections } from '../../src/hooks/useProspections';
+import { useCotations } from '../../src/hooks/useCotations';
+import { useVentes } from '../../src/hooks/useVentes';
+import { useClients } from '../../src/hooks/useClients';
 import { Button } from '../../src/components/common/Button';
 import { MetricCard, ObjectiveBox, Pipeline, UrgentFollowUps } from '../../src/components/dashboard/MetricCard';
 import { NewProspectionModal } from '../../src/components/modals/NewProspectionModal';
@@ -10,6 +14,7 @@ import apiClient from '../../src/services/api/client';
 import { API_ENDPOINTS } from '../../src/services/api/endpoints';
 import { colors, spacing } from '../../src/config/theme';
 import { fmt } from '../../src/utils/constants';
+import { exportAllDataToExcel } from '../../src/utils/export';
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -43,8 +48,21 @@ export default function DashboardScreen() {
     setTimeout(() => setRefreshing(false), 600);
   };
 
+  const { prospections } = useProspections();
+  const { cotations } = useCotations();
+  const { ventes } = useVentes();
+  const { clients } = useClients();
   const role = user?.role ?? 'commercial';
   const isCommercial = role === 'commercial';
+
+  const handleExport = () => {
+    try {
+      exportAllDataToExcel(prospections, cotations, ventes, clients);
+    } catch (error) {
+      console.error('Export error:', error);
+      Alert.alert('Erreur', 'Impossible d\'exporter les données');
+    }
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -84,6 +102,9 @@ export default function DashboardScreen() {
         <View style={styles.topBarActions}>
           <TouchableOpacity style={styles.notificationBtn} onPress={() => router.push('/notifications' as any)}>
             <Text style={styles.notificationIcon}>🔔</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.exportBtn} onPress={handleExport}>
+            <Text style={styles.exportBtnText}>Exporter</Text>
           </TouchableOpacity>
           {/* <Button title="+ Nouvelle prospection" onPress={() => setShowNewProspectionModal(true)} style={styles.topButton} /> */}
         </View>
@@ -150,6 +171,8 @@ const styles = StyleSheet.create({
   topBarActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   notificationBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.gray100, alignItems: 'center', justifyContent: 'center' },
   notificationIcon: { fontSize: 16 },
+  exportBtn: { paddingHorizontal: spacing.md, paddingVertical: 10, borderRadius: 10, backgroundColor: colors.success, alignItems: 'center', justifyContent: 'center' },
+  exportBtnText: { fontSize: 12, fontWeight: '700', color: colors.white },
   topButton: { paddingHorizontal: spacing.md, paddingVertical: 4, minHeight: 32 },
   content: { padding: spacing.xl },
   metricsGrid: { flexDirection: 'row', marginBottom: spacing.xl, gap: spacing.sm },

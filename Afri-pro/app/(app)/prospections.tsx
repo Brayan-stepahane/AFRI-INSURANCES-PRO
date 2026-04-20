@@ -40,8 +40,8 @@ export default function ProspectionsScreen() {
 
   const name = user?.name ?? '';
   const role = user?.role ?? 'commercial';
-  const canCreateProspection = ['commercial', 'manager_adj', 'manager', 'chef_agence'].includes(role);
-  const canValidateProspection = ['manager_adj', 'manager', 'chef_agence', 'admin'].includes(role);
+  const canCreateProspection = ['commercial', 'manager_adjoint', 'manager', 'chef_agence'].includes(role);
+  const canValidateProspection = ['manager_adjoint', 'manager', 'chef_agence', 'admin'].includes(role);
 
   const getClient = (id: string) => clients.find(c => c.id === id);
 

@@ -5,12 +5,13 @@ import { userService } from '../../src/services/auth.service';
 import { colors, spacing, radius } from '../../src/config/theme';
 import { User } from '../../src/types/auth.types';
 
-const TEAM_ROLES = ['manager', 'manager_adjoint', 'chef_agence', 'admin'];
+const TEAM_ROLES = ['manager', 'manager_adjoint',  'chef_agence', 'admin'];
 
 export default function EquipeScreen() {
   const { user } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const role = user?.role ?? 'commercial';
+  const isManagerAdjoint = role === 'manager_adjoint';
 
   React.useEffect(() => {
     const loadUsers = async () => {
@@ -34,11 +35,37 @@ export default function EquipeScreen() {
     );
   }
 
-  const members = users.filter((u: User) => {
-    if (role === 'manager_adjoint') {
-      return u.role === 'commercial' && u.manager_adjoint_id === parseInt(user?.id || '0');
+  const currentUserId = Number(user?.id || 0);
+
+  const findDescendantIds = (parentId: number, allUsers: User[]) => {
+    const descendants = new Set<string>();
+    const queue = [parentId];
+
+    while (queue.length > 0) {
+      const nextId = queue.shift()!;
+      allUsers.forEach((u) => {
+        if (Number(u.parent_id) === nextId && !descendants.has(u.id)) {
+          descendants.add(u.id);
+          queue.push(Number(u.id));
+        }
+      });
     }
-    return u.role && u.role !== 'admin';
+
+    return Array.from(descendants);
+  };
+
+  const teamIds = (role === 'manager' || role === 'manager_adjoint' || role === 'chef_agence')
+    ? findDescendantIds(currentUserId, users)
+    : [];
+
+  const members = users.filter((u: User) => {
+    if (role === 'manager' || role === 'manager_adjoint' || role === 'chef_agence') {
+      return teamIds.includes(u.id);
+    }
+    if (role === 'admin') {
+      return u.role && u.role !== 'admin';
+    }
+    return false;
   });
 
   return (

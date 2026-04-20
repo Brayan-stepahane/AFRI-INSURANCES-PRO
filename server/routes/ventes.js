@@ -14,18 +14,21 @@ router.get('/', auth, async (req, res) => {
       JOIN clients cl ON v.client_id = cl.id
       JOIN users u ON v.commercial_id = u.id
       LEFT JOIN produits p ON v.produit_id = p.id
-      WHERE v.active = true`;
+      WHERE COALESCE(v.active::text, 'true') IN ('t','true','1')`;
     const params = [];
 
-    if (req.user.role === 'commercial') {
-      params.push(req.user.id);
-      query += ` AND v.commercial_id = $${params.length}`;
-    } else if (isManagerAdjointRole(req.user.role)) {
-      params.push(req.user.id);
-      query += ` AND u.manager_adjoint_id = $${params.length}`;
-    } else if (req.user.role === 'manager' || req.user.role === 'chef_agence') {
-      params.push(req.user.id);
-      query += ` AND ${buildHierarchyFilter('u', params.length)}`;
+    // Admin has access to all ventes
+    if (req.user.role !== 'admin') {
+      if (req.user.role === 'commercial') {
+        params.push(req.user.id);
+        query += ` AND v.commercial_id = $${params.length}`;
+      } else if (isManagerAdjointRole(req.user.role)) {
+        params.push(req.user.id);
+        query += ` AND u.parent_id = $${params.length}`;
+      } else if (req.user.role === 'manager' || req.user.role === 'chef_agence') {
+        params.push(req.user.id);
+        query += ` AND ${buildHierarchyFilter('u', params.length)}`;
+      }
     }
     if (mois) {
       params.push(mois); // format: 2026-03

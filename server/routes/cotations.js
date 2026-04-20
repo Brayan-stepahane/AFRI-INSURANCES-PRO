@@ -11,18 +11,21 @@ router.get('/', auth, async (req, res) => {
       FROM cotations c
       JOIN clients cl ON c.client_id = cl.id
       JOIN users u ON c.commercial_id = u.id
-      WHERE c.active = true`;
+      WHERE COALESCE(c.active::text, 'true') IN ('t','true','1')`;
     const params = [];
 
-    if (req.user.role === 'commercial') {
-      params.push(req.user.id);
-      query += ` AND c.commercial_id = $${params.length}`;
-    } else if (isManagerAdjointRole(req.user.role)) {
-      params.push(req.user.id);
-      query += ` AND u.manager_adjoint_id = $${params.length}`;
-    } else if (req.user.role === 'manager' || req.user.role === 'chef_agence') {
-      params.push(req.user.id);
-      query += ` AND ${buildHierarchyFilter('u', params.length)}`;
+    // Admin has access to all cotations
+    if (req.user.role !== 'admin') {
+      if (req.user.role === 'commercial') {
+        params.push(req.user.id);
+        query += ` AND c.commercial_id = $${params.length}`;
+      } else if (isManagerAdjointRole(req.user.role)) {
+        params.push(req.user.id);
+        query += ` AND u.parent_id = $${params.length}`;
+      } else if (req.user.role === 'manager' || req.user.role === 'chef_agence') {
+        params.push(req.user.id);
+        query += ` AND ${buildHierarchyFilter('u', params.length)}`;
+      }
     }
     query += ' ORDER BY c.date_cotation DESC';
 
@@ -35,10 +38,6 @@ router.get('/', auth, async (req, res) => {
 
 // POST /api/cotations
 router.post('/', auth, async (req, res) => {
-  if (req.user.role === 'admin') {
-    return res.status(403).json({ error: 'Administrateur non autorisé à créer une cotation' });
-  }
-
   const { prospection_id, client_id, risque_cote, date_cotation, montant } = req.body;
   const commercial_id = req.user.role === 'commercial' ? req.user.id : req.body.commercial_id;
   try {

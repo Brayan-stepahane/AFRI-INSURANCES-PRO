@@ -5,7 +5,7 @@ const bcrypt = require('bcryptjs');
 
 // Middleware : réservé aux managers et admins
 const managerOnly = (req, res, next) => {
-  const allowed = ['manager', 'chef_agence', 'admin', 'manager_adj', 'manager_adjoint'];
+  const allowed = ['manager', 'chef_agence', 'admin', 'manager_adjoint', 'manager_adjoint'];
   if (!allowed.includes(req.user.role))
     return res.status(403).json({ error: 'Accès refusé' });
   next();
@@ -15,13 +15,11 @@ const managerOnly = (req, res, next) => {
 router.get('/', auth, managerOnly, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT u.id, u.nom, u.prenom, u.identifiant, u.role, u.equipe, u.objectif_mensuel, u.active, u.created_at, 
-              u.manager_id, u.manager_adjoint_id, u.parent_id,
-              ma.nom as manager_adjoint_nom, ma.prenom as manager_adjoint_prenom,
-              m.nom as manager_nom, m.prenom as manager_prenom
+      `SELECT u.id, u.nom, u.prenom, u.identifiant, u.email, u.role, u.equipe, u.objectif_mensuel, u.active, u.created_at,
+              u.parent_id,
+              p.nom as parent_nom, p.prenom as parent_prenom, p.role as parent_role
        FROM users u
-       LEFT JOIN users ma ON u.manager_adjoint_id = ma.id
-       LEFT JOIN users m ON u.manager_id = m.id
+       LEFT JOIN users p ON u.parent_id = p.id
        ORDER BY u.role, u.nom`
     );
     res.json(rows);
@@ -31,72 +29,82 @@ router.get('/', auth, managerOnly, async (req, res) => {
   }
 });
 
-// POST /api/users  — créer un utilisateur (UPDATED)
+// POST /api/users
 router.post('/', auth, managerOnly, async (req, res) => {
-  const { 
-    nom, 
-    prenom, 
-    identifiant, 
-    mot_de_passe, 
-    role, 
-    equipe, 
-    manager_id, 
-    manager_adjoint_id,
-    parentId    ,
-    objectif_mensuel,       // ← New field from frontend
+  const {
+    nom,
+    prenom,
+    identifiant,
+    email,
+    mot_de_passe,
+    role,
+    equipe,
+    parentId,
+    parent_id,
+    objectif_mensuel,
   } = req.body;
 
-  const normalizedRole = role === 'manager_adj' ? 'manager_adjoint' : role;
+  const normalizedRole = role === 'manager_adjoint' ? 'manager_adjoint' : role;
 
-  // Basic validation
-  if (!nom || !prenom || !identifiant || !mot_de_passe || !normalizedRole) {
-    return res.status(400).json({ error: 'Nom, prénom, identifiant, mot de passe et rôle sont requis' });
+  if (!nom || !prenom || !identifiant || !email || !mot_de_passe || !normalizedRole) {
+    return res.status(400).json({ error: 'Nom, prénom, identifiant, email, mot de passe et rôle sont requis' });
   }
 
-  // Hierarchy validation (support both old fields and new parentId)
-  if (normalizedRole === 'commercial' && !manager_adjoint_id && !parentId) {
-    return res.status(400).json({ error: 'manager_adjoint_id ou parentId requis pour commercial' });
+  let finalParentId = parentId ? Number(parentId) : parent_id ? Number(parent_id) : null;
+
+  if (normalizedRole === 'commercial' && !finalParentId) {
+    return res.status(400).json({ error: 'parentId requis pour commercial' });
   }
-  if (normalizedRole === 'manager_adjoint' && !manager_id && !parentId) {
-    return res.status(400).json({ error: 'manager_id ou parentId requis pour manager_adjoint' });
+  if (normalizedRole === 'manager_adjoint' && !finalParentId) {
+    return res.status(400).json({ error: 'parentId requis pour manager_adjoint' });
   }
 
   try {
     const hash = await bcrypt.hash(mot_de_passe, 10);
 
-    // Convert parentId to number or null (important for integer column)
-    const finalParentId = parentId ? Number(parentId) : null;
-
-    // Decide values for old columns (for backward compatibility)
-    let finalManagerId = manager_id ? Number(manager_id) : null;
-    let finalManagerAdjointId = manager_adjoint_id ? Number(manager_adjoint_id) : null;
-
-    // Map new parentId to old columns if needed
     if (finalParentId) {
+      const { rows: parentRows } = await pool.query(
+        'SELECT id, role FROM users WHERE id = $1',
+        [finalParentId]
+      );
+
+      if (parentRows.length === 0) {
+        return res.status(400).json({ error: 'Le supérieur sélectionné n\'existe pas' });
+      }
+
+      const parentRole = parentRows[0].role;
+
       if (normalizedRole === 'commercial') {
-        finalManagerAdjointId = finalParentId;
-      } else if (normalizedRole === 'manager_adjoint' || normalizedRole === 'manager') {
-        finalManagerId = finalParentId;
+        if (!['manager_adjoint', 'manager', 'chef_agence'].includes(parentRole)) {
+          return res.status(400).json({ error: 'Le parent d\'un commercial doit être manager_adjoint, manager ou chef_agence' });
+        }
+      } else if (normalizedRole === 'manager_adjoint') {
+        if (!['manager', 'chef_agence', 'admin'].includes(parentRole)) {
+          return res.status(400).json({ error: 'Le parent d\'un manager_adjoint doit être manager, chef_agence ou admin' });
+        }
+      } else if (normalizedRole === 'manager') {
+        if (!['chef_agence', 'admin'].includes(parentRole)) {
+          return res.status(400).json({ error: 'Le parent d\'un manager doit être chef_agence ou admin' });
+        }
       }
     }
 
     const { rows } = await pool.query(
-      `INSERT INTO users 
-       (nom, prenom, identifiant, mot_de_passe, role, equipe, objectif_mensuel, 
-        manager_id, manager_adjoint_id, parent_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-       RETURNING id, nom, prenom, identifiant, role, equipe, objectif_mensuel`,
+      `INSERT INTO users
+       (nom, prenom, identifiant, email, mot_de_passe, role, equipe, objectif_mensuel,
+        parent_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING id, nom, prenom, identifiant, email, role, equipe, objectif_mensuel`,
       [
         nom.trim(),
         prenom.trim(),
         identifiant.trim().toLowerCase(),
+        email.trim().toLowerCase(),
         hash,
         normalizedRole,
         equipe || null,
         objectif_mensuel || 0,
-        finalManagerId,
-        finalManagerAdjointId,
-        finalParentId
+        finalParentId,
       ]
     );
 
@@ -104,10 +112,10 @@ router.post('/', auth, managerOnly, async (req, res) => {
   } catch (e) {
     console.error('Create user error:', e);
 
-    if (e.code === '23505') 
+    if (e.code === '23505')
       return res.status(409).json({ error: 'Identifiant déjà utilisé' });
-    
-    if (e.code === '23503') 
+
+    if (e.code === '23503')
       return res.status(400).json({ error: 'Le supérieur sélectionné n\'existe pas ou n\'a pas le bon rôle' });
 
     res.status(500).json({ error: e.message || 'Erreur lors de la création' });
