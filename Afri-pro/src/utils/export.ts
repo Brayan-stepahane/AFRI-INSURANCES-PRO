@@ -19,6 +19,112 @@ export const exportAllDataToExcel = (prospections: any[], cotations: any[], vent
   XLSX.writeFile(workbook, `Tableau_Bord_${new Date().toISOString().split('T')[0]}.xlsx`);
 };
 
+export const exportAllDataToCSV = (prospections: any[], cotations: any[], ventes: any[], clients: any[]) => {
+  const getClient = (clientId: string) => clients.find(c => c.id === clientId) || {};
+
+  const escapeCell = (value: any) => {
+    if (value === null || value === undefined) return '';
+    const text = String(value).replace(/"/g, '""');
+    return text.includes(',') || text.includes('"') || text.includes('\n')
+      ? `"${text}"`
+      : text;
+  };
+
+  const formatRow = (row: any[]) => row.map(escapeCell).join(',');
+  const buildSection = (title: string, header: string[], rows: any[][]) => {
+    return [title, header.join(','), ...rows.map(formatRow)].join('\r\n');
+  };
+
+  const prospectionsHeader = [
+    'Noms du Prospect',
+    'Types de client',
+    'Activites',
+    'Tel_clients',
+    'Risques de Prospection',
+    'Potentiel chiffre d\'affaire',
+    'Chance de realisation %',
+    'Anciens assureur',
+    'Observations',
+  ];
+
+  const prospectionsRows = prospections.map(p => {
+    const client = getClient(p.clientId);
+    return [
+      client.nom || '',
+      client.type_client || p.typeClient || '',
+      client.activite || p.activity || '',
+      client.telephone || p.telephone || '',
+      p.produit || p.risque || '',
+      p.potentielCA || 0,
+      p.chance || 0,
+      p.ancienAssureur || '',
+      p.observations || '',
+    ];
+  });
+
+  const cotationsHeader = [
+    'Date de Cotation',
+    'Risques coté',
+    'Montant de la cotation',
+    'Date de Validation de Cotation',
+    'N° Cotation',
+    'Client',
+  ];
+
+  const cotationsRows = cotations.map(c => [
+    c.dateCotation || '',
+    c.risqueCote || '',
+    c.montant || 0,
+    c.dateValidation || '',
+    `COT-${String(c.noCot).padStart(3, '0')}`,
+    getClient(c.clientId).nom || c.clientId || '',
+  ]);
+
+  const ventesHeader = [
+    'Dates de Ventes',
+    'Types de Ventes',
+    'N° Police',
+    'Primes Nette',
+    'Accessoires',
+    'Numero Attestation',
+    'Numero Carte Rose',
+    'Dates d\'effets',
+    'Dates D\'échéance',
+    'Client',
+  ];
+
+  const ventesRows = ventes.map(v => [
+    v.dateVente || '',
+    v.typeVente || '',
+    v.noPolice || '',
+    v.primeNette || 0,
+    v.accessoires || 0,
+    v.noAttestation || '',
+    v.noCarteRose || '',
+    v.dateEffet || '',
+    v.dateEcheance || '',
+    getClient(v.clientId).nom || v.clientId || '',
+  ]);
+
+  const csvContent = [
+    buildSection('PROSPECTIONS', prospectionsHeader, prospectionsRows),
+    '',
+    buildSection('COTATIONS', cotationsHeader, cotationsRows),
+    '',
+    buildSection('VENTES', ventesHeader, ventesRows),
+  ].join('\r\n');
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.setAttribute('href', url);
+  link.setAttribute('download', `Tableau_Bord_${new Date().toISOString().split('T')[0]}.csv`);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
 const buildProspectionsSheet = (data: any[], getClient: (id: string) => any) => {
   const header = [
     'Noms du Prospect',
@@ -29,6 +135,7 @@ const buildProspectionsSheet = (data: any[], getClient: (id: string) => any) => 
     'Potentiel chiffre d\'affaire',
     'Chance de realisation %',
     'Anciens assureur',
+    'Date d\'Effet ancien',
     'Date d\'Échéance ancien',
     'Observations',
   ];
@@ -37,7 +144,7 @@ const buildProspectionsSheet = (data: any[], getClient: (id: string) => any) => 
     const client = getClient(p.clientId) || {};
 
     return [
-      client.nom || '',
+      client.nom || p.clientId || '',
       client.type_client || p.typeClient || '',
       client.activite || p.activity || '',
       client.telephone || p.telephone || '',
@@ -45,6 +152,7 @@ const buildProspectionsSheet = (data: any[], getClient: (id: string) => any) => 
       p.potentielCA || 0,
       p.chance || 0,
       p.ancienAssureur || '',
+      p.dateAncienEffet || '',
       p.dateAncienEch || '',
       p.observations || '',
     ];

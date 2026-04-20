@@ -38,6 +38,7 @@ export interface Prospection {
   dateV3: string;
   observations: string;
   ancienAssureur: string;
+  dateAncienEffet?: string;
   dateAncienEch: string;
   active?: boolean;
 }

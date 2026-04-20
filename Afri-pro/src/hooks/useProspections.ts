@@ -33,6 +33,7 @@ export function useProspections(refreshKey = 0) {
   dateV3: normalizeDateInput(p.date_visite_3),
   observations: p.observations || '',
   ancienAssureur: p.ancien_assureur || '',
+  dateAncienEffet: normalizeDateInput(p.date_effet),
   dateAncienEch: normalizeDateInput(p.date_echeance_ancien),
   // ✅ NULL/undefined = active (legacy records), false = deactivated
   active: p.active === null || p.active === undefined

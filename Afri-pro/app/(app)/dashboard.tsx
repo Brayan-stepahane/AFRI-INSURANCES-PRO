@@ -14,7 +14,7 @@ import apiClient from '../../src/services/api/client';
 import { API_ENDPOINTS } from '../../src/services/api/endpoints';
 import { colors, spacing } from '../../src/config/theme';
 import { fmt } from '../../src/utils/constants';
-import { exportAllDataToExcel } from '../../src/utils/export';
+import { exportAllDataToCSV } from '../../src/utils/export';
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -57,7 +57,7 @@ export default function DashboardScreen() {
 
   const handleExport = () => {
     try {
-      exportAllDataToExcel(prospections, cotations, ventes, clients);
+      exportAllDataToCSV(prospections, cotations, ventes, clients);
     } catch (error) {
       console.error('Export error:', error);
       Alert.alert('Erreur', 'Impossible d\'exporter les données');
