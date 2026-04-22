@@ -120,4 +120,14 @@ export const userService = {
       createdAt: new Date().toISOString(),
     };
   },
+
+  toggleUser: async (userId: string): Promise<{ id: number; active: boolean }> => {
+    const response = await apiClient.put(API_ENDPOINTS.USERS.TOGGLE.replace(':id', userId));
+    return response.data;
+  },
+
+  resetPassword: async (userId: string): Promise<{ message: string; user: any; newPassword: string }> => {
+    const response = await apiClient.put(API_ENDPOINTS.USERS.RESET_PASSWORD.replace(':id', userId));
+    return response.data;
+  },
 };

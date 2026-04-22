@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Modal, Alert } from 'react-native';
 import { useAuth } from '../../src/hooks/useAuth';
 import { useRouter } from 'expo-router';
 import { colors, spacing, radius } from '../../src/config/theme';
@@ -59,6 +59,45 @@ export default function UsersScreen() {
 
     loadUsers();
   }, []);
+
+  const handleToggleUser = async (userId: string, currentActive: boolean) => {
+    try {
+      await userService.toggleUser(userId);
+      setMessage(`Utilisateur ${currentActive ? 'désactivé' : 'activé'} avec succès.`);
+      // Reload users
+      const allUsers = await userService.getUsers();
+      setUsers(allUsers);
+    } catch (err) {
+      setError('Erreur lors de la modification du statut utilisateur.');
+      console.error('Failed to toggle user:', err);
+    }
+  };
+
+  const handleResetPassword = async (userId: string, userName: string) => {
+    Alert.alert(
+      'Réinitialiser le mot de passe',
+      `Êtes-vous sûr de vouloir réinitialiser le mot de passe de ${userName} ? Le nouveau mot de passe sera "Pass1234!".`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Réinitialiser',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const result = await userService.resetPassword(userId);
+              setMessage(`Mot de passe réinitialisé avec succès. Nouveau mot de passe: ${result.newPassword}`);
+              // Reload users
+              const allUsers = await userService.getUsers();
+              setUsers(allUsers);
+            } catch (err) {
+              setError('Erreur lors de la réinitialisation du mot de passe.');
+              console.error('Failed to reset password:', err);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const handleCreateUser = async () => {
     setError('');
@@ -310,10 +349,30 @@ export default function UsersScreen() {
       ) : (
         users.map((u) => (
           <View key={u.id} style={styles.userRow}>
-            <Text style={styles.userText}>
-              {u.name} {u.surname ? `(${u.surname})` : ''}
-            </Text>
-            <Text style={styles.userMeta}>{u.role?.toUpperCase()}</Text>
+            <View style={styles.userInfo}>
+              <Text style={styles.userText}>
+                {u.name} {u.surname ? `(${u.surname})` : ''}
+              </Text>
+              <Text style={styles.userMeta}>{u.role?.toUpperCase()} - {u.active ? 'Actif' : 'Inactif'}</Text>
+            </View>
+            {role === 'admin' && (
+              <View style={styles.userActions}>
+                <TouchableOpacity
+                  style={[styles.actionButton, u.active ? styles.deactivateButton : styles.activateButton]}
+                  onPress={() => handleToggleUser(u.id, u.active || false)}
+                >
+                  <Text style={styles.actionButtonText}>
+                    {u.active ? 'Désactiver' : 'Activer'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.resetButton]}
+                  onPress={() => handleResetPassword(u.id, `${u.name} ${u.surname || ''}`.trim())}
+                >
+                  <Text style={styles.actionButtonText}>Reset MDP</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         ))
       )}
@@ -345,8 +404,15 @@ const styles = StyleSheet.create({
   createButtonText: { color: colors.white, fontWeight: '700' },
 
   userRow: { backgroundColor: colors.white, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.gray100, padding: spacing.sm, marginBottom: spacing.xs },
+  userInfo: { flex: 1 },
   userText: { fontSize: 13, color: colors.gray800, fontWeight: '600' },
   userMeta: { fontSize: 11, color: colors.gray400 },
+  userActions: { flexDirection: 'row', gap: spacing.xs },
+  actionButton: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radius.xs, minWidth: 70, alignItems: 'center' },
+  actionButtonText: { fontSize: 11, fontWeight: '600', color: colors.white },
+  activateButton: { backgroundColor: colors.success },
+  deactivateButton: { backgroundColor: colors.danger },
+  resetButton: { backgroundColor: colors.orange },
 
   dropdownTrigger: {
     flexDirection: 'row',

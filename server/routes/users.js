@@ -11,6 +11,13 @@ const managerOnly = (req, res, next) => {
   next();
 };
 
+// Middleware : réservé aux admins
+const adminOnly = (req, res, next) => {
+  if (req.user.role !== 'admin')
+    return res.status(403).json({ error: 'Accès réservé aux administrateurs' });
+  next();
+};
+
 // GET /api/users
 router.get('/', auth, managerOnly, async (req, res) => {
   try {
@@ -199,6 +206,45 @@ router.put('/:id/change-password', auth, async (req, res) => {
     });
   } catch (e) {
     console.error('Change password error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PUT /api/users/:id/reset-password — Reset user password (admin only)
+router.put('/:id/reset-password', auth, adminOnly, async (req, res) => {
+  try {
+    const userId = Number(req.params.id);
+
+    // Check if user exists
+    const { rows: userRows } = await pool.query(
+      'SELECT id, nom, prenom FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (userRows.length === 0) {
+      return res.status(404).json({ error: 'Utilisateur non trouvé' });
+    }
+
+    // Generate a default password (you can change this to a random one if needed)
+    const defaultPassword = 'Pass1234!';
+    const hashedPassword = await bcrypt.hash(defaultPassword, 10);
+
+    // Update password and set is_default_password to true
+    const { rows } = await pool.query(
+      `UPDATE users
+       SET mot_de_passe = $1, is_default_password = true, updated_at = NOW()
+       WHERE id = $2
+       RETURNING id, nom, prenom, identifiant, email, role, is_default_password`,
+      [hashedPassword, userId]
+    );
+
+    res.json({
+      message: 'Mot de passe réinitialisé avec succès',
+      user: rows[0],
+      newPassword: defaultPassword, // Send the new password back to admin
+    });
+  } catch (e) {
+    console.error('Reset password error:', e);
     res.status(500).json({ error: e.message });
   }
 });
