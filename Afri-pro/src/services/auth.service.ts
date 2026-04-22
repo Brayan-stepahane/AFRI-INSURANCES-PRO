@@ -27,6 +27,7 @@ export const authService = {
         phone: apiUser.phone,
         role: normalizeRole(apiUser.role),
         objectifMensuel: apiUser.objectif_mensuel ?? apiUser.objectifMensuel,
+        isDefaultPassword: apiUser.is_default_password,
         createdAt: apiUser.createdAt || new Date().toISOString(),
       },
     };
@@ -39,6 +40,13 @@ export const authService = {
 
   logout: async (): Promise<void> => {
     await apiClient.post(API_ENDPOINTS.AUTH.LOGOUT);
+  },
+
+  changePassword: async (userId: string, currentPassword: string, newPassword: string): Promise<void> => {
+    await apiClient.put(`/api/users/${userId}/change-password`, {
+      currentPassword,
+      newPassword,
+    });
   },
 
   getProfile: async (): Promise<User> => {

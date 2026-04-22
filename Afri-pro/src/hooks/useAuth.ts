@@ -51,6 +51,28 @@ export const useAuth = () => {
     }
   };
 
+  const changePassword = async (currentPassword: string, newPassword: string) => {
+    store.setLoading(true);
+    store.setError(null);
+    try {
+      if (!store.user?.id) {
+        throw new Error('User not authenticated');
+      }
+      await authService.changePassword(store.user.id, currentPassword, newPassword);
+      // Update user with isDefaultPassword set to false
+      store.setUser({
+        ...store.user,
+        isDefaultPassword: false,
+      });
+    } catch (err) {
+      const errorMsg = getErrorMessage(err);
+      store.setError(errorMsg);
+      throw err;
+    } finally {
+      store.setLoading(false);
+    }
+  };
+
   return {
     user: store.user,
     token: store.token,
@@ -59,6 +81,7 @@ export const useAuth = () => {
     login,
     register,
     logout: handleLogout,
+    changePassword,
     isAuthenticated: !!store.token,
   };
 };

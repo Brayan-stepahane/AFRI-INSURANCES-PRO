@@ -15,7 +15,7 @@ router.post('/login', async (req, res) => {
 
     // Get user from database
     const { rows } = await pool.query(
-      'SELECT id, nom, prenom, identifiant, mot_de_passe, role, equipe, objectif_mensuel, active FROM users WHERE identifiant = $1',
+      'SELECT id, nom, prenom, identifiant, mot_de_passe, role, equipe, objectif_mensuel, active, is_default_password FROM users WHERE identifiant = $1',
       [identifiant]
     );
 
@@ -60,6 +60,7 @@ router.post('/login', async (req, res) => {
         role: user.role,
         equipe: user.equipe,
         objectif_mensuel: user.objectif_mensuel,
+        is_default_password: user.is_default_password,
       },
     });
   } catch (e) {

@@ -10,6 +10,7 @@ export interface User {
   role?: UserRole;
   equipe?: string;
   objectifMensuel?: string;
+  isDefaultPassword?: boolean;
   createdAt: string;
   manager_id?: number;
   manager_adjoint_id?: number;

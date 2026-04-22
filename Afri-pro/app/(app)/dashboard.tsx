@@ -10,6 +10,7 @@ import { useClients } from '../../src/hooks/useClients';
 import { Button } from '../../src/components/common/Button';
 import { MetricCard, ObjectiveBox, Pipeline, UrgentFollowUps } from '../../src/components/dashboard/MetricCard';
 import { NewProspectionModal } from '../../src/components/modals/NewProspectionModal';
+import { ChangePasswordModal } from '../../src/components/modals/ChangePasswordModal';
 import apiClient from '../../src/services/api/client';
 import { API_ENDPOINTS } from '../../src/services/api/endpoints';
 import { colors, spacing } from '../../src/config/theme';
@@ -18,12 +19,28 @@ import { exportAllDataToCSV } from '../../src/utils/export';
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, changePassword, error: authError, isLoading: authLoading } = useAuth();
   const [reloadKey, setReloadKey] = React.useState(0);
   const stats = useDashboardStats(reloadKey);
   const objective = useObjective(reloadKey);
   const [refreshing, setRefreshing] = React.useState(false);
   const [showNewProspectionModal, setShowNewProspectionModal] = React.useState(false);
+  const [showPasswordChangeModal, setShowPasswordChangeModal] = React.useState(false);
+
+  // Check if user has default password on component mount
+  React.useEffect(() => {
+    if (user?.isDefaultPassword) {
+      setShowPasswordChangeModal(true);
+    }
+  }, [user?.isDefaultPassword]);
+
+  const handlePasswordChangeSuccess = () => {
+    setShowPasswordChangeModal(false);
+  };
+
+  const handleChangePassword = async (currentPassword: string, newPassword: string) => {
+    await changePassword(currentPassword, newPassword);
+  };
 
   const handleNewProspectionSubmit = async (data: any, isEdit?: boolean, prospectionId?: number, options?: { refreshOnly?: boolean }) => {
     if (options?.refreshOnly) {
@@ -155,6 +172,13 @@ export default function DashboardScreen() {
           onSubmit={handleNewProspectionSubmit}
         />
       )}
+      <ChangePasswordModal
+        visible={showPasswordChangeModal}
+        onSuccess={handlePasswordChangeSuccess}
+        onChangePassword={handleChangePassword}
+        isLoading={authLoading}
+        error={authError}
+      />
     </ScrollView>
   );
 }

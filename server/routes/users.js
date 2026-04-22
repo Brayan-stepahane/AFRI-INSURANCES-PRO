@@ -92,9 +92,9 @@ router.post('/', auth, managerOnly, async (req, res) => {
     const { rows } = await pool.query(
       `INSERT INTO users
        (nom, prenom, identifiant, email, mot_de_passe, role, equipe, objectif_mensuel,
-        parent_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-       RETURNING id, nom, prenom, identifiant, email, role, equipe, objectif_mensuel`,
+        parent_id, is_default_password)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)
+       RETURNING id, nom, prenom, identifiant, email, role, equipe, objectif_mensuel, is_default_password`,
       [
         nom.trim(),
         prenom.trim(),
@@ -132,6 +132,73 @@ router.put('/:id/toggle', auth, managerOnly, async (req, res) => {
     res.json(rows[0]);
   } catch (e) {
     console.error(e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PUT /api/users/:id/change-password — Change user password
+router.put('/:id/change-password', auth, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const userId = Number(req.params.id);
+    const authenticatedUserId = req.user.id;
+
+    // Users can only change their own password
+    if (userId !== authenticatedUserId) {
+      return res.status(403).json({ error: 'Vous ne pouvez modifier que votre propre mot de passe' });
+    }
+
+    // Validation
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Le mot de passe actuel et le nouveau mot de passe sont requis' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'Le nouveau mot de passe doit avoir au moins 6 caractères' });
+    }
+
+    // Get user from database
+    const { rows: userRows } = await pool.query(
+      'SELECT id, mot_de_passe FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (userRows.length === 0) {
+      return res.status(404).json({ error: 'Utilisateur non trouvé' });
+    }
+
+    const user = userRows[0];
+
+    // Verify current password
+    const passwordMatch = await bcrypt.compare(currentPassword, user.mot_de_passe);
+    if (!passwordMatch) {
+      return res.status(401).json({ error: 'Le mot de passe actuel est incorrect' });
+    }
+
+    // Check if new password is same as current password
+    const samePassword = await bcrypt.compare(newPassword, user.mot_de_passe);
+    if (samePassword) {
+      return res.status(400).json({ error: 'Le nouveau mot de passe doit être différent du mot de passe actuel' });
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password and set is_default_password to false
+    const { rows } = await pool.query(
+      `UPDATE users
+       SET mot_de_passe = $1, is_default_password = false, updated_at = NOW()
+       WHERE id = $2
+       RETURNING id, nom, prenom, identifiant, email, role, is_default_password`,
+      [hashedPassword, userId]
+    );
+
+    res.json({
+      message: 'Mot de passe modifié avec succès',
+      user: rows[0],
+    });
+  } catch (e) {
+    console.error('Change password error:', e);
     res.status(500).json({ error: e.message });
   }
 });

@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS users (
   equipe VARCHAR(100),
   objectif_mensuel DECIMAL(12, 2) DEFAULT 0,
   active BOOLEAN DEFAULT true,
+  is_default_password BOOLEAN DEFAULT true,
   parent_id INT,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW(),
