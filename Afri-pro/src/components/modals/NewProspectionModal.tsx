@@ -784,7 +784,10 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
             options={PRODUCTS}
             isOpen={openDropdown === 'product'}
             onToggle={() => toggle('product')}
-            onSelect={v => upd('product', v)}
+onSelect={v => {
+  upd('product', v);
+  upd('ratedRisk', v);
+}}
           />
         </View>
         <View style={styles.half}>
@@ -888,13 +891,12 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
       <View style={styles.row}>
         <View style={styles.half}>
           <Text style={styles.label}>Risque coté</Text>
-          <SelectField
-            value={form.ratedRisk}
-            options={RISKS}
-            isOpen={openDropdown === 'ratedRisk'}
-            onToggle={() => toggle('ratedRisk')}
-            onSelect={v => upd('ratedRisk', v)}
-          />
+          <View style={sf.wrapper}>
+            <View style={sf.trigger}>
+              <Text style={sf.triggerText} numberOfLines={1}>{form.ratedRisk || form.product}</Text>
+              <Text style={sf.caret}>●</Text>
+            </View>
+          </View>
         </View>
         <View style={styles.half}>
           <Text style={styles.label}>Date de cotation</Text>
