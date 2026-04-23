@@ -1,212 +1,207 @@
-import React from 'react';
-import { StyleSheet, View, ScrollView, Text } from 'react-native';
+﻿import React from 'react';
+import { ScrollView, View, Text, StyleSheet, TouchableOpacity, RefreshControl, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Button } from '../../src/components/common/Button';
-import { Header } from '../../src/components/common/Header';
-import { Card } from '../../src/components/common/Card';
 import { useAuth } from '../../src/hooks/useAuth';
-import { colors, spacing, typography, radius } from '../../src/config/theme';
+import { useDashboardStats, useObjective } from '../../src/hooks/useDashboardStats';
+import { useProspections } from '../../src/hooks/useProspections';
+import { useCotations } from '../../src/hooks/useCotations';
+import { useVentes } from '../../src/hooks/useVentes';
+import { useClients } from '../../src/hooks/useClients';
+import { Button } from '../../src/components/common/Button';
+import { MetricCard, ObjectiveBox, Pipeline, UrgentFollowUps } from '../../src/components/dashboard/MetricCard';
+import { NewProspectionModal } from '../../src/components/modals/NewProspectionModal';
+import { ChangePasswordModal } from '../../src/components/modals/ChangePasswordModal';
+import apiClient from '../../src/services/api/client';
+import { API_ENDPOINTS } from '../../src/services/api/endpoints';
+import { colors, spacing } from '../../src/config/theme';
+import { fmt } from '../../src/utils/constants';
+import { exportAllDataToCSV } from '../../src/utils/export';
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, changePassword, error: authError, isLoading: authLoading } = useAuth();
+  const [reloadKey, setReloadKey] = React.useState(0);
+  const stats = useDashboardStats(reloadKey);
+  const objective = useObjective(reloadKey);
+  const [refreshing, setRefreshing] = React.useState(false);
+  const [showNewProspectionModal, setShowNewProspectionModal] = React.useState(false);
+  const [showPasswordChangeModal, setShowPasswordChangeModal] = React.useState(false);
+
+  // Check if user has default password on component mount
+  React.useEffect(() => {
+    if (user?.isDefaultPassword) {
+      setShowPasswordChangeModal(true);
+    }
+  }, [user?.isDefaultPassword]);
+
+  const handlePasswordChangeSuccess = () => {
+    setShowPasswordChangeModal(false);
+  };
+
+  const handleChangePassword = async (currentPassword: string, newPassword: string) => {
+    await changePassword(currentPassword, newPassword);
+  };
+
+  const handleNewProspectionSubmit = async (data: any, isEdit?: boolean, prospectionId?: number, options?: { refreshOnly?: boolean }) => {
+    if (options?.refreshOnly) {
+      setReloadKey(prev => prev + 1);
+      return;
+    }
+
+    try {
+      const response = await apiClient.post(API_ENDPOINTS.PROSPECTIONS.CREATE, data);
+      console.log('Created prospection from dashboard:', response.data);
+      setShowNewProspectionModal(false);
+      setReloadKey(prev => prev + 1);
+    } catch (error) {
+      console.error('Failed to create prospection:', error);
+      Alert.alert('Erreur', 'Impossible de créer la prospection. Vérifiez vos informations et réessayez.');
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    setReloadKey(prev => prev + 1);
+    setTimeout(() => setRefreshing(false), 600);
+  };
+
+  const { prospections } = useProspections();
+  const { cotations } = useCotations();
+  const { ventes } = useVentes();
+  const { clients } = useClients();
+  const role = user?.role ?? 'commercial';
+  const isCommercial = role === 'commercial';
+
+  const handleExport = () => {
+    try {
+      exportAllDataToCSV(prospections, cotations, ventes, clients);
+    } catch (error) {
+      console.error('Export error:', error);
+      Alert.alert('Erreur', 'Impossible d\'exporter les données');
+    }
+  };
 
   const handleLogout = async () => {
     await logout();
-    router.replace('/(auth)/login');
+    router.replace('/login');
   };
 
-  const getInitials = (name?: string) => {
-    if (!name) return 'U';
-    return name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
+  if (stats.loading || objective.loading) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color={colors.violet} />
+        <Text style={styles.loadingText}>Chargement du tableau de bord...</Text>
+      </View>
+    );
+  }
 
-  const role = user?.role ?? 'commercial';
-  const capabilityMap: Record<string, string> = {
-    commercial: 'Saisir prospections, cotations et ventes · Voir uniquement ses propres données',
-    manager_adj: 'Voir et valider les saisies de son équipe',
-    manager: 'Tableau de bord de l’équipe · Suivi des objectifs',
-    chef: 'Vue globale de toute l’agence · Statistiques consolidées',
-    admin: 'Gestion complète : utilisateurs, paramètres, exports Excel',
-  };
-
-  const roleLabelMap: Record<string, string> = {
-    commercial: 'Commercial',
-    manager_adj: 'Manager adjoint',
-    manager: 'Manager',
-    chef: 'Chef d\'Agence',
-    admin: 'Administrateur',
-  };
+  if (stats.error || objective.error) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <Text style={styles.errorText}>Erreur de chargement</Text>
+        <Text style={styles.errorSubtext}>{stats.error || objective.error}</Text>
+        <Button title="Réessayer" onPress={() => setReloadKey(prev => prev + 1)} style={{ marginTop: spacing.lg }} />
+      </View>
+    );
+  }
 
   return (
-    <ScrollView style={styles.container}>
-      <Header
-        title="Tableau de bord"
-        subtitle={`Bienvenue, ${user?.name || 'Utilisateur'}`}
-      />
+    <ScrollView
+      style={styles.container}
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+    >
+      <View style={styles.topBar}>
+        <View>
+          <Text style={styles.pageTitle}>Tableau de bord</Text>
+          <Text style={styles.pageSubtitle}>Vue d'ensemble</Text>
+        </View>
+        <View style={styles.topBarActions}>
+          <TouchableOpacity style={styles.notificationBtn} onPress={() => router.push('/notifications' as any)}>
+            <Text style={styles.notificationIcon}>🔔</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.exportBtn} onPress={handleExport}>
+            <Text style={styles.exportBtnText}>Exporter</Text>
+          </TouchableOpacity>
+          {/* <Button title="+ Nouvelle prospection" onPress={() => setShowNewProspectionModal(true)} style={styles.topButton} /> */}
+        </View>
+      </View>
 
       <View style={styles.content}>
-        {/* User Profile Card */}
-        <Card variant="outlined" style={styles.profileCard}>
-          <View style={styles.profileHeader}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{getInitials(user?.name)}</Text>
-            </View>
-            <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>{user?.name || 'N/A'}</Text>
-              <Text style={styles.profileEmail}>{user?.email || 'N/A'}</Text>
-              {user?.phone && <Text style={styles.profilePhone}>{user.phone}</Text>}
-            </View>
+        {isCommercial && <ObjectiveBox objective={objective} />}
+
+        <View style={styles.metricsGrid}>
+          <View style={styles.metricCol}>
+            <MetricCard label="Prospects actives" value={stats.activeProspects} subtext="en cours" valueColor={colors.violet} />
           </View>
-        </Card>
-
-        {/* Role summary */}
-        <Card variant="outlined" style={styles.profileCard}>
-          <Text style={styles.roleTitle}>Rôle : {roleLabelMap[role] || 'Utilisateur'}</Text>
-          <Text style={styles.roleDescription}>{capabilityMap[role] || capabilityMap.commercial}</Text>
-        </Card>
-
-        {/* Quick Stats */}
-        <View style={styles.statsGrid}>
-          <Card variant="filled" style={styles.statCard}>
-            <Text style={styles.statValue}>0</Text>
-            <Text style={styles.statLabel}>Prospections</Text>
-          </Card>
-          <Card variant="filled" style={styles.statCard}>
-            <Text style={styles.statValue}>0</Text>
-            <Text style={styles.statLabel}>Cotations</Text>
-          </Card>
+          <View style={styles.metricCol}>
+            <MetricCard
+              label="Cotations"
+              value={stats.quotations}
+              subtext={`${stats.pendingCotations} en attente`}
+              valueColor={colors.teal}
+            />
+          </View>
+          <View style={styles.metricCol}>
+            <MetricCard label="Ventes" value={stats.completedSales} subtext="contrats" valueColor={colors.orange} />
+          </View>
+          <View style={styles.metricCol}>
+            <MetricCard label="CA total" value={`${fmt(Math.round(stats.totalRevenue / 1000))}K`} subtext="FCFA" valueColor={colors.violetDark} />
+          </View>
         </View>
 
-        <View style={styles.statsGrid}>
-          <Card variant="filled" style={styles.statCard}>
-            <Text style={styles.statValue}>0</Text>
-            <Text style={styles.statLabel}>Ventes</Text>
-          </Card>
-          <Card variant="filled" style={styles.statCard}>
-            <Text style={styles.statValue}>0 %</Text>
-            <Text style={styles.statLabel}>Objectif</Text>
-          </Card>
+        <View style={styles.twoColumnSection}>
+          <View style={styles.leftColumn}>
+            <Pipeline
+              steps={[
+                { label: 'Prospection', count: stats.pipelineData.prospects, status: 'done' },
+                { label: 'Cotation',    count: stats.pipelineData.quotations, status: 'done' },
+                { label: 'Vente',       count: stats.pipelineData.sales,      status: 'active' },
+              ]}
+            />
+          </View>
+          <View style={styles.rightColumn}>
+            <UrgentFollowUps prospects={stats.urgentFollowUps} />
+          </View>
         </View>
-
-        {/* Actions */}
-        <View style={styles.actions}>
-          <Button
-            title="+ Nouvelle prospection"
-            onPress={() => {}}
-            style={styles.actionButton}
-          />
-          <Button
-            title="Voir le profil"
-            variant="outline"
-            onPress={() => router.push('/(app)/profile')}
-            style={styles.actionButton}
-          />
-        </View>
-
-        {/* Logout Button */}
-        <Button
-          title="Se déconnecter"
-          variant="danger"
-          onPress={handleLogout}
-          style={styles.logoutButton}
-        />
       </View>
+      {showNewProspectionModal && (
+        <NewProspectionModal
+          visible={showNewProspectionModal}
+          onClose={() => setShowNewProspectionModal(false)}
+          onSubmit={handleNewProspectionSubmit}
+        />
+      )}
+      <ChangePasswordModal
+        visible={showPasswordChangeModal}
+        onSuccess={handlePasswordChangeSuccess}
+        onChangePassword={handleChangePassword}
+        isLoading={authLoading}
+        error={authError}
+      />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.gray50,
-  },
-  content: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
-    gap: spacing.lg,
-  },
-  profileCard: {
-    marginBottom: spacing.lg,
-  },
-  profileHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.lg,
-  },
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.violet,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: {
-    ...typography.bodyBold,
-    color: colors.white,
-    fontSize: 16,
-  },
-  profileInfo: {
-    flex: 1,
-  },
-  profileName: {
-    ...typography.bodyBold,
-    color: colors.violetDark,
-    marginBottom: spacing.xs,
-  },
-  profileEmail: {
-    ...typography.small,
-    color: colors.gray400,
-    marginBottom: spacing.xs,
-  },
-  profilePhone: {
-    ...typography.small,
-    color: colors.gray600,
-  },
-  roleTitle: {
-    ...typography.smallBold,
-    color: colors.violetDark,
-    marginBottom: spacing.xs,
-  },
-  roleDescription: {
-    ...typography.small,
-    color: colors.gray600,
-    lineHeight: 18,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    gap: spacing.lg,
-  },
-  statCard: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.xl,
-  },
-  statValue: {
-    ...typography.displayMedium,
-    color: colors.violet,
-    marginBottom: spacing.sm,
-  },
-  statLabel: {
-    ...typography.smallBold,
-    color: colors.gray600,
-    textAlign: 'center',
-  },
-  actions: {
-    gap: spacing.md,
-  },
-  actionButton: {
-    marginBottom: spacing.md,
-  },
-  logoutButton: {
-    marginTop: spacing.xl,
-    marginBottom: spacing.xl,
-  },
+  container: { flex: 1, backgroundColor: colors.gray50 },
+  centerContent: { justifyContent: 'center', alignItems: 'center', padding: spacing.xl },
+  loadingText: { marginTop: spacing.md, fontSize: 16, color: colors.gray600 },
+  errorText: { fontSize: 18, fontWeight: '600', color: colors.danger, textAlign: 'center' },
+  errorSubtext: { fontSize: 14, color: colors.gray600, textAlign: 'center', marginTop: spacing.sm },
+  topBar: { backgroundColor: colors.white, paddingHorizontal: spacing.xl, paddingTop: spacing.lg, paddingBottom: spacing.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.gray200 },
+  pageTitle: { fontSize: 18, fontWeight: '700', color: colors.violetDark },
+  pageSubtitle: { fontSize: 13, color: colors.gray400, marginTop: 2 },
+  topBarActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  notificationBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.gray100, alignItems: 'center', justifyContent: 'center' },
+  notificationIcon: { fontSize: 16 },
+  exportBtn: { paddingHorizontal: spacing.md, paddingVertical: 10, borderRadius: 10, backgroundColor: colors.success, alignItems: 'center', justifyContent: 'center' },
+  exportBtnText: { fontSize: 12, fontWeight: '700', color: colors.white },
+  topButton: { paddingHorizontal: spacing.md, paddingVertical: 4, minHeight: 32 },
+  content: { padding: spacing.xl },
+  metricsGrid: { flexDirection: 'row', marginBottom: spacing.xl, gap: spacing.sm },
+  metricCol: { flex: 1 },
+  twoColumnSection: { flexDirection: 'row', gap: spacing.lg },
+  leftColumn: { flex: 1 },
+  rightColumn: { flex: 1 },
 });

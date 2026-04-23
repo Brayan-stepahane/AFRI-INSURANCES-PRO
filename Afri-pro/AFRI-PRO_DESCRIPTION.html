@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AFRI-PRO - Plateforme de Gestion Commerciale</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #2D1F3D;
+            background: #F8F7FA;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            padding: 60px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            border-bottom: 3px solid #4A1E61;
+            padding-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 48px;
+            color: #4A1E61;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 18px;
+            color: #6B2D8B;
+            font-weight: 500;
+        }
+
+        .meta {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 15px;
+            font-size: 14px;
+            color: #5C5270;
+        }
+
+        .meta strong {
+            color: #4A1E61;
+        }
+
+        .overview {
+            background: #F0E6F6;
+            padding: 25px;
+            border-left: 4px solid #E8521A;
+            margin-bottom: 40px;
+            border-radius: 6px;
+        }
+
+        .overview h2 {
+            color: #4A1E61;
+            margin-bottom: 15px;
+            font-size: 24px;
+        }
+
+        .overview p {
+            margin-bottom: 10px;
+            line-height: 1.8;
+        }
+
+        h2 {
+            color: #4A1E61;
+            font-size: 28px;
+            margin-top: 40px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        h3 {
+            color: #6B2D8B;
+            font-size: 20px;
+            margin-top: 25px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .feature-item {
+            margin: 15px 0;
+            padding-left: 20px;
+            border-left: 3px solid #E8521A;
+            padding: 12px 0 12px 20px;
+        }
+
+        .feature-item strong {
+            color: #4A1E61;
+        }
+
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .feature-list li {
+            list-style: none;
+            padding: 10px 15px;
+            background: #F8F7FA;
+            border-radius: 6px;
+            border-left: 3px solid #6B2D8B;
+            line-height: 1.5;
+        }
+
+        .feature-list li strong {
+            color: #4A1E61;
+        }
+
+        .code-block {
+            background: #2D1F3D;
+            color: #E8521A;
+            padding: 20px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            margin: 20px 0;
+            border-left: 4px solid #E8521A;
+        }
+
+        .color-palette {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .color-box {
+            padding: 20px;
+            border-radius: 8px;
+            color: white;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .color-box h4 {
+            margin-bottom: 5px;
+            font-size: 16px;
+        }
+
+        .color-box p {
+            font-size: 13px;
+            opacity: 0.9;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            border: 1px solid #DDD6E8;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        table thead {
+            background: #4A1E61;
+            color: white;
+        }
+
+        table th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #DDD6E8;
+        }
+
+        table tbody tr:hover {
+            background: #F0E6F6;
+        }
+
+        .tech-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .tech-item {
+            background: #F8F7FA;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #6B2D8B;
+        }
+
+        .tech-item strong {
+            color: #4A1E61;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 8px 15px;
+            background: #F0E6F6;
+            color: #4A1E61;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+            border: 1px solid #6B2D8B;
+        }
+
+        .badge.success {
+            background: #E6F7EE;
+            color: #1A8A4A;
+            border-color: #1A8A4A;
+        }
+
+        .badge.orange {
+            background: #FFF0EB;
+            color: #E8521A;
+            border-color: #E8521A;
+        }
+
+        .footer {
+            margin-top: 50px;
+            padding-top: 30px;
+            border-top: 2px solid #DDD6E8;
+            text-align: center;
+            color: #5C5270;
+            font-size: 14px;
+        }
+
+        .summary {
+            background: #E6F7EE;
+            padding: 25px;
+            border-left: 4px solid #1A8A4A;
+            border-radius: 6px;
+            margin: 30px 0;
+        }
+
+        .summary h3 {
+            color: #1A8A4A;
+            margin-bottom: 15px;
+        }
+
+        .summary ul {
+            list-style: none;
+        }
+
+        .summary li {
+            padding: 8px 0;
+            padding-left: 25px;
+            position: relative;
+        }
+
+        .summary li:before {
+            content: "✅";
+            position: absolute;
+            left: 0;
+            font-size: 16px;
+        }
+
+        .architecture {
+            background: #F8F7FA;
+            padding: 20px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.8;
+            overflow-x: auto;
+            border-left: 4px solid #6B2D8B;
+            margin: 20px 0;
+        }
+
+        .page-break {
+            page-break-after: always;
+            margin: 40px 0;
+        }
+
+        @media print {
+            body {
+                padding: 0;
+                background: white;
+            }
+            .container {
+                max-width: 100%;
+                box-shadow: none;
+                padding: 40px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>📱 AFRI-INSURANCES-PRO</h1>
+            <p>Plateforme de Gestion Commerciale pour Assurances</p>
+            <div class="meta">
+                <div><strong>Type:</strong> Application React Native + Expo</div>
+                <div><strong>Langues:</strong> Français</div>
+                <div><strong>Technos:</strong> TypeScript, Zustand, Axios</div>
+                <div><strong>Version:</strong> 1.0.0 (En cours)</div>
+            </div>
+        </div>
+
+        <!-- Overview -->
+        <div class="overview">
+            <h2>🎯 Vue d'ensemble</h2>
+            <p><strong>AFRI-PRO</strong> est une plateforme complète de gestion commerciale conçue pour les équipes commerciales d'AFRI Insurance S.A. Elle permet de gérer l'ensemble du cycle de vie d'une opportunité commerciale : de la prospection à la vente, avec suivi des objectifs et collaboration d'équipe.</p>
+            <div class="badges" style="margin-top: 15px;">
+                <span class="badge">📱 iOS</span>
+                <span class="badge">🤖 Android</span>
+                <span class="badge">💻 Web</span>
+            </div>
+        </div>
+
+        <!-- Section 1: Features -->
+        <h2>✨ Fonctionnalités principales</h2>
+
+        <h3>1️⃣ Authentification & Gestion des utilisateurs</h3>
+        <ul class="feature-list">
+            <li><strong>Connexion sécurisée:</strong> Login/identifiant + mot de passe</li>
+            <li><strong>Rôles:</strong> Commercial, Manager adjoint, Manager, Chef d'agence, Admin</li>
+            <li><strong>Tokens sécurisés:</strong> Expo Secure Store</li>
+            <li><strong>Hiérarchie:</strong> Système manager/adjoint/commercial</li>
+        </ul>
+
+        <h3>2️⃣ Dashboard Principal 📊</h3>
+        <p>Tableau de bord personnalisé avec vue d'ensemble de la performance commerciale:</p>
+        <ul class="feature-list">
+            <li><strong>📈 Métriques clés:</strong> Prospects, Cotations, Ventes, CA</li>
+            <li><strong>🎯 Objectifs:</strong> Progression mensuelle (Commercial)</li>
+            <li><strong>📊 Pipeline:</strong> Funnel Prospection → Cotation → Vente</li>
+            <li><strong>⏰ Follow-ups urgent:</strong> Actions critiques urgentes</li>
+            <li><strong>🚀 Actions rapides:</strong> Accès direct aux fonctionnalités</li>
+        </ul>
+
+        <h3>3️⃣ Prospections 🔍</h3>
+        <p>Gestion complète des prospects et opportunités commerciales:</p>
+        <ul class="feature-list">
+            <li><strong>Recherche temps réel:</strong> Client, Produit, Commercial</li>
+            <li><strong>Filtrage avancé:</strong> 8 statuts différents</li>
+            <li><strong>Création:</strong> Modal pour ajouter prospections</li>
+            <li><strong>Alertes urgentes:</strong> Dates dépassées en rouge</li>
+            <li><strong>Avatar clients:</strong> Colorés avec initiales</li>
+            <li><strong>Barre de progression:</strong> Probabilité de conversion</li>
+        </ul>
+
+        <h3>4️⃣ Cotations 📋</h3>
+        <ul class="feature-list">
+            <li><strong>Création/modification:</strong> Gestion complète des devis</li>
+            <li><strong>Liaisons:</strong> Prospects, produits, montants</li>
+            <li><strong>Suivi statut:</strong> Brouillon, envoyée, acceptée, refusée</li>
+            <li><strong>Dates:</strong> Émission, expiration, relance</li>
+        </ul>
+
+        <h3>5️⃣ Ventes 🎉</h3>
+        <ul class="feature-list">
+            <li><strong>Enregistrement:</strong> Ventes finalisées</li>
+            <li><strong>Commissions:</strong> Calcul automatique</li>
+            <li><strong>Contrats:</strong> Dates signature, documents</li>
+            <li><strong>Historique:</strong> Complet et traçable</li>
+        </ul>
+
+        <h3>6️⃣ Objectifs 🎯</h3>
+        <ul class="feature-list">
+            <li><strong>Mensuel:</strong> Objectif par utilisateur</li>
+            <li><strong>Progression:</strong> VS objectif en temps réel</li>
+            <li><strong>Alertes:</strong> Dépassement ou non-atteinte</li>
+            <li><strong>Vue temporelle:</strong> Mensuelle, trimestrielle</li>
+        </ul>
+
+        <h3>7️⃣ Clients 👥</h3>
+        <ul class="feature-list">
+            <li><strong>Répertoire:</strong> Base de données complète</li>
+            <li><strong>Contacts:</strong> Email, téléphone, adresse</li>
+            <li><strong>Historique:</strong> Toutes les interactions</li>
+            <li><strong>Liaisons:</strong> Prospects, cotations, ventes</li>
+        </ul>
+
+        <h3>8️⃣ Équipe 👨‍💼👩‍💼</h3>
+        <ul class="feature-list">
+            <li><strong>Hiérarchie:</strong> Org chart complet</li>
+            <li><strong>Performance:</strong> Stats chaque collaborateur</li>
+            <li><strong>Collaboration:</strong> Partage d'informations</li>
+            <li><strong>Contacts:</strong> Répertoire interne</li>
+        </ul>
+
+        <h3>9️⃣ Statistiques 📊</h3>
+        <ul class="feature-list">
+            <li><strong>Analytics:</strong> Graphiques performance</li>
+            <li><strong>Top 10:</strong> Meilleurs commerciaux</li>
+            <li><strong>Trends:</strong> Évolution CA, conversions</li>
+            <li><strong>Export:</strong> CSV/Excel disponible</li>
+        </ul>
+
+        <h3>🔟 Notifications 🔔</h3>
+        <ul class="feature-list">
+            <li><strong>Rappels:</strong> Suivi prospections</li>
+            <li><strong>Alertes:</strong> Cotations à traiter</li>
+            <li><strong>Confirmations:</strong> Actions système</li>
+            <li><strong>Équipe:</strong> Nouvelles activités</li>
+        </ul>
+
+        <h3>1️⃣1️⃣ Gestion utilisateurs (Admin) 👤</h3>
+        <ul class="feature-list">
+            <li><strong>Créer:</strong> Nouveaux utilisateurs</li>
+            <li><strong>Rôles:</strong> Assigner permissions</li>
+            <li><strong>Hiérarchie:</strong> Manager adjoint, Manager</li>
+            <li><strong>Objectifs:</strong> Assigner mensuels</li>
+        </ul>
+
+        <h3>1️⃣2️⃣ Profil utilisateur 👤</h3>
+        <ul class="feature-list">
+            <li><strong>Infos:</strong> Données personnelles</li>
+            <li><strong>Sécurité:</strong> Changer mot de passe</li>
+            <li><strong>Préférences:</strong> Notifications, affichage</li>
+            <li><strong>Déconnexion:</strong> Logout sécurisé</li>
+        </ul>
+
+        <!-- Architecture Section -->
+        <div class="page-break"></div>
+        <h2>🏗️ Architecture technique</h2>
+
+        <div class="architecture">
+Afri-pro/
+├── app/                           # Écrans (Expo Router)
+│   ├── (auth)/                   # Authentification
+│   │   ├── login.tsx             # Connexion
+│   │   └── _layout.tsx
+│   └── (app)/                    # Écrans protégés
+│       ├── dashboard.tsx         # Tableau de bord
+│       ├── prospections.tsx      # Prospections
+│       ├── cotations.tsx         # Devis
+│       ├── ventes.tsx            # Ventes
+│       ├── clients.tsx           # Clients
+│       ├── equipe.tsx            # Équipe
+│       ├── objectifs.tsx         # Objectifs
+│       ├── stats.tsx             # Analytics
+│       ├── users.tsx             # Admin users
+│       ├── notifications.tsx     # Notifications
+│       ├── profile.tsx           # Profil
+│       └── _layout.tsx
+│
+├── src/
+│   ├── components/               # Composants réutilisables
+│   │   ├── common/              # Button, Card, Header, Badge
+│   │   ├── dashboard/           # Dashboard components
+│   │   ├── layout/              # Sidebar, PageWrapper
+│   │   └── modals/              # Modals formulaires
+│   │
+│   ├── hooks/                   # Custom React hooks
+│   │   ├── useAuth.ts
+│   │   ├── useDashboardStats.ts
+│   │   ├── useProspections.ts
+│   │   ├── useCotations.ts
+│   │   ├── useVentes.ts
+│   │   └── useClients.ts
+│   │
+│   ├── services/                # API & storage
+│   │   ├── auth.service.ts
+│   │   ├── storage.service.ts
+│   │   └── api/
+│   │       ├── client.ts        # Axios client
+│   │       └── endpoints.ts     # URLs API
+│   │
+│   ├── store/                   # Zustand state
+│   │   └── authStore.ts
+│   │
+│   ├── types/                   # TypeScript types
+│   │   ├── auth.types.ts
+│   │   ├── api.types.ts
+│   │   └── common.types.ts
+│   │
+│   ├── config/                  # Configuration
+│   │   └── theme.ts             # Colors, spacing
+│   │
+│   └── utils/                   # Utilities
+│       ├── constants.ts
+│       ├── export.ts
+│       ├── validation.ts
+│       └── errors.ts
+│
+└── assets/                      # Images, icons
+        </div>
+
+        <!-- Design System -->
+        <h2>🎨 Design System</h2>
+
+        <h3>Palette de couleurs</h3>
+        <div class="color-palette">
+            <div class="color-box" style="background: #4A1E61;">
+                <h4>Violet Dark</h4>
+                <p>#4A1E61</p>
+                <p>Primaire</p>
+            </div>
+            <div class="color-box" style="background: #6B2D8B;">
+                <h4>Violet Main</h4>
+                <p>#6B2D8B</p>
+                <p>Secondaire</p>
+            </div>
+            <div class="color-box" style="background: #E8521A;">
+                <h4>Orange</h4>
+                <p>#E8521A</p>
+                <p>Accent</p>
+            </div>
+            <div class="color-box" style="background: #1A8A4A;">
+                <h4>Success</h4>
+                <p>#1A8A4A</p>
+                <p>Validé</p>
+            </div>
+            <div class="color-box" style="background: #C02020;">
+                <h4>Danger</h4>
+                <p>#C02020</p>
+                <p>Erreur</p>
+            </div>
+            <div class="color-box" style="background: #1A5FA8;">
+                <h4>Info</h4>
+                <p>#1A5FA8</p>
+                <p>Info</p>
+            </div>
+        </div>
+
+        <h3>Composants principaux</h3>
+        <ul class="feature-list">
+            <li><strong>Button:</strong> Variants: primary, secondary, danger, outline, ghost</li>
+            <li><strong>Card:</strong> Filled/outlined avec 2 tailles</li>
+            <li><strong>Header:</strong> Titre + sous-titre</li>
+            <li><strong>Badge:</strong> Statuts colorés</li>
+            <li><strong>Input:</strong> Champs saisie</li>
+        </ul>
+
+        <!-- Tech Stack -->
+        <h2>🚀 Tech Stack</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Technologie</th>
+                    <th>Usage</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>React Native</strong></td>
+                    <td>Framework mobile/web</td>
+                </tr>
+                <tr>
+                    <td><strong>Expo</strong></td>
+                    <td>Build & deployment</td>
+                </tr>
+                <tr>
+                    <td><strong>Expo Router</strong></td>
+                    <td>Navigation file-based</td>
+                </tr>
+                <tr>
+                    <td><strong>TypeScript</strong></td>
+                    <td>Type safety</td>
+                </tr>
+                <tr>
+                    <td><strong>Zustand</strong></td>
+                    <td>State management</td>
+                </tr>
+                <tr>
+                    <td><strong>Axios</strong></td>
+                    <td>HTTP client</td>
+                </tr>
+                <tr>
+                    <td><strong>Tailwind CSS</strong></td>
+                    <td>Styling (twrnc)</td>
+                </tr>
+                <tr>
+                    <td><strong>AsyncStorage</strong></td>
+                    <td>Données persistantes</td>
+                </tr>
+                <tr>
+                    <td><strong>Expo Secure Store</strong></td>
+                    <td>Tokens sécurisés</td>
+                </tr>
+                <tr>
+                    <td><strong>XLSX</strong></td>
+                    <td>Export Excel/CSV</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- Platforms -->
+        <h2>📱 Plateformes supportées</h2>
+        <div class="tech-grid">
+            <div class="tech-item">
+                <strong>💻 Web</strong>
+                <p>Responsive design avec sidebar navigation</p>
+            </div>
+            <div class="tech-item">
+                <strong>🍎 iOS</strong>
+                <p>Build Expo optimisé pour iPhone/iPad</p>
+            </div>
+            <div class="tech-item">
+                <strong>🤖 Android</strong>
+                <p>Build Expo pour tous appareils Android</p>
+            </div>
+        </div>
+
+        <!-- Security -->
+        <h2>🔐 Sécurité</h2>
+        <div class="badges">
+            <span class="badge success">✅ Authentification JWT</span>
+            <span class="badge success">✅ Tokens stockés sécurisés</span>
+            <span class="badge success">✅ Interception 401</span>
+            <span class="badge success">✅ Validation rôles</span>
+            <span class="badge success">✅ Validation formulaires</span>
+        </div>
+
+        <!-- Summary -->
+        <div class="summary">
+            <h3>📋 Résumé final</h3>
+            <p><strong>AFRI-PRO est une solution commerciale complète et moderne</strong> pour gérer l'ensemble du cycle de vente, avec collaboration d'équipe, analytics et export de données.</p>
+            <h3 style="margin-top: 20px; color: #1A8A4A; font-size: 18px;">Points clés:</h3>
+            <ul>
+                <li>Multi-plateforme (Web, iOS, Android)</li>
+                <li>Architecture moderne (React Native, Expo, TypeScript)</li>
+                <li>Design System cohérent et professionnel</li>
+                <li>Gestion complète du cycle commercial</li>
+                <li>Analytics et export de données</li>
+                <li>Gestion d'équipe et hiérarchie</li>
+                <li>Sécurité robuste (JWT, SecureStore)</li>
+                <li>Extensible et maintenable</li>
+            </ul>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p><strong>AFRI-INSURANCES-PRO v1.0.0</strong></p>
+            <p>Propriétaire: AFRI Insurance S.A. | Date: Avril 2026</p>
+            <p style="margin-top: 15px; font-size: 12px;">Document généré automatiquement | Pour imprimer en PDF: Ctrl+P ou ⌘+P</p>
+        </div>
+    </div>
+</body>
+</html>

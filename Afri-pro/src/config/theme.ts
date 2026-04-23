@@ -50,6 +50,7 @@ export const spacing = {
   lg: 16,
   xl: 24,
   xxl: 32,
+  xxxl: 40,
 };
 
 export const typography = {
@@ -67,27 +68,39 @@ export const typography = {
 };
 
 export const radius = {
+  xs: 4,
   sm: 8,
   md: 12,
   lg: 16,
+  full: 99,
 };
 
 export const shadows = {
   sm: {
-    shadowColor: '#6B2D8B',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
     elevation: 3,
     boxShadow: '0 2px 4px rgba(107, 45, 139, 0.1)',
   } as any,
   lg: {
-    shadowColor: '#6B2D8B',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18,
-    shadowRadius: 16,
     elevation: 8,
     boxShadow: '0 8px 16px rgba(107, 45, 139, 0.18)',
   } as any,
+};
+
+// ─── STATUS BADGE COLORS ──────────────────────────────────────────────────────
+export const STATUT_BADGE_COLORS: Record<string, { bg: string; text: string }> = {
+  // Prospections
+  'Premier contact': { bg: colors.infoBg, text: colors.info },
+  'Relance 1': { bg: colors.warningBg, text: colors.warning },
+  'Relance 2': { bg: colors.warningBg, text: colors.warning },
+  'Cotation envoyée': { bg: colors.violetPale, text: colors.violet },
+  'En attente signature': { bg: colors.tealBg, text: colors.teal },
+  'Contrat conclu': { bg: colors.successBg, text: colors.success },
+  'Perdu': { bg: colors.dangerBg, text: colors.danger },
+
+  // Cotations
+  'En attente': { bg: colors.warningBg, text: colors.warning },
+  'Validée': { bg: colors.successBg, text: colors.success },
+  'Refusée': { bg: colors.dangerBg, text: colors.danger },
+  'Convertie en vente': { bg: colors.successBg, text: colors.success },
 };
 

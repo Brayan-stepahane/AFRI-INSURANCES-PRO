@@ -1,13 +1,12 @@
 import axios, { AxiosInstance } from 'axios';
 import { ENV } from '../../config/env';
 import { STORAGE_KEYS } from '../../utils/constants';
+import { storageService } from '../storage.service';
 
 // Safe storage access for web
 const getToken = async () => {
   try {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN) || undefined;
-    }
+    return await storageService.getSecure(STORAGE_KEYS.AUTH_TOKEN);
   } catch (error) {
     console.error('Failed to get auth token:', error);
   }
@@ -16,9 +15,7 @@ const getToken = async () => {
 
 const setToken = async (token: string) => {
   try {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
-    }
+    await storageService.setSecure(STORAGE_KEYS.AUTH_TOKEN, token);
   } catch (error) {
     console.error('Failed to set auth token:', error);
   }
@@ -26,9 +23,7 @@ const setToken = async (token: string) => {
 
 const removeToken = async () => {
   try {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-    }
+    await storageService.removeSecure(STORAGE_KEYS.AUTH_TOKEN);
   } catch (error) {
     console.error('Failed to remove auth token:', error);
   }
@@ -41,6 +36,9 @@ const apiClient: AxiosInstance = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// Log baseURL for debugging
+console.log('🔌 API Client initialized with baseURL:', ENV.API_URL);
 
 // Add request interceptor to include auth token
 apiClient.interceptors.request.use(

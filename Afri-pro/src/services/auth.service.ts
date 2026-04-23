@@ -1,56 +1,36 @@
 import apiClient from './api/client';
 import { API_ENDPOINTS } from './api/endpoints';
-import { AuthResponse, LoginPayload, RegisterPayload, User, UserRole } from '../types/auth.types';
+import { AuthResponse, LoginPayload, RegisterPayload, User, UserRole, CreateUserPayload } from '../types/auth.types';
 
-type DemoUser = {
-  id: string;
-  email: string;
-  name: string;
-  role: UserRole;
-  password: string;
-  phone?: string;
+const normalizeRole = (role?: string): UserRole | undefined => {
+  if (!role) return undefined;
+  if (role === 'manager_adjoint') return 'manager_adjoint';
+  return role as UserRole;
 };
-
-const DEMO_USERS: DemoUser[] = [
-  { id: 'u1', email: 'commerciale@afri.com', name: 'Commerciale Demo', role: 'commercial', password: 'demo1234', phone: '+237670000001' },
-  { id: 'u2', email: 'manager_adj@afri.com', name: 'Manager Adjoint Demo', role: 'manager_adj', password: 'demo1234', phone: '+237670000002' },
-  { id: 'u3', email: 'manager@afri.com', name: 'Manager Demo', role: 'manager', password: 'demo1234', phone: '+237670000003' },
-  { id: 'u4', email: 'chef_agence@afri.com', name: 'Chef d\'Agence Demo', role: 'chef', password: 'demo1234', phone: '+237670000004' },
-  { id: 'u5', email: 'admin@afri.com', name: 'Admin Demo', role: 'admin', password: 'demo1234', phone: '+237670000005' },
-];
-
-const createDemoResponse = (user: DemoUser): AuthResponse => ({
-  token: `demo-token-${user.id}`,
-  user: {
-    id: user.id,
-    email: user.email,
-    name: user.name,
-    phone: user.phone,
-    role: user.role,
-    createdAt: new Date().toISOString(),
-  },
-});
 
 export const authService = {
   login: async (payload: LoginPayload): Promise<AuthResponse> => {
-    try {
-      const response = await apiClient.post(API_ENDPOINTS.AUTH.LOGIN, payload);
-      const apiUser: User = response.data.user;
-      return {
-        token: response.data.token,
-        user: {
-          ...apiUser,
-          role: apiUser.role as UserRole,
-        },
-      };
-    } catch (err) {
-      // fallback to local demo count for test/demo purposes
-      const demoUser = DEMO_USERS.find((u) => u.email.toLowerCase() === payload.email.toLowerCase() && u.password === payload.password);
-      if (demoUser) {
-        return createDemoResponse(demoUser);
-      }
-      throw err;
-    }
+    const response = await apiClient.post(API_ENDPOINTS.AUTH.LOGIN, {
+      identifiant: payload.identifiant,
+      password: payload.password,
+    });
+
+    const apiUser = response.data.user;
+    return {
+      token: response.data.token,
+      user: {
+        id: apiUser.id,
+        identifiant: apiUser.identifiant,
+        surname: apiUser.prenom || '',
+        email: apiUser.email ,
+        name: apiUser.name || `${[apiUser.nom, apiUser.prenom].filter(Boolean).join(' ')}`.trim() || apiUser.identifiant || '',
+        phone: apiUser.phone,
+        role: normalizeRole(apiUser.role),
+        objectifMensuel: apiUser.objectif_mensuel ?? apiUser.objectifMensuel,
+        isDefaultPassword: apiUser.is_default_password,
+        createdAt: apiUser.createdAt || new Date().toISOString(),
+      },
+    };
   },
 
   register: async (payload: RegisterPayload): Promise<AuthResponse> => {
@@ -62,8 +42,92 @@ export const authService = {
     await apiClient.post(API_ENDPOINTS.AUTH.LOGOUT);
   },
 
+  changePassword: async (userId: string, currentPassword: string, newPassword: string): Promise<void> => {
+    await apiClient.put(`/api/users/${userId}/change-password`, {
+      currentPassword,
+      newPassword,
+    });
+  },
+
   getProfile: async (): Promise<User> => {
     const response = await apiClient.get(API_ENDPOINTS.USER.PROFILE);
+    const apiUser = response.data;
+    return {
+      id: apiUser.id,
+      identifiant: apiUser.identifiant,
+      email: apiUser.email,
+      name: apiUser.name || `${[apiUser.nom, apiUser.prenom].filter(Boolean).join(' ')}`.trim() || apiUser.identifiant || '',
+      surname: apiUser.prenom || '',
+      phone: apiUser.phone,
+      role: normalizeRole(apiUser.role),
+      objectifMensuel: apiUser.objectif_mensuel ?? apiUser.objectifMensuel,
+      createdAt: apiUser.createdAt || new Date().toISOString(),
+    };
+  },
+};
+
+export const userService = {
+  getUsers: async (): Promise<User[]> => {
+    const response = await apiClient.get(API_ENDPOINTS.USERS.LIST);
+    return response.data.map((apiUser: any) => ({
+      id: apiUser.id.toString(),
+      identifiant: apiUser.identifiant,
+      email: apiUser.email,
+      name: apiUser.name || `${[apiUser.nom, apiUser.prenom].filter(Boolean).join(' ')}`.trim() || apiUser.identifiant || '',
+      surname: apiUser.prenom || '',
+      phone: apiUser.phone,
+      role: normalizeRole(apiUser.role),
+      equipe: apiUser.equipe,
+      objectifMensuel: apiUser.objectif_mensuel ?? apiUser.objectifMensuel,
+      createdAt: apiUser.created_at || apiUser.createdAt || new Date().toISOString(),
+      manager_id: apiUser.manager_id,
+      manager_adjoint_id: apiUser.manager_adjoint_id,
+      parent_id: apiUser.parent_id,
+      active: apiUser.active,
+      manager_adjoint_nom: apiUser.manager_adjoint_nom,
+      manager_adjoint_prenom: apiUser.manager_adjoint_prenom,
+      manager_nom: apiUser.manager_nom,
+      manager_prenom: apiUser.manager_prenom,
+    }));
+  },
+
+  createUser: async (payload: CreateUserPayload): Promise<User> => {
+    const body: any = {
+      nom: payload.name,
+      prenom: payload.surname,
+      identifiant: payload.name.trim().toLowerCase().replace(/\s+/g, ''),
+      email: payload.email || null,
+      mot_de_passe: payload.password,
+      role: payload.role === 'manager_adjoint' ? 'manager_adjoint' : payload.role,
+      phone: payload.phone || null,
+      objectif_mensuel: payload.objectifMensuel || 500000,
+    };
+
+    if (payload.parentId && payload.parentId > 0) {
+      body.parentId = payload.parentId;
+    }
+
+    const response = await apiClient.post(API_ENDPOINTS.USERS.CREATE, body);
+
+    const apiUser = response.data;
+    return {
+      id: apiUser.id,
+      email: apiUser.email || '',
+      name: `${apiUser.nom || ''} ${apiUser.prenom || ''}`.trim(),
+      surname: apiUser.prenom || '',
+      phone: apiUser.phone,
+      role: normalizeRole(apiUser.role),
+      createdAt: new Date().toISOString(),
+    };
+  },
+
+  toggleUser: async (userId: string): Promise<{ id: number; active: boolean }> => {
+    const response = await apiClient.put(API_ENDPOINTS.USERS.TOGGLE.replace(':id', userId));
+    return response.data;
+  },
+
+  resetPassword: async (userId: string): Promise<{ message: string; user: any; newPassword: string }> => {
+    const response = await apiClient.put(API_ENDPOINTS.USERS.RESET_PASSWORD.replace(':id', userId));
     return response.data;
   },
 };

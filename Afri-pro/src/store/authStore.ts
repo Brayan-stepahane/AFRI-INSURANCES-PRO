@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { User } from '../types/auth.types';
+import { authService } from '../services/auth.service';
 import { storageService } from '../services/storage.service';
 import { STORAGE_KEYS } from '../utils/constants';
 
@@ -46,6 +47,16 @@ export const useAuthStore = create<AuthState>((set) => ({
       const token = await storageService.getSecure(STORAGE_KEYS.AUTH_TOKEN);
       const user = await storageService.getAsync<User>(STORAGE_KEYS.USER);
       set({ token: token || null, user: user || null });
+
+      if (token && !user) {
+        try {
+          const profile = await authService.getProfile();
+          set({ user: profile });
+          storageService.setAsync(STORAGE_KEYS.USER, profile);
+        } catch (error) {
+          console.error('Failed to fetch profile during hydrate:', error);
+        }
+      }
     } catch (error) {
       console.error('Failed to hydrate auth:', error);
     }

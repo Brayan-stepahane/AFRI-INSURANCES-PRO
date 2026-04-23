@@ -52,13 +52,52 @@ export default function ProfileScreen() {
             <Text style={styles.infoValue}>{user?.email || 'Non renseigné'}</Text>
           </View>
 
+          {user?.identifiant && (
+            <>
+              <View style={styles.divider} />
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Identifiant</Text>
+                <Text style={styles.infoValue}>{user.identifiant}</Text>
+              </View>
+            </>
+          )}
+
           {user?.phone && (
             <>
               <View style={styles.divider} />
-
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Téléphone</Text>
                 <Text style={styles.infoValue}>{user.phone}</Text>
+              </View>
+            </>
+          )}
+
+          {user?.role && (
+            <>
+              <View style={styles.divider} />
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Rôle</Text>
+                <Text style={styles.infoValue}>{user.role}</Text>
+              </View>
+            </>
+          )}
+
+          {user?.equipe && (
+            <>
+              <View style={styles.divider} />
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Équipe</Text>
+                <Text style={styles.infoValue}>{user.equipe}</Text>
+              </View>
+            </>
+          )}
+
+          {typeof user?.objectifMensuel === 'number' && (
+            <>
+              <View style={styles.divider} />
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Objectif mensuel</Text>
+                <Text style={styles.infoValue}>{user.objectifMensuel?.toLocaleString('fr-FR')} FCFA</Text>
               </View>
             </>
           )}
@@ -70,7 +109,7 @@ export default function ProfileScreen() {
 
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Statut</Text>
-            <Text style={[styles.infoValue, styles.statusActive]}>Actif</Text>
+            <Text style={[styles.infoValue, styles.statusActive]}>active</Text>
           </View>
 
           <View style={styles.divider} />
