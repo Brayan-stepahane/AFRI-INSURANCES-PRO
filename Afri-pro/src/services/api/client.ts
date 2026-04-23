@@ -37,6 +37,9 @@ const apiClient: AxiosInstance = axios.create({
   },
 });
 
+// Log baseURL for debugging
+console.log('🔌 API Client initialized with baseURL:', ENV.API_URL);
+
 // Add request interceptor to include auth token
 apiClient.interceptors.request.use(
   async (config) => {
