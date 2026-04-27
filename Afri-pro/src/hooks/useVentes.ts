@@ -26,9 +26,7 @@ export function useVentes(refreshKey = 0) {
         produit: v.produit || '',
         dateVente: normalizeDateInput(v.date_vente),
         typeVente: v.type_vente,
-        noPolice: v.no_police || '',
-        noAttestation: v.no_attestation || '',
-        noCarteRose: v.no_carte_rose || '',
+        noPolice: v.no_police && v.no_police !== 'null' ? v.no_police : '',
         primeNette: Number(v.prime_nette) || 0,
         accessoires: Number(v.accessoires) || 0,
         dateEffet: normalizeDateInput(v.date_effet),
@@ -51,3 +49,4 @@ export function useVentes(refreshKey = 0) {
 
   return { ventes, loading, error, refetch: fetchVentes };
 }
+

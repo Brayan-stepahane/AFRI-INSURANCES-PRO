@@ -53,7 +53,7 @@ export default function ClientsScreen() {
     setCreateError('');
 
     try {
-      const response = await apiClient.post(API_ENDPOINTS.CLIENTS.LIST, newClient);
+      const response = await apiClient.post(API_ENDPOINTS.CLIENTS.CREATE, newClient);
       if (response?.data) {
         refetch();
         resetNewClientForm();
@@ -100,6 +100,8 @@ export default function ClientsScreen() {
               {item.telephone && <Text style={styles.clientMeta}>Tel: {item.telephone}</Text>}
               {item.activite && <Text style={styles.clientMeta}>Activité: {item.activite}</Text>}
               {item.type_client && <Text style={styles.clientMeta}>Type: {item.type_client}</Text>}
+              {item.email && <Text style={styles.clientMeta}>Email: {item.email}</Text>}
+              {item.ville && <Text style={styles.clientMeta}>Ville: {item.ville}</Text>}
             </View>
           )}
           contentContainerStyle={styles.list}

@@ -29,6 +29,8 @@ export default function CotationsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [showNewCotationModal, setShowNewCotationModal] = useState(false);
   const [editingCotation, setEditingCotation] = useState<Cotation | null>(null);
+  const [editingProspection, setEditingProspection] = useState<any>(null);
+  const [loadingProspection, setLoadingProspection] = useState(false);
   const [cotationToConvert, setCotationToConvert] = useState<Cotation | null>(null);
   const [showNewVenteModal, setShowNewVenteModal] = useState(false);
 
@@ -243,7 +245,18 @@ export default function CotationsScreen() {
               <Text style={styles.actionBtnText}>→ Convertir en vente</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity style={[styles.actionBtn, styles.actionEdit]} onPress={() => setEditingCotation(c)}>
+          <TouchableOpacity style={[styles.actionBtn, styles.actionEdit]} onPress={async () => {
+            setLoadingProspection(true);
+            try {
+              const response = await apiClient.get(`${API_ENDPOINTS.PROSPECTIONS.LIST}/${c.prospId}`);
+              setEditingProspection(response.data);
+            } catch (error) {
+              console.error('Failed to fetch prospection:', error);
+            } finally {
+              setLoadingProspection(false);
+            }
+            setEditingCotation(c);
+          }}>
             <Text style={styles.actionBtnText}>✏️ Modifier</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.actionBtn, styles.actionDelete]} onPress={() => deleteCotation(c)}>
@@ -335,9 +348,13 @@ export default function CotationsScreen() {
 
       <NewCotationModal
         visible={!!editingCotation}
-        onClose={() => setEditingCotation(null)}
+        onClose={() => {
+          setEditingCotation(null);
+          setEditingProspection(null);
+        }}
         onSubmit={handleCotationSubmit}
         editCotation={editingCotation as any}
+        editProspection={editingProspection}
       />
 
       <NewVenteModal

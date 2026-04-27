@@ -28,7 +28,6 @@ export interface Prospection {
   clientId: string;
   commercial: string;
   produit: string;
-  potentielCA: number;
   chance: number;
   statut: StatutProspection;
   dateContact: string;
@@ -67,8 +66,6 @@ export interface Vente {
   dateVente: string;
   typeVente: TypeVente;
   noPolice: string;
-  noAttestation: string;
-  noCarteRose: string;
   primeNette: number;
   accessoires: number;
   dateEffet: string;

@@ -117,8 +117,6 @@ export default function VentesScreen() {
           no_police: data.noPolice,
           prime_nette: Number(data.primeNette) || 0,
           accessoires: Number(data.accessories) || 0,
-          no_attestation: data.noAttestation,
-          no_carte_rose: data.noCarteRose,
           date_effet: data.dateEffet,
           date_echeance: data.dateEcheance,
         };
@@ -189,8 +187,6 @@ export default function VentesScreen() {
           {v.dateEffet    ? <Text style={styles.dateText}>⚡ Effet : {fmtDate(v.dateEffet)}</Text>    : null}
           {v.dateEcheance ? <Text style={styles.dateText}>🔚 Échéance : {fmtDate(v.dateEcheance)}</Text> : null}
           {v.noPolice     ? <Text style={styles.dateText}>📄 Police : {v.noPolice}</Text>              : null}
-          {v.noAttestation ? <Text style={styles.dateText}>📋 Attestation : {v.noAttestation}</Text>  : null}
-          {v.noCarteRose  ? <Text style={styles.dateText}>🔴 Carte rose : {v.noCarteRose}</Text>       : null}
         </View>
 
         {/* Commercial (manager view) */}

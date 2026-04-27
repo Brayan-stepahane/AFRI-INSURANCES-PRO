@@ -107,10 +107,6 @@ export default function ProspectionsScreen() {
         <Text style={styles.produit}>{p.produit}</Text>
 
         <View style={styles.cardFooter}>
-          <Text style={styles.footerText}>
-            Potentiel :{' '}
-            <Text style={styles.footerBold}>{fmt(p.potentielCA)} FCFA</Text>
-          </Text>
           <Text style={styles.footerText}>Chance : {p.chance}%</Text>
         </View>
 

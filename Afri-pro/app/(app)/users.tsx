@@ -19,19 +19,21 @@ export default function UsersScreen() {
     role: 'commercial' as UserRole,
     phone: '',
     password: '',
-    parentId: '', 
-    objectif_mensuel: 5000000 as number,          // number for consistent calculations
+    parentId: '',
+    objectif_mensuel: 5000000,  // Default 5M for commercial
   });
 
   const [message, setMessage] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [roleOpen, setRoleOpen] = useState(false);
   const [parentOpen, setParentOpen] = useState(false);
+  const [resetModalVisible, setResetModalVisible] = useState(false);
+  const [resetUser, setResetUser] = useState<{id: string, name: string} | null>(null);
 
   const ROLE_OPTIONS: UserRole[] = ['commercial', 'manager_adjoint', 'manager', 'chef_agence', 'admin'];
 
   // Filter possible parents based on selected role
-  const isManagerAdjointRole = (role?: string) => role === 'manager_adjoint' || role === 'manager_adjoint';
+  const isManagerAdjointRole = (role?: string) => role === 'manager_adjoint';
 
   const possibleParents = useMemo(() => {
     switch (formData.role) {
@@ -74,29 +76,29 @@ export default function UsersScreen() {
   };
 
   const handleResetPassword = async (userId: string, userName: string) => {
-    Alert.alert(
-      'Réinitialiser le mot de passe',
-      `Êtes-vous sûr de vouloir réinitialiser le mot de passe de ${userName} ? Le nouveau mot de passe sera "Pass1234!".`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Réinitialiser',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const result = await userService.resetPassword(userId);
-              setMessage(`Mot de passe réinitialisé avec succès. Nouveau mot de passe: ${result.newPassword}`);
-              // Reload users
-              const allUsers = await userService.getUsers();
-              setUsers(allUsers);
-            } catch (err) {
-              setError('Erreur lors de la réinitialisation du mot de passe.');
-              console.error('Failed to reset password:', err);
-            }
-          },
-        },
-      ]
-    );
+    console.log('🚨 ResetPassword called with userId:', userId);
+    setResetUser({ id: userId, name: userName });
+    setResetModalVisible(true);
+  };
+
+  const confirmResetPassword = async () => {
+    if (!resetUser) return;
+    
+    try {
+      console.log('🌐 Calling API resetPassword for userId:', resetUser.id);
+      const result = await userService.resetPassword(resetUser.id);
+      console.log('✅ ResetPassword success:', result);
+      setMessage(`Mot de passe réinitialisé avec succès. Nouveau mot de passe: ${result.newPassword}`);
+      // Reload users
+      const allUsers = await userService.getUsers();
+      setUsers(allUsers);
+    } catch (err: any) {
+      console.error('❌ ResetPassword failed:', err.response?.data || err.message);
+      setError(`Erreur: ${err.response?.data?.error || err.message || 'Réinitialisation échouée'}`);
+    } finally {
+      setResetModalVisible(false);
+      setResetUser(null);
+    }
   };
 
   const handleCreateUser = async () => {
@@ -121,7 +123,7 @@ export default function UsersScreen() {
 
     try {
       // Prepare data for backend - convert parentId correctly
-      const parentIdNum = formData.parentId ? Number(formData.parentId) : null;
+      const parentIdNum = formData.parentId && formData.parentId !== '' ? Number(formData.parentId) : null;
       
       // Verify parentId is valid for roles that require it
       if (['commercial', 'manager_adjoint', 'manager'].includes(formData.role) && !parentIdNum) {
@@ -129,7 +131,7 @@ export default function UsersScreen() {
         return;
       }
 
-      const createData = {
+      const createData: any = {
         name: formData.name.trim(),
         surname: formData.surname.trim(),
         email: formData.email.trim(),
@@ -137,11 +139,11 @@ export default function UsersScreen() {
         phone: formData.phone.trim() || undefined,
         password: formData.password,
         parentId: parentIdNum,
-        objectifMensuel: formData.objectif_mensuel || undefined,
+        objectifMensuel: formData.role === 'commercial' ? formData.objectif_mensuel : undefined,
       };
 
       // Validation
-      if (formData.role === 'commercial' && formData.objectif_mensuel <= 4900000) {
+      if (formData.role === 'commercial' && formData.objectif_mensuel <= 5000000) {
         setError('Objectif mensuel doit être supérieur à 5M FCFA pour un commercial.');
         return;
       }
@@ -160,7 +162,7 @@ export default function UsersScreen() {
         phone: '',
         password: '',
         parentId: '',
-        objectif_mensuel: 0,
+        objectif_mensuel: 5000000,
       });
     } catch (err: any) {
       console.error('Create user error:', err);
@@ -191,15 +193,16 @@ export default function UsersScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <Text style={styles.title}>Gestion des utilisateurs</Text>
-      <Text style={styles.text}>Role: {role}</Text>
+    <View style={{ flex: 1 }}>
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+        <Text style={styles.title}>Gestion des utilisateurs</Text>
+        <Text style={styles.text}>Role: {role}</Text>
 
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
-      {message ? <Text style={styles.successText}>{message}</Text> : null}
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        {message ? <Text style={styles.successText}>{message}</Text> : null}
 
-      <View style={styles.box}>
-        <Text style={styles.subTitle}>Créer un nouvel utilisateur</Text>
+        <View style={styles.box}>
+          <Text style={styles.subTitle}>Créer un nouvel utilisateur</Text>
 
         <TextInput
           style={styles.input}
@@ -296,14 +299,13 @@ export default function UsersScreen() {
             <Modal transparent visible={parentOpen} animationType="fade" onRequestClose={() => setParentOpen(false)}>
               <TouchableOpacity style={styles.modalOverlay} onPress={() => setParentOpen(false)} activeOpacity={1}>
                 <View style={styles.dropdownBox}>
-                  {possibleParents.map((parent) => (
+                  {possibleParents.map((parent, index) => (
                     <TouchableOpacity
-                      key={parent.id || `parent-${Math.random()}`}
+                      key={parent.id ?? `parent-${index}`}
                       style={styles.dropdownItem}
                       onPress={() => {
-                        const parentId = parent.id ? String(parent.id) : null;
-                        if (parentId && parentId !== 'undefined') {
-                          setFormData((prev) => ({ ...prev, parentId }));
+                        if (parent.id) {
+                          setFormData((prev) => ({ ...prev, parentId: parent.id! }));
                           setParentOpen(false);
                         } else {
                           setError('Erreur : Parent ID invalide');
@@ -325,14 +327,17 @@ export default function UsersScreen() {
 {formData.role === 'commercial' && (
         <>
         <Text style={styles.subTitle}>Objectif mensuel (FCFA)</Text>
-          <TextInput
-            style={styles.input}
-            placeholder={formData.objectif_mensuel === 0 ? "Objectif mensuel (FCFA)" : ''}
-            value={formData.objectif_mensuel.toString()}
-            onChangeText={(t) => setFormData((prev) => ({ ...prev, objectif_mensuel: parseFloat(t.replace(/[^0-9.]/g, '')) || 0 }))}
-            keyboardType="numeric"
-            placeholderTextColor={colors.gray400}
-          />
+            <TextInput
+              style={styles.input}
+              placeholder="Objectif mensuel (FCFA)"
+              value={formData.objectif_mensuel > 0 ? formData.objectif_mensuel.toLocaleString() : ''}
+              onChangeText={(t) => {
+                const cleanValue = t.replace(/[^0-9.]/g, '');
+                setFormData((prev) => ({ ...prev, objectif_mensuel: cleanValue ? parseFloat(cleanValue) || 5000000 : 5000000 }));
+              }}
+              keyboardType="numeric"
+              placeholderTextColor={colors.gray400}
+            />
            
         </>
       )}
@@ -347,39 +352,83 @@ export default function UsersScreen() {
       {users.length === 0 ? (
         <Text style={styles.text}>Aucun utilisateur trouvé.</Text>
       ) : (
-        users.map((u) => (
-          <View key={u.id} style={styles.userRow}>
-            <View style={styles.userInfo}>
-              <Text style={styles.userText}>
-                {u.name} {u.surname ? `(${u.surname})` : ''}
-              </Text>
-              <Text style={styles.userMeta}>{u.role?.toUpperCase()} - {u.active ? 'Actif' : 'Inactif'}</Text>
-            </View>
-            {role === 'admin' && (
-              <View style={styles.userActions}>
-                <TouchableOpacity
-                  style={[styles.actionButton, u.active ? styles.deactivateButton : styles.activateButton]}
-                  onPress={() => handleToggleUser(u.id, u.active || false)}
-                >
-                  <Text style={styles.actionButtonText}>
-                    {u.active ? 'Désactiver' : 'Activer'}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.resetButton]}
-                  onPress={() => handleResetPassword(u.id, `${u.name} ${u.surname || ''}`.trim())}
-                >
-                  <Text style={styles.actionButtonText}>Reset MDP</Text>
-                </TouchableOpacity>
+        users.map((u) => {
+          console.log('📋 Rendering user:', u.id, u.name, u.role);
+          if (!u.id) {
+            console.warn('⚠️ Skipping user without ID:', u);
+            return null;
+          }
+          return (
+            <View key={u.id} style={styles.userRow}>
+              <View style={styles.userInfo}>
+                <Text style={styles.userText}>
+                  {u.name} {u.surname ? `(${u.surname})` : ''}
+                </Text>
+                <Text style={styles.userMeta}>{u.role?.toUpperCase()} - {u.active ? 'Actif' : 'Inactif'}</Text>
               </View>
-            )}
-          </View>
-        ))
+              {u.id && role === 'admin' && (
+                <View style={styles.userActions}>
+                  <TouchableOpacity
+                    style={[styles.actionButton, u.active ? styles.deactivateButton : styles.activateButton]}
+                    onPress={() => handleToggleUser(u.id!, u.active || false)}
+                  >
+                    <Text style={styles.actionButtonText}>
+                      {u.active ? 'Désactiver' : 'Activer'}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.resetButton, {opacity: 1, minHeight: 32, paddingHorizontal: 12}]}
+                    onPress={() => {
+                      console.log('🔄 Reset MDP clicked for user:', u.id, u.name);
+                      handleResetPassword(u.id!, `${u.name} ${u.surname || ''}`.trim());
+                    }}
+                  >
+                    <Text style={styles.actionButtonText}>Reset MDP</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          );
+        })
       )}
-    </ScrollView>
+      </ScrollView>
+
+      {/* Reset Password Confirmation Modal */}
+      <Modal
+        transparent
+        visible={resetModalVisible}
+        animationType="fade"
+        onRequestClose={() => setResetModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.resetModalBox}>
+            <Text style={styles.resetModalTitle}>Réinitialiser le mot de passe</Text>
+            <Text style={styles.resetModalText}>
+              Êtes-vous sûr de vouloir réinitialiser le mot de passe?
+            </Text>
+            <Text style={styles.resetModalWarning}>
+              Le nouveau mot de passe sera "Pass1234!".
+            </Text>
+            <View style={styles.resetModalButtons}>
+              <TouchableOpacity
+                style={[styles.resetModalButton, styles.cancelButton]}
+                onPress={() => setResetModalVisible(false)}
+              >
+                <Text style={styles.resetModalButtonText}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.resetModalButton, styles.confirmButton]}
+                onPress={confirmResetPassword}
+              >
+                <Text style={styles.resetModalButtonText}>Réinitialiser</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 }
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.gray50, padding: spacing.xl },
   title: { fontSize: 22, fontWeight: '700', color: colors.violetDark, marginBottom: spacing.sm },
@@ -462,5 +511,59 @@ const styles = StyleSheet.create({
     color: colors.violetDark, 
     marginTop: spacing.sm, 
     marginBottom: spacing.xs 
+  },
+
+  resetModalBox: {
+    backgroundColor: colors.white,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+    padding: spacing.xl,
+    minWidth: 300,
+    maxWidth: 400,
+    alignSelf: 'center',
+  },
+  resetModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.violetDark,
+    marginBottom: spacing.md,
+    textAlign: 'center',
+  },
+  resetModalText: {
+    fontSize: 16,
+    color: colors.gray800,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  resetModalWarning: {
+    fontSize: 14,
+    color: colors.danger,
+    marginBottom: spacing.lg,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  resetModalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  resetModalButton: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+  },
+  resetModalButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.white,
+  },
+  cancelButton: {
+    backgroundColor: colors.gray400,
+  },
+  confirmButton: {
+    backgroundColor: colors.danger,
   },
 });

@@ -18,12 +18,12 @@ export function useProspections(refreshKey = 0) {
       const response = await apiClient.get(API_ENDPOINTS.PROSPECTIONS.LIST);
 
       // Transform snake_case API response to camelCase TypeScript types
-      let transformed = Array.isArray(response.data) ? response.data.map((p: any) => ({
-  id: p.id,
-  clientId: p.client_id,
-  commercial: p.commercial_nom || '',
+        let transformed = Array.isArray(response.data) ? response.data.map((p: any) => ({
+        id: p.id,
+        clientId: p.client_id,
+        clientName: p.client_nom || '',
+        commercial: p.commercial_nom || '',
   produit: p.risque_prospecte || '',
-  potentielCA: Number(p.potentiel_ca) || 0,
   chance: (Number(p.chance_realisation) || 0) * 100,
   statut: p.statut,
   dateContact: normalizeDateInput(p.date_prospection),

@@ -113,7 +113,7 @@ export default function ObjectifsScreen() {
                     <View key={p.id} style={styles.listRow}>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.listNom} numberOfLines={1}>{(p.produit || 'Produit').split(' ').slice(0, 2).join(' ')}</Text>
-                        <Text style={styles.listSub}>{fmt(p.potentielCA)} FCFA</Text>
+                        <Text style={styles.listSub}>{p.dateRelance ? new Date(p.dateRelance).toLocaleDateString('fr-FR') : 'Sans relance'}</Text>
                       </View>
                       <View style={[styles.miniStatut, { backgroundColor: p.statut === 'Cotation envoyée' ? colors.violetPale : colors.warningBg }]}>
                         <Text style={{ fontSize: 9, color: p.statut === 'Cotation envoyée' ? colors.violet : colors.warning }}>{p.statut.split(' ')[0]}</Text>

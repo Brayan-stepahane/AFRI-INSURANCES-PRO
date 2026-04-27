@@ -114,8 +114,8 @@ router.get('/:id', auth, async (req, res) => {
          cot.id AS cotation_id, cot.risque_cote, cot.date_cotation, cot.montant AS cotation_montant,
          cot.date_validation, cot.statut AS cotation_statut,
          v.id AS vente_id, v.produit AS vente_produit, v.prime_nette, v.accessoires,
-         v.ca, v.date_vente, v.type_vente, v.no_police, v.no_attestation,
-         v.no_carte_rose, v.date_effet, v.date_echeance
+         v.ca, v.date_vente, v.type_vente, v.no_police,
+         v.date_effet, v.date_echeance
        FROM prospections p
        JOIN clients c ON p.client_id = c.id
        JOIN users u ON p.commercial_id = u.id
@@ -161,7 +161,7 @@ router.post('/', auth, async (req, res) => {
 
   const {
     clientName, phone, clientType, activity,
-    prospectionDate, product, potentialCA, status, probability,
+    prospectionDate, product, status, probability,
     visitDate1, nextFollowUp, visitDate2, visitDate3,
     previousInsurer, previousContract, observations,
     ratedRisk, quotationDate, quotationAmount, validationDate,
@@ -199,7 +199,7 @@ router.post('/', auth, async (req, res) => {
       ) AS prospection_id`,
       [
         clientName, phone, clientType, activity,
-        commercial_id, prospectionDate, product, potentialCA, status, probability,
+        commercial_id, prospectionDate, product, null, status, probability,
         visitDate1, visitDate2, visitDate3, nextFollowUp,
         previousInsurer, previousContract, observations,
         ratedRisk, quotationDate, quotationAmount, validationDate,
@@ -232,13 +232,15 @@ router.post('/', auth, async (req, res) => {
 // PUT /api/prospections/:id
 router.put('/:id', auth, async (req, res) => {
   const {
-    clientId, product, prospectionDate, potentialCA, probability, status,
+    clientId, product, prospectionDate, probability, status,
     visitDate1, visitDate2, visitDate3, nextFollowUp, observations,
     previousInsurer, previousContract, active
   } = req.body;
   try {
-    // Round probability to 1 decimal place and ensure it's within valid range
-    const roundedProbability = Math.max(0.1, Math.min(1.0, Math.round(probability * 10) / 10));
+    // Normalize probability whether client sends a percentage (60) or a fraction (0.6)
+    const rawProbability = Number(probability) || 0;
+    const effectiveProbability = rawProbability <= 1 ? rawProbability : rawProbability / 100;
+    const roundedProbability = Math.max(0.1, Math.min(1.0, Math.round(effectiveProbability * 10) / 10));
 
     const { rows } = await pool.query(
       `UPDATE prospections SET
@@ -247,11 +249,19 @@ router.put('/:id', auth, async (req, res) => {
         date_visite_3=$9, date_relance=$10, observations=$11,
         ancien_assureur=$12, date_effet_ancien=$13, active=$14, updated_at=NOW()
        WHERE id=$15 RETURNING *`,
-      [clientId, product, prospectionDate, potentialCA, roundedProbability, normalizeProspectionStatus(status),
+      [clientId, product, prospectionDate, null, roundedProbability, normalizeProspectionStatus(status),
        visitDate1, visitDate2, visitDate3, nextFollowUp, observations,
        previousInsurer, previousContract, active, req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Prospection introuvable' });
+
+    if (product) {
+      await pool.query(
+        `UPDATE cotations SET risque_cote = $1 WHERE prospection_id = $2`,
+        [product, req.params.id]
+      );
+    }
+
     res.json(rows[0]);
   } catch (e) {
     console.error('Error updating prospection:', e.message, e.code);

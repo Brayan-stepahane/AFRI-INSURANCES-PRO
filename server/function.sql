@@ -84,8 +84,21 @@ BEGIN
     ELSE 'Premier contact'
   END;
 
-  -- probability 0-100  →  chance_realisation 0.1-1.0
-  v_chance := GREATEST(0.1, LEAST(1.0, ROUND(p_probability / 100.0, 1)))::DECIMAL(3,1);
+  -- probability 0-100 or 0-1  →  chance_realisation 0.1-1.0
+  v_chance := GREATEST(
+    0.1,
+    LEAST(
+      1.0,
+      ROUND(
+        CASE
+          WHEN p_probability IS NULL THEN 0
+          WHEN p_probability <= 1 THEN p_probability
+          ELSE p_probability / 100.0
+        END,
+        1
+      )
+    )
+  )::DECIMAL(3,1);
 
   -- ── 3. PROSPECTION ───────────────────────────────────────────────────────
   INSERT INTO prospections (
@@ -171,8 +184,6 @@ BEGIN
       no_police,
       prime_nette,
       accessoires,
-      no_attestation,
-      no_carte_rose,
       date_effet,
       date_echeance
     )

@@ -26,7 +26,7 @@ export const authService = {
         name: apiUser.name || `${[apiUser.nom, apiUser.prenom].filter(Boolean).join(' ')}`.trim() || apiUser.identifiant || '',
         phone: apiUser.phone,
         role: normalizeRole(apiUser.role),
-        objectifMensuel: apiUser.objectif_mensuel ?? apiUser.objectifMensuel,
+        objectifMensuel: apiUser.objectif_mensuel,
         isDefaultPassword: apiUser.is_default_password,
         createdAt: apiUser.createdAt || new Date().toISOString(),
       },
@@ -60,7 +60,7 @@ export const authService = {
       surname: apiUser.prenom || '',
       phone: apiUser.phone,
       role: normalizeRole(apiUser.role),
-      objectifMensuel: apiUser.objectif_mensuel ?? apiUser.objectifMensuel,
+      objectifMensuel: apiUser.objectif_mensuel,
       createdAt: apiUser.createdAt || new Date().toISOString(),
     };
   },

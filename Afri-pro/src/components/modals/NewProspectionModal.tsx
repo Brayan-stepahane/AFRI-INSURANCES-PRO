@@ -17,9 +17,11 @@ interface ProspectionFormData {
   phone: string;
   clientType: string;
   activity: string;
+  email: string;
+  ville: string;
   prospectionDate: string;
   product: string;
-  potentialCA: string;
+  productCategory: string;
   status: string;
   probability: number;
   visitDate1: string;
@@ -36,12 +38,12 @@ interface ProspectionFormData {
   saleDate: string;
   saleType: string;
   policyNumber: string;
-  attestationNumber: string;
+  
   netPremiums: string;
   accessories: string;
   effectDate: string;
   expiryDate: string;
-  carRoseNumber: string;
+ 
 }
 
 interface NewProspectionModalProps {
@@ -72,19 +74,28 @@ const normalizeProbability = (value: number) => {
   return Math.min(Math.max(value / 100, 0.1), 1);
 };
 
-const PRODUCTS = [
+const PRODUCT_CATEGORIES = ['Vie', 'Non-vie'];
+const VIE_PRODUCTS = [
   'Afrilife étude', 'Afrilife retraite individuelle', 'Afrilife retraite plus',
   'Afrilife libre retraite', 'Afrilife Pension', 'Afrilife prévoyance individuelle',
   'Afrilife Prévoyance groupe', 'Afrilife retraite complémentaire',
-  'Afrilife Indemnité de fin de carrière', 'Assurance Santé Groupe',
-  'Assurance Maritime', 'Automobile', 'Flotte Automobile', 'Assurance Voyage',
-  'Caution de soumission', 'Individuelle Accident', 'Individuelle Accident Groupe',
-  'Multirisque Habitation', 'Responsabilité Civile chef_agence Entreprise',
-  'Transport Marchandise', 'Autre',
+  'Afrilife Indemnité de fin de carrière',
 ];
+const NON_VIE_PRODUCTS = [
+  'Assurance Santé Groupe', 'Assurance Maritime', 'Automobile', 'Flotte Automobile',
+  'Assurance Voyage', 'Caution de soumission', 'Individuelle Accident',
+  'Individuelle Accident Groupe', 'Multirisque Habitation',
+  'Responsabilité Civile chef_agence Entreprise', 'Transport Marchandise', 'Autre',
+];
+const PRODUCTS_BY_CATEGORY: Record<string, string[]> = {
+  Vie: VIE_PRODUCTS,
+  'Non-vie': NON_VIE_PRODUCTS,
+};
+const getCategoryFromProduct = (product: string) =>
+  VIE_PRODUCTS.includes(product) ? 'Vie' : 'Non-vie';
 
 const STATUSES = ['Premier contact', 'En discussion', 'Proposition envoyée', 'Négociation', 'Autre'];
-const SALE_TYPES = ['Nouvelle vente (NouVe)', 'Transfert', 'Augmentation', 'Autre'];
+const SALE_TYPES = ['Nouvelle vente (NouVe)', 'Renouvellement'];
 const RISKS = ['— Non coté —', 'Standard', 'Surcoté', 'Refusé'];
 
 // ==================== SELECT FIELD ====================
@@ -185,14 +196,16 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
   const [form, setForm] = useState<ProspectionFormData>({
     clientId: '', clientName: '', phone: '', clientType: 'Particulier',
     activity: 'chef_agence d\'entreprise',
+    email: '',
+    ville: '',
     prospectionDate: new Date().toISOString().split('T')[0],
-    product: 'Afrilife étude', potentialCA: '', status: 'Premier contact',
+    productCategory: 'Vie', product: 'Afrilife étude', status: 'Premier contact',
     probability: 50, visitDate1: '', nextFollowUp: '', visitDate2: '',
     visitDate3: '', previousInsurer: '', previousContract: '', observations: '',
     ratedRisk: '— Non coté —', quotationDate: '', quotationAmount: '',
     validationDate: '', saleDate: '', saleType: 'Nouvelle vente (NouVe)',
-    policyNumber: '', attestationNumber: '', netPremiums: '', accessories: '1000',
-    effectDate: '', expiryDate: '', carRoseNumber: '',
+    policyNumber: '', netPremiums: '', accessories: '1000',
+    effectDate: '', expiryDate: '', 
   });
 
   const [clientSearchResults, setClientSearchResults] = useState<Client[]>([]);
@@ -201,10 +214,17 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
   const [cotationId, setCotationId] = useState<number | null>(null);
   const [venteId, setVenteId] = useState<number | null>(null);
   const [isLoadingEditData, setIsLoadingEditData] = useState(false);
+  const [editError, setEditError] = useState<string>('');
   const [saveMessage, setSaveMessage] = useState<string>('');
   const [saveError, setSaveError] = useState<string>('');
   const [savedSteps, setSavedSteps] = useState<{ client?: boolean; prospection?: boolean; cotation?: boolean; vente?: boolean }>({});
   const [isSaving, setIsSaving] = useState(false);
+
+  React.useEffect(() => {
+    if (form.product && (form.ratedRisk === '— Non coté —' || form.ratedRisk === '')) {
+      setForm(prev => ({ ...prev, ratedRisk: prev.product }));
+    }
+  }, [form.product]);
 
   // ==================== CLIENT LOGIC (ANTI-DUPLICATE) ====================
   const getOrCreateClientId = async (): Promise<string> => {
@@ -256,8 +276,8 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
       telephone: form.phone?.trim() || '',
       activite: form.activity?.trim() || '',
       type_client: clientType,
-      email: '',
-      ville: '',
+      email: form.email?.trim() || '',
+      ville: form.ville?.trim() || '',
     };
 
     try {
@@ -275,13 +295,13 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
           }
         } catch (e) { /* ignore */ }
 
-        const response = await apiClient.post(API_ENDPOINTS.CLIENTS.LIST, payload);
+        const response = await apiClient.post(API_ENDPOINTS.CLIENTS.CREATE, payload);
         if (response?.data?.id) {
           setForm(prev => ({ ...prev, clientId: response.data.id }));
           return true;
         }
       } else {
-        await apiClient.put(`${API_ENDPOINTS.CLIENTS.LIST}/${clientId}`, payload);
+        await apiClient.put(`${API_ENDPOINTS.CLIENTS.UPDATE}/${clientId}`, payload);
         return true;
       }
     } catch (error: any) {
@@ -306,6 +326,8 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
       phone: client.telephone || prev.phone,
       clientType,
       activity: client.activite || prev.activity,
+      email: client.email || prev.email,
+      ville: client.ville || prev.ville,
     }));
 
     setClientSearchResults([]);
@@ -332,7 +354,7 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
         clientId, clientName: form.clientName.trim(), phone: form.phone?.trim() || '',
         clientType, activity: form.activity?.trim() || '',
         prospectionDate: dateOrNull(form.prospectionDate),
-        product: form.product, potentialCA: numOrNull(form.potentialCA),
+        product: form.product,
         status: form.status, probability: normalizeProbability(form.probability),
         visitDate1: dateOrNull(form.visitDate1), nextFollowUp: dateOrNull(form.nextFollowUp),
         visitDate2: dateOrNull(form.visitDate2), visitDate3: dateOrNull(form.visitDate3),
@@ -341,16 +363,16 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
         quotationDate: dateOrNull(form.quotationDate), quotationAmount: numOrNull(form.quotationAmount),
         validationDate: dateOrNull(form.validationDate), saleDate: dateOrNull(form.saleDate),
         saleType: form.saleType, policyNumber: form.policyNumber || '',
-        attestationNumber: form.attestationNumber || '', netPremiums: numOrNull(form.netPremiums),
+        netPremiums: numOrNull(form.netPremiums),
         accessories: numOrNull(form.accessories), effectDate: dateOrNull(form.effectDate),
-        expiryDate: dateOrNull(form.expiryDate), carRoseNumber: form.carRoseNumber || '',
+        expiryDate: dateOrNull(form.expiryDate),
       };
 
       let response: AxiosResponse<any>;
       if (prospectionId) {
         const updatePayload = {
           clientId, product: form.product, prospectionDate: dateOrNull(form.prospectionDate),
-          potentialCA: numOrNull(form.potentialCA), probability: normalizeProbability(form.probability),
+          probability: normalizeProbability(form.probability),
           status: form.status, visitDate1: dateOrNull(form.visitDate1),
           visitDate2: dateOrNull(form.visitDate2), visitDate3: dateOrNull(form.visitDate3),
           nextFollowUp: dateOrNull(form.nextFollowUp), observations: form.observations || '',
@@ -439,8 +461,6 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
         type_vente: mapSaleType(form.saleType),
         produit: form.product,
         numero_police: form.policyNumber || null,
-        numero_attestation: form.attestationNumber || null,
-        no_carte_rose: form.carRoseNumber || null,
         prime_nette: numOrNull(form.netPremiums),
         accessoires: numOrNull(form.accessories),
         date_effet: dateOrNull(form.effectDate),
@@ -563,7 +583,7 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
 
   const formatSaleTypeToLabel = (type: string) => {
     if (type === 'NouVe') return 'Nouvelle vente (NouVe)';
-    if (type === 'VenRec') return 'Transfert';
+    if (type === 'VenRec') return 'transfert';
     return 'Autre';
   };
 
@@ -577,10 +597,12 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
       phone: data.client_tel || '',
       clientType: data.type_client || 'Particulier',
       activity: data.activite || 'chef_agence d\'entreprise',
+      email: data.email || '',
+      ville: data.ville || '',
       prospectionDate: normalizeDate(data.date_prospection) || new Date().toISOString().split('T')[0],
       product: data.risque_prospecte || 'Afrilife étude',
-      potentialCA: data.potentiel_ca != null ? String(data.potentiel_ca) : '',
       status: data.statut || 'Premier contact',
+      productCategory: getCategoryFromProduct(data.risque_prospecte || 'Afrilife étude'),
       probability,
       visitDate1: normalizeDate(data.date_visite_1) || '',
       nextFollowUp: normalizeDate(data.date_relance) || '',
@@ -596,12 +618,10 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
       saleDate: normalizeDate(data.date_vente) || '',
       saleType: formatSaleTypeToLabel(data.type_vente || ''),
       policyNumber: data.no_police || '',
-      attestationNumber: data.no_attestation || '',
       netPremiums: data.prime_nette != null ? String(data.prime_nette) : '',
       accessories: data.accessoires != null ? String(data.accessoires) : '',
       effectDate: normalizeDate(data.date_effet) || '',
       expiryDate: normalizeDate(data.date_echeance) || '',
-      carRoseNumber: data.no_carte_rose || '',
     };
   };
 
@@ -613,14 +633,16 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
       setForm({
         clientId: '', clientName: '', phone: '', clientType: 'Particulier',
         activity: 'chef_agence d\'entreprise',
+        email: '',
+        ville: '',
         prospectionDate: new Date().toISOString().split('T')[0],
-        product: 'Afrilife étude', potentialCA: '', status: 'Premier contact',
+        productCategory: 'Vie', product: 'Afrilife étude', status: 'Premier contact',
         probability: 50, visitDate1: '', nextFollowUp: '', visitDate2: '',
         visitDate3: '', previousInsurer: '', previousContract: '', observations: '',
         ratedRisk: '— Non coté —', quotationDate: '', quotationAmount: '',
         validationDate: '', saleDate: '', saleType: 'Nouvelle vente (NouVe)',
-        policyNumber: '', attestationNumber: '', netPremiums: '', accessories: '',
-        effectDate: '', expiryDate: '', carRoseNumber: '',
+        policyNumber: '',netPremiums: '', accessories: '',
+        effectDate: '', expiryDate: '',
       });
       setProspectionId(null);
       setCotationId(null);
@@ -652,7 +674,8 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
         });
       } catch (error) {
         console.error('Failed to load prospection for edit:', error);
-        initNewForm();
+        setEditError('Impossible de charger les données complètes. Données partielles utilisées.');
+        if (editProspection) setForm(mapEditProspectionToForm(editProspection));
       } finally {
         setIsLoadingEditData(false);
       }
@@ -769,6 +792,25 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
           onSelect={v => upd('activity', v)}
         />
       </View>
+
+      <Text style={styles.label}>Email</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Email"
+        placeholderTextColor={colors.gray400}
+        value={form.email}
+        onChangeText={v => upd('email', v)}
+        keyboardType="email-address"
+      />
+
+      <Text style={styles.label}>Ville</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Ville"
+        placeholderTextColor={colors.gray400}
+        value={form.ville}
+        onChangeText={v => upd('ville', v)}
+      />
     </ScrollView>
   );
 
@@ -776,44 +818,60 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
     <ScrollView style={styles.formScroll} contentContainerStyle={styles.formContent} keyboardShouldPersistTaps="handled">
       <Text style={styles.subtitle}>Détails de la prospection</Text>
 
-      <View style={styles.row}>
-        <View style={styles.half}>
-          <Text style={styles.label}>Produit / Risque visé *</Text>
-          <SelectField
-            value={form.product}
-            options={PRODUCTS}
-            isOpen={openDropdown === 'product'}
-            onToggle={() => toggle('product')}
-onSelect={v => {
-  upd('product', v);
-  upd('ratedRisk', v);
-}}
-          />
-        </View>
-        <View style={styles.half}>
-          <Text style={styles.label}>Statut *</Text>
-          <SelectField
-            value={form.status}
-            options={STATUSES}
-            isOpen={openDropdown === 'status'}
-            onToggle={() => toggle('status')}
-            onSelect={v => upd('status', v)}
-          />
-        </View>
-      </View>
+      {(() => {
+        const productOptions = PRODUCTS_BY_CATEGORY[form.productCategory] || VIE_PRODUCTS;
+        return (
+          <>
+            <View style={styles.row}>
+              <View style={styles.half}>
+                <Text style={styles.label}>Catégorie produit *</Text>
+                <SelectField
+                  value={form.productCategory}
+                  options={PRODUCT_CATEGORIES}
+                  isOpen={openDropdown === 'productCategory'}
+                  onToggle={() => toggle('productCategory')}
+                  onSelect={(v) => {
+                    const selectedCategory = v;
+                    const options = PRODUCTS_BY_CATEGORY[selectedCategory] || VIE_PRODUCTS;
+                    const selectedProduct = options.includes(form.product) ? form.product : options[0];
+                    upd('productCategory', selectedCategory);
+                    upd('product', selectedProduct);
+                    upd('ratedRisk', selectedProduct);
+                  }}
+                />
+              </View>
+              <View style={styles.half}>
+                <Text style={styles.label}>Statut *</Text>
+                <SelectField
+                  value={form.status}
+                  options={STATUSES}
+                  isOpen={openDropdown === 'status'}
+                  onToggle={() => toggle('status')}
+                  onSelect={v => upd('status', v)}
+                />
+              </View>
+            </View>
+
+            <View style={styles.row}>
+              <View style={styles.half}>
+                <Text style={styles.label}>Produit / Risque visé *</Text>
+                <SelectField
+                  value={form.product}
+                  options={productOptions}
+                  isOpen={openDropdown === 'product'}
+                  onToggle={() => toggle('product')}
+                  onSelect={v => {
+                    upd('product', v);
+                    upd('ratedRisk', v);
+                  }}
+                />
+              </View>
+            </View>
+          </>
+        );
+      })()}
 
       <View style={styles.row}>
-        <View style={styles.half}>
-          <Text style={styles.label}>Potentiel CA (FCFA)</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ex: 250000"
-            value={form.potentialCA}
-            onChangeText={v => upd('potentialCA', v.replace(/[^0-9]/g, ''))}
-            keyboardType="numeric"
-            placeholderTextColor={colors.gray400}
-          />
-        </View>
         <View style={styles.half}>
           <Text style={styles.label}>Chance de réalisation (%)</Text>
           <View style={styles.probabilityContainer}>
@@ -893,7 +951,9 @@ onSelect={v => {
           <Text style={styles.label}>Risque coté</Text>
           <View style={sf.wrapper}>
             <View style={sf.trigger}>
-              <Text style={sf.triggerText} numberOfLines={1}>{form.ratedRisk || form.product}</Text>
+              <Text style={sf.triggerText} numberOfLines={1}>
+                {form.ratedRisk && form.ratedRisk !== '— Non coté —' ? form.ratedRisk : form.product}
+              </Text>
               <Text style={sf.caret}>●</Text>
             </View>
           </View>
@@ -946,12 +1006,8 @@ onSelect={v => {
 
       <View style={styles.row}>
         <View style={styles.half}>
-          <Text style={styles.label}>N° Police EXCEL/ORASS</Text>
+          <Text style={styles.label}>N° Police</Text>
           <TextInput style={styles.input} placeholder="Numéro de police" value={form.policyNumber} onChangeText={v => upd('policyNumber', v)} placeholderTextColor={colors.gray400} />
-        </View>
-        <View style={styles.half}>
-          <Text style={styles.label}>N° Attestation</Text>
-          <TextInput style={styles.input} placeholder="Numéro attestation" value={form.attestationNumber} onChangeText={v => upd('attestationNumber', v)} placeholderTextColor={colors.gray400} />
         </View>
       </View>
 
@@ -976,9 +1032,6 @@ onSelect={v => {
           <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.expiryDate} onChangeText={v => upd('expiryDate', v)} placeholderTextColor={colors.gray400} />
         </View>
       </View>
-
-      <Text style={styles.label}>N° Carte rose (automobile)</Text>
-      <TextInput style={styles.input} placeholder="Numéro carte rose" value={form.carRoseNumber} onChangeText={v => upd('carRoseNumber', v)} placeholderTextColor={colors.gray400} />
     </ScrollView>
   );
 
@@ -992,6 +1045,9 @@ onSelect={v => {
             <Text style={styles.closeButton}>✕</Text>
           </TouchableOpacity>
         </View>
+
+        {isLoadingEditData && <Text style={styles.loadingMsg}>Chargement des données d'édition...</Text>}
+        {editError && <Text style={styles.editError}>{editError}</Text>}
 
         {renderStepIndicator()}
 
@@ -1117,6 +1173,8 @@ const styles = StyleSheet.create({
   nextButtonDisabled: { backgroundColor: colors.gray200 },
   submitButton: { backgroundColor: colors.success },
   nextButtonText: { fontSize: 14, fontWeight: '600', color: colors.white },
+  loadingMsg: { fontSize: 13, color: colors.gray600, paddingHorizontal: spacing.xl, paddingVertical: spacing.sm, textAlign: 'center' },
+  editError: { fontSize: 13, color: colors.danger, paddingHorizontal: spacing.xl, paddingVertical: spacing.sm, textAlign: 'center', backgroundColor: colors.dangerBg },
 });
 
 export default NewProspectionModal;
