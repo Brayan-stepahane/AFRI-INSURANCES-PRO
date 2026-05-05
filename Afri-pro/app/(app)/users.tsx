@@ -27,8 +27,22 @@ export default function UsersScreen() {
   const [error, setError] = useState<string>('');
   const [roleOpen, setRoleOpen] = useState(false);
   const [parentOpen, setParentOpen] = useState(false);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editRoleOpen, setEditRoleOpen] = useState(false);
+  const [editParentOpen, setEditParentOpen] = useState(false);
   const [resetModalVisible, setResetModalVisible] = useState(false);
   const [resetUser, setResetUser] = useState<{id: string, name: string} | null>(null);
+  const [editUserId, setEditUserId] = useState<string | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    surname: '',
+    email: '',
+    role: 'commercial' as UserRole,
+    phone: '',
+    parentId: '',
+    objectif_mensuel: 5000000,
+    equipe: '',
+  });
 
   const ROLE_OPTIONS: UserRole[] = ['commercial', 'manager_adjoint', 'manager', 'chef_agence', 'admin'];
 
@@ -47,6 +61,28 @@ export default function UsersScreen() {
         return [];
     }
   }, [users, formData.role]);
+
+  const editPossibleParents = useMemo(() => {
+    switch (editFormData.role) {
+      case 'commercial':
+        return users.filter(u => isManagerAdjointRole(u.role));
+      case 'manager_adjoint':
+        return users.filter(u => u.role === 'manager');
+      case 'manager':
+        return users.filter(u => u.role === 'chef_agence');
+      default:
+        return [];
+    }
+  }, [users, editFormData.role]);
+
+  const getEditParentLabel = () => {
+    switch (editFormData.role) {
+      case 'commercial': return 'Manager Adjoint';
+      case 'manager_adjoint': return 'Manager';
+      case 'manager': return 'chef_agence d\'Agence';
+      default: return '';
+    }
+  };
 
   useEffect(() => {
     const loadUsers = async () => {
@@ -79,6 +115,65 @@ export default function UsersScreen() {
     console.log('🚨 ResetPassword called with userId:', userId);
     setResetUser({ id: userId, name: userName });
     setResetModalVisible(true);
+  };
+
+  const openEditModal = (user: User) => {
+    setEditUserId(user.id);
+    setEditFormData({
+      name: user.name,
+      surname: user.surname,
+      email: user.email || '',
+      role: user.role || 'commercial',
+      phone: user.phone || '',
+      parentId: user.parent_id ? String(user.parent_id) : '',
+      objectif_mensuel: user.objectifMensuel ? Number(user.objectifMensuel) : 5000000,
+      equipe: user.equipe || '',
+    });
+    setEditModalVisible(true);
+  };
+
+  const handleUpdateUser = async () => {
+    if (!editUserId) {
+      setError('Aucun utilisateur sélectionné pour la modification.');
+      return;
+    }
+
+    if (!editFormData.name || !editFormData.surname) {
+      setError('Nom et prénom sont requis.');
+      return;
+    }
+
+    if (['commercial', 'manager_adjoint', 'manager', 'chef_agence'].includes(editFormData.role) && editFormData.objectif_mensuel <= 5000000) {
+      setError('Objectif mensuel doit être supérieur à 5M FCFA.');
+      return;
+    }
+
+    if (['commercial', 'manager_adjoint', 'manager'].includes(editFormData.role) && !editFormData.parentId) {
+      setError(`Veuillez sélectionner ${getEditParentLabel().toLowerCase()}.`);
+      return;
+    }
+
+    try {
+      const payload = {
+        name: editFormData.name.trim(),
+        surname: editFormData.surname.trim(),
+        email: editFormData.email.trim(),
+        role: editFormData.role,
+        phone: editFormData.phone.trim() || undefined,
+        objectifMensuel: editFormData.objectif_mensuel,
+        parentId: editFormData.parentId ? Number(editFormData.parentId) : null,
+        equipe: editFormData.equipe.trim() || undefined,
+      };
+
+      const updatedUser = await userService.updateUser(editUserId, payload);
+      setUsers((prev) => prev.map((u) => (u.id === editUserId ? { ...u, ...updatedUser } : u)));
+      setMessage('Utilisateur modifié avec succès.');
+      setEditModalVisible(false);
+      setError('');
+    } catch (err: any) {
+      console.error('Update user error:', err);
+      setError(err.response?.data?.error || err.message || 'Erreur lors de la modification de l\'utilisateur.');
+    }
   };
 
   const confirmResetPassword = async () => {
@@ -139,12 +234,12 @@ export default function UsersScreen() {
         phone: formData.phone.trim() || undefined,
         password: formData.password,
         parentId: parentIdNum,
-        objectifMensuel: formData.role === 'commercial' ? formData.objectif_mensuel : undefined,
+        objectifMensuel: formData.objectif_mensuel,
       };
 
       // Validation
-      if (formData.role === 'commercial' && formData.objectif_mensuel <= 5000000) {
-        setError('Objectif mensuel doit être supérieur à 5M FCFA pour un commercial.');
+      if (['commercial', 'manager_adjoint', 'manager', 'chef_agence'].includes(formData.role) && formData.objectif_mensuel <= 5000000) {
+        setError('Objectif mensuel doit être supérieur à 5M FCFA.');
         return;
       }
 
@@ -324,7 +419,7 @@ export default function UsersScreen() {
         )}
 
 
-{formData.role === 'commercial' && (
+{['commercial', 'manager_adjoint', 'manager', 'chef_agence'].includes(formData.role) && (
         <>
         <Text style={styles.subTitle}>Objectif mensuel (FCFA)</Text>
             <TextInput
@@ -369,6 +464,12 @@ export default function UsersScreen() {
               {u.id && role === 'admin' && (
                 <View style={styles.userActions}>
                   <TouchableOpacity
+                    style={[styles.actionButton, styles.editButton]}
+                    onPress={() => openEditModal(u)}
+                  >
+                    <Text style={styles.actionButtonText}>Modifier</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
                     style={[styles.actionButton, u.active ? styles.deactivateButton : styles.activateButton]}
                     onPress={() => handleToggleUser(u.id!, u.active || false)}
                   >
@@ -392,6 +493,149 @@ export default function UsersScreen() {
         })
       )}
       </ScrollView>
+
+      {/* Edit User Modal */}
+      <Modal
+        transparent
+        visible={editModalVisible}
+        animationType="fade"
+        onRequestClose={() => setEditModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.editModalBox}>
+            <Text style={styles.resetModalTitle}>Modifier l'utilisateur</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Nom"
+              value={editFormData.name}
+              onChangeText={(t) => setEditFormData((prev) => ({ ...prev, name: t }))}
+              placeholderTextColor={colors.gray400}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Prénom"
+              value={editFormData.surname}
+              onChangeText={(t) => setEditFormData((prev) => ({ ...prev, surname: t }))}
+              placeholderTextColor={colors.gray400}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              value={editFormData.email}
+              onChangeText={(t) => setEditFormData((prev) => ({ ...prev, email: t }))}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              placeholderTextColor={colors.gray400}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Téléphone (optionnel)"
+              value={editFormData.phone}
+              onChangeText={(t) => setEditFormData((prev) => ({ ...prev, phone: t }))}
+              placeholderTextColor={colors.gray400}
+            />
+            <TouchableOpacity
+              style={[styles.input, styles.dropdownTrigger]}
+              onPress={() => setEditRoleOpen(true)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.inputText}>{editFormData.role}</Text>
+              <Text style={styles.dropdownCaret}>▾</Text>
+            </TouchableOpacity>
+            <Modal transparent visible={editRoleOpen} animationType="fade" onRequestClose={() => setEditRoleOpen(false)}>
+              <TouchableOpacity style={styles.modalOverlay} onPress={() => setEditRoleOpen(false)} activeOpacity={1}>
+                <View style={styles.dropdownBox}>
+                  {ROLE_OPTIONS.map((roleOption) => (
+                    <TouchableOpacity
+                      key={roleOption}
+                      style={styles.dropdownItem}
+                      onPress={() => {
+                        setEditFormData((prev) => ({ ...prev, role: roleOption, parentId: '' }));
+                        setEditRoleOpen(false);
+                      }}
+                    >
+                      <Text style={styles.dropdownItemText}>{roleOption}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </TouchableOpacity>
+            </Modal>
+            {['commercial', 'manager_adjoint', 'manager'].includes(editFormData.role) && (
+              <>
+                <Text style={styles.parentLabel}>{getEditParentLabel()}</Text>
+                <TouchableOpacity
+                  style={[styles.input, styles.dropdownTrigger]}
+                  onPress={() => editPossibleParents.length > 0 && setEditParentOpen(true)}
+                  activeOpacity={0.8}
+                  disabled={editPossibleParents.length === 0}
+                >
+                  <Text style={styles.inputText}>
+                    {editFormData.parentId
+                      ? users.find(u => String(u.id) === editFormData.parentId)?.name || 'Sélectionné'
+                      : editPossibleParents.length > 0
+                        ? `Sélectionnez ${getEditParentLabel().toLowerCase()}`
+                        : `Aucun ${getEditParentLabel().toLowerCase()} disponible`
+                    }
+                  </Text>
+                  <Text style={styles.dropdownCaret}>▾</Text>
+                </TouchableOpacity>
+                <Modal transparent visible={editParentOpen} animationType="fade" onRequestClose={() => setEditParentOpen(false)}>
+                  <TouchableOpacity style={styles.modalOverlay} onPress={() => setEditParentOpen(false)} activeOpacity={1}>
+                    <View style={styles.dropdownBox}>
+                      {editPossibleParents.map((parent, index) => (
+                        <TouchableOpacity
+                          key={parent.id ?? `parent-${index}`}
+                          style={styles.dropdownItem}
+                          onPress={() => {
+                            if (parent.id) {
+                              setEditFormData((prev) => ({ ...prev, parentId: parent.id! }));
+                              setEditParentOpen(false);
+                            }
+                          }}
+                        >
+                          <Text style={styles.dropdownItemText}>
+                            {parent.name} {parent.surname ? `(${parent.surname})` : ''} - {parent.role}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </TouchableOpacity>
+                </Modal>
+              </>
+            )}
+            {['commercial', 'manager_adjoint', 'manager', 'chef_agence'].includes(editFormData.role) && (
+              <>
+                <Text style={styles.subTitle}>Objectif mensuel (FCFA)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Objectif mensuel (FCFA)"
+                  value={editFormData.objectif_mensuel > 0 ? editFormData.objectif_mensuel.toLocaleString() : ''}
+                  onChangeText={(t) => {
+                    const cleanValue = t.replace(/[^0-9.]/g, '');
+                    setEditFormData((prev) => ({ ...prev, objectif_mensuel: cleanValue ? parseFloat(cleanValue) || 5000000 : 5000000 }));
+                  }}
+                  keyboardType="numeric"
+                  placeholderTextColor={colors.gray400}
+                />
+              </>
+            )}
+            <View style={styles.resetModalButtons}>
+              <TouchableOpacity
+                style={[styles.resetModalButton, styles.cancelButton]}
+                onPress={() => setEditModalVisible(false)}
+              >
+                <Text style={styles.resetModalButtonText}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.resetModalButton, styles.confirmButton]}
+                onPress={handleUpdateUser}
+              >
+                <Text style={styles.resetModalButtonText}>Enregistrer</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Reset Password Confirmation Modal */}
       <Modal
@@ -462,6 +706,7 @@ const styles = StyleSheet.create({
   activateButton: { backgroundColor: colors.success },
   deactivateButton: { backgroundColor: colors.danger },
   resetButton: { backgroundColor: colors.orange },
+  editButton: { backgroundColor: colors.violet },
 
   dropdownTrigger: {
     flexDirection: 'row',
@@ -521,6 +766,16 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     minWidth: 300,
     maxWidth: 400,
+    alignSelf: 'center',
+  },
+  editModalBox: {
+    backgroundColor: colors.white,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.gray200,
+    padding: spacing.xl,
+    minWidth: 320,
+    maxWidth: 420,
     alignSelf: 'center',
   },
   resetModalTitle: {

@@ -53,8 +53,15 @@ router.post('/', auth, managerOnly, async (req, res) => {
 
   const normalizedRole = role === 'manager_adjoint' ? 'manager_adjoint' : role;
 
-  if (!nom || !prenom || !identifiant || !email || !mot_de_passe || !normalizedRole) {
-    return res.status(400).json({ error: 'Nom, prénom, identifiant, email, mot de passe et rôle sont requis' });
+  if (!nom || !prenom || !identifiant || !mot_de_passe || !normalizedRole) {
+    return res.status(400).json({ error: 'Nom, prénom, identifiant, mot de passe et rôle sont requis' });
+  }
+
+  // Validate objectif_mensuel for required roles
+  if (['commercial', 'manager_adjoint', 'manager', 'chef_agence'].includes(normalizedRole)) {
+    if (!objectif_mensuel || objectif_mensuel <= 5000000) {
+      return res.status(400).json({ error: 'Objectif mensuel requis et doit être supérieur à 5M FCFA' });
+    }
   }
 
   let finalParentId = parentId ? Number(parentId) : parent_id ? Number(parent_id) : null;
@@ -106,7 +113,7 @@ router.post('/', auth, managerOnly, async (req, res) => {
         nom.trim(),
         prenom.trim(),
         identifiant.trim().toLowerCase(),
-        email.trim().toLowerCase(),
+        email && email.trim() ? email.trim().toLowerCase() : null,
         hash,
         normalizedRole,
         equipe || null,
@@ -139,6 +146,95 @@ router.put('/:id/toggle', auth, managerOnly, async (req, res) => {
     res.json(rows[0]);
   } catch (e) {
     console.error(e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PUT /api/users/:id — Update user details
+router.put('/:id', auth, managerOnly, async (req, res) => {
+  const {
+    nom,
+    prenom,
+    email,
+    role,
+    equipe,
+    parentId,
+    parent_id,
+    objectif_mensuel,
+  } = req.body;
+
+  const normalizedRole = role === 'manager_adjoint' ? 'manager_adjoint' : role;
+  const finalParentId = parentId ? Number(parentId) : parent_id ? Number(parent_id) : null;
+
+  if (!nom || !prenom || !normalizedRole) {
+    return res.status(400).json({ error: 'Nom, prénom et rôle sont requis' });
+  }
+
+  if (['commercial', 'manager_adjoint', 'manager', 'chef_agence'].includes(normalizedRole)) {
+    if (!objectif_mensuel || objectif_mensuel <= 5000000) {
+      return res.status(400).json({ error: 'Objectif mensuel requis et doit être supérieur à 5M FCFA' });
+    }
+  }
+
+  if (['commercial', 'manager_adjoint', 'manager'].includes(normalizedRole) && !finalParentId) {
+    return res.status(400).json({ error: 'Parent requis pour ce rôle' });
+  }
+
+  try {
+    if (finalParentId) {
+      const { rows: parentRows } = await pool.query(
+        'SELECT id, role FROM users WHERE id = $1',
+        [finalParentId]
+      );
+
+      if (parentRows.length === 0) {
+        return res.status(400).json({ error: 'Le supérieur sélectionné n\'existe pas' });
+      }
+
+      const parentRole = parentRows[0].role;
+
+      if (normalizedRole === 'commercial') {
+        if (!['manager_adjoint', 'manager', 'chef_agence'].includes(parentRole)) {
+          return res.status(400).json({ error: 'Le parent d\'un commercial doit être manager_adjoint, manager ou chef_agence' });
+        }
+      } else if (normalizedRole === 'manager_adjoint') {
+        if (!['manager', 'chef_agence', 'admin'].includes(parentRole)) {
+          return res.status(400).json({ error: 'Le parent d\'un manager_adjoint doit être manager, chef_agence ou admin' });
+        }
+      } else if (normalizedRole === 'manager') {
+        if (!['chef_agence', 'admin'].includes(parentRole)) {
+          return res.status(400).json({ error: 'Le parent d\'un manager doit être chef_agence ou admin' });
+        }
+      }
+    }
+
+    const { rows } = await pool.query(
+      `UPDATE users
+       SET nom = $1,
+           prenom = $2,
+           email = $3,
+           role = $4,
+           equipe = $5,
+           objectif_mensuel = $6,
+           parent_id = $7,
+           updated_at = NOW()
+       WHERE id = $8
+       RETURNING id, nom, prenom, identifiant, email, role, equipe, objectif_mensuel, parent_id, active`,
+      [
+        nom.trim(),
+        prenom.trim(),
+        email && email.trim() ? email.trim().toLowerCase() : null,
+        normalizedRole,
+        equipe || null,
+        objectif_mensuel,
+        finalParentId,
+        Number(req.params.id),
+      ]
+    );
+
+    res.json(rows[0]);
+  } catch (e) {
+    console.error('Update user error:', e);
     res.status(500).json({ error: e.message });
   }
 });

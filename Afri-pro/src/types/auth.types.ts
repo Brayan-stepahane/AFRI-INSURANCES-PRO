@@ -9,7 +9,7 @@ export interface User {
   phone?: string;
   role?: UserRole;
   equipe?: string;
-  objectifMensuel?: string;
+  objectifMensuel?: number;
   isDefaultPassword?: boolean;
   createdAt: string;
   manager_id?: number;
@@ -43,7 +43,7 @@ export interface RegisterPayload extends LoginPayload {
 export interface CreateUserPayload {
   name: string;
   surname: string;
-  email: string;
+  email?: string;
   role: UserRole;
   phone?: string;
   password: string;
@@ -52,5 +52,16 @@ export interface CreateUserPayload {
   manager_id?: number;
   chef_agence__id?: number;
   parentId?: number | null;
+}
+
+export interface UpdateUserPayload {
+  name: string;
+  surname: string;
+  email?: string;
+  role: UserRole;
+  phone?: string;
+  objectifMensuel?: number;
+  parentId?: number | null;
+  equipe?: string;
 }
 

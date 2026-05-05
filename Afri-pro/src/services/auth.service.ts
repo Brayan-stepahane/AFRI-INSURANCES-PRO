@@ -1,6 +1,6 @@
 import apiClient from './api/client';
 import { API_ENDPOINTS } from './api/endpoints';
-import { AuthResponse, LoginPayload, RegisterPayload, User, UserRole, CreateUserPayload } from '../types/auth.types';
+import { AuthResponse, LoginPayload, RegisterPayload, User, UserRole, CreateUserPayload, UpdateUserPayload } from '../types/auth.types';
 
 const normalizeRole = (role?: string): UserRole | undefined => {
   if (!role) return undefined;
@@ -118,6 +118,38 @@ export const userService = {
       phone: apiUser.phone,
       role: normalizeRole(apiUser.role),
       createdAt: new Date().toISOString(),
+    };
+  },
+
+  updateUser: async (userId: string, payload: UpdateUserPayload): Promise<User> => {
+    const body: any = {
+      nom: payload.name,
+      prenom: payload.surname,
+      email: payload.email || null,
+      role: payload.role === 'manager_adjoint' ? 'manager_adjoint' : payload.role,
+      phone: payload.phone || null,
+      objectif_mensuel: payload.objectifMensuel,
+      equipe: payload.equipe || null,
+    };
+
+    if (payload.parentId !== undefined) {
+      body.parentId = payload.parentId;
+    }
+
+    const response = await apiClient.put(API_ENDPOINTS.USERS.UPDATE.replace(':id', userId), body);
+    const apiUser = response.data;
+    return {
+      id: apiUser.id.toString(),
+      email: apiUser.email || '',
+      name: `${apiUser.nom || ''} ${apiUser.prenom || ''}`.trim(),
+      surname: apiUser.prenom || '',
+      phone: apiUser.phone,
+      role: normalizeRole(apiUser.role),
+      createdAt: new Date().toISOString(),
+      equipe: apiUser.equipe,
+      objectifMensuel: apiUser.objectif_mensuel ?? apiUser.objectifMensuel,
+      parent_id: apiUser.parent_id,
+      active: apiUser.active,
     };
   },
 
