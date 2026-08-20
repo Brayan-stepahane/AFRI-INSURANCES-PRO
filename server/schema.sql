@@ -283,8 +283,6 @@ WHERE COALESCE(p.active::text, 'true') IN ('t','true','1')
 
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE INDEX IF NOT EXISTS idx_users_parent_id ON users(parent_id);
-CREATE INDEX IF NOT EXISTS idx_users_manager_id ON users(manager_id);
-CREATE INDEX IF NOT EXISTS idx_users_manager_adjoint_id ON users(manager_adjoint_id);
 
 CREATE INDEX IF NOT EXISTS idx_clients_nom ON clients(nom);
 CREATE INDEX IF NOT EXISTS idx_clients_type_client ON clients(type_client);

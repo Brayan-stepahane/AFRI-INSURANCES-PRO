@@ -7,6 +7,7 @@ const pool = new Pool({
   database: process.env.DB_NAME     || 'afri-pro',
   user:     process.env.DB_USER     || 'postgres',
   password: process.env.DB_PASSWORD || '',
+  ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false },
 });
 
 // Test the connection once on startup
