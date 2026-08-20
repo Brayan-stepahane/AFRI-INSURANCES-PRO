@@ -259,7 +259,7 @@ export function NewCotationModal({ visible, onClose, onSubmit, editCotation, edi
     </Modal>
   );
 }
-
+//dist created
 const sf = StyleSheet.create({
   wrapper: { position: 'relative' },
   trigger: {
