@@ -29,7 +29,7 @@ export default function LoginScreen() {
     if (!password.trim())    { setValidationError('Entrez votre mot de passe'); return; }
 
     try {
-      const loggedUser = await login({ identifiant: identifiant, password });
+      const loggedUser = await login({ identifiant: identifiant.trim(), password: password.trim() });
       const role = loggedUser?.role ?? 'commercial';
 
       const roleRoute: Record<string, string> = {

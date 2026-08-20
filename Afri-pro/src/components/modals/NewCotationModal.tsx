@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { useAuth } from '../../hooks/useAuth';
 import { colors, spacing, radius } from '../../config/theme';
-import type { Cotation } from '../../types';
+import type { Cotation, Prospection } from '../../types';
 import apiClient from '../../services/api/client';
 import { API_ENDPOINTS } from '../../services/api/endpoints';
 
@@ -21,9 +21,10 @@ interface NewCotationModalProps {
   onClose: () => void;
   onSubmit?: (data: CotationFormData, isEdit?: boolean, cotationId?: number, options?: { refreshOnly?: boolean }) => void;
   editCotation?: Cotation;
+  editProspection?: Prospection;
 }
 
-const RISKS = ['— Non coté —', 'Standard', 'Surcoté', 'Refusé'];
+// RISKS removed - now uses product selected from prospection
 
 function SelectField({
   value, options, isOpen, onToggle, onSelect,
@@ -87,7 +88,7 @@ function SelectField({
   );
 }
 
-export function NewCotationModal({ visible, onClose, onSubmit, editCotation }: NewCotationModalProps) {
+export function NewCotationModal({ visible, onClose, onSubmit, editCotation, editProspection }: NewCotationModalProps) {
   const { user } = useAuth();
   const [cotationId, setCotationId] = useState<number | null>(editCotation?.id ?? null);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
@@ -109,8 +110,9 @@ export function NewCotationModal({ visible, onClose, onSubmit, editCotation }: N
   // Populate form on edit
   React.useEffect(() => {
     if (editCotation && visible) {
+      const defaultRisque = editCotation.risqueCote || editProspection?.produit || '— Non coté —';
       setForm({
-        risqueCote: editCotation.risqueCote || '— Non coté —',
+        risqueCote: defaultRisque,
         dateCotation: editCotation.dateCotation || new Date().toISOString().split('T')[0],
         montant: String(editCotation.montant || ''),
         dateValidation: editCotation.dateValidation || '',
@@ -127,7 +129,7 @@ export function NewCotationModal({ visible, onClose, onSubmit, editCotation }: N
     }
     setSaveMessage('');
     setSaveError('');
-  }, [editCotation, visible]);
+  }, [editCotation, editProspection, visible]);
 
   const handleSaveCurrentStep = async () => {
     setSaveError('');
@@ -205,13 +207,9 @@ export function NewCotationModal({ visible, onClose, onSubmit, editCotation }: N
             </View>
             <View style={styles.half}>
               <Text style={styles.label}>Risque coté</Text>
-              <SelectField
-                value={form.risqueCote}
-                options={RISKS}
-                isOpen={openDropdown === 'risqueCote'}
-                onToggle={() => toggle('risqueCote')}
-                onSelect={v => upd('risqueCote', v)}
-              />
+              <View style={styles.readOnlyField}>
+                <Text style={styles.readOnlyText}>{form.risqueCote}</Text>
+              </View>
             </View>
           </View>
 
@@ -313,4 +311,6 @@ const styles = StyleSheet.create({
   cancelButtonText: { fontSize: 14, fontWeight: '600', color: colors.gray600 },
   submitButton: { backgroundColor: colors.success, paddingHorizontal: spacing.xl, paddingVertical: spacing.md, borderRadius: radius.sm },
   submitButtonText: { fontSize: 14, fontWeight: '600', color: colors.white },
+  readOnlyField: { borderWidth: 1, borderColor: colors.gray200, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: colors.gray100, minHeight: 40, justifyContent: 'center' },
+  readOnlyText: { fontSize: 14, color: colors.gray600 },
 });

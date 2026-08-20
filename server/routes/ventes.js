@@ -3,6 +3,13 @@ const pool   = require('../db');
 const auth   = require('../middleware/auth');
 const { isManagerAdjointRole, buildHierarchyFilter } = require('../utils/hierarchy');
 
+const normalizePoliceNumber = value => {
+  if (value == null) return null;
+  const text = String(value).trim();
+  if (text === '' || text.toLowerCase() === 'null' || text.toLowerCase() === 'undefined') return null;
+  return text;
+};
+
 // GET /api/ventes
 router.get('/', auth, async (req, res) => {
   try {
@@ -48,14 +55,13 @@ router.post('/', auth, async (req, res) => {
   const {
     prospection_id, cotation_id, client_id,
     date_vente, type_vente, produit, produit_id,
-    no_police, numero_police, no_attestation, numero_attestation,
-    prime_nette, accessoires, no_carte_rose, date_effet, date_echeance
+    no_police, numero_police,
+    prime_nette, accessoires, date_effet, date_echeance
   } = req.body;
   const commercial_id = req.user.role === 'commercial' ? req.user.id : req.body.commercial_id;
 
-  // Handle both naming conventions
-  const finalNoPolice = no_police || numero_police;
-  const finalNoAttestation = no_attestation || numero_attestation;
+  // Handle both naming conventions and normalize explicit null/undefined values
+  const finalNoPolice = normalizePoliceNumber(no_police || numero_police);
 
   try {
     console.log('Creating vente with data:', {
@@ -122,15 +128,19 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ error: 'type_vente invalide' });
     }
 
+    const normalizedPrimeNette = Number(prime_nette) || 0;
+    const normalizedAccessoires = Number(accessoires) || 0;
+    const storedPrimeNette = Math.max(0, normalizedPrimeNette - normalizedAccessoires);
+
     const { rows } = await pool.query(
       `INSERT INTO ventes
         (prospection_id, cotation_id, client_id, commercial_id, date_vente,
-         type_vente, produit, produit_id, no_police, prime_nette, accessoires, no_attestation,
-         no_carte_rose, date_effet, date_echeance)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+         type_vente, produit, produit_id, no_police, prime_nette, accessoires, 
+          date_effet, date_echeance)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
       [prospId, cotation_id, client_id, commercial_id, date_vente,
-       type_vente, produitVal, produitIdVal, finalNoPolice, prime_nette || 0, accessoires || 0,
-       finalNoAttestation, no_carte_rose || null, date_effet || null, date_echeance || null]
+       type_vente, produitVal, produitIdVal, finalNoPolice, storedPrimeNette, normalizedAccessoires,
+       date_effet || null, date_echeance || null]
     );
 
     // Mettre à jour la prospection et la cotation
@@ -160,16 +170,16 @@ router.put('/:id', auth, async (req, res) => {
   const {
     produit, produit_id, date_vente, dateVente, type_vente, typeVente,
     no_police, numero_police, noPolice, prime_nette, primeNette,
-    accessoires, no_attestation, numero_attestation, no_carte_rose, noCarteRose,
+    accessoires, 
     date_effet, dateEffet, date_echeance, dateEcheance
   } = req.body;
 
   const finalDateVente = date_vente || dateVente;
   const finalTypeVente = type_vente || typeVente;
-  const finalNoPolice = no_police || numero_police || noPolice;
-  const finalPrimeNette = prime_nette || primeNette;
-  const finalNoAttestation = no_attestation || numero_attestation;
-  const finalNoCarteRose = no_carte_rose || noCarteRose;
+  const finalNoPolice = normalizePoliceNumber(no_police || numero_police || noPolice);
+  const rawPrimeNette = Number(prime_nette != null ? prime_nette : primeNette) || 0;
+  const normalizedAccessoires = Number(accessoires) || 0;
+  const finalPrimeNette = Math.max(0, rawPrimeNette - normalizedAccessoires);
   const finalDateEffet = date_effet || dateEffet;
   const finalDateEcheance = date_echeance || dateEcheance;
 
@@ -202,12 +212,11 @@ router.put('/:id', auth, async (req, res) => {
 
     const { rows } = await pool.query(
       `UPDATE ventes SET produit=$1, produit_id=$2, date_vente=$3, type_vente=$4, no_police=$5,
-       prime_nette=$6, accessoires=$7, no_attestation=$8, no_carte_rose=$9,
-       date_effet=$10, date_echeance=$11, updated_at=NOW()
-       WHERE id=$12 RETURNING *`,
-      [produitVal, produitIdVal, finalDateVente, finalTypeVente, finalNoPolice, finalPrimeNette || 0, 
-       accessoires || 0, finalNoAttestation, finalNoCarteRose, finalDateEffet, finalDateEcheance, 
-       req.params.id]
+       prime_nette=$6, accessoires=$7,
+       date_effet=$8, date_echeance=$9, updated_at=NOW()
+       WHERE id=$10 RETURNING *`,
+      [produitVal, produitIdVal, finalDateVente, finalTypeVente, finalNoPolice, finalPrimeNette,
+       normalizedAccessoires, finalDateEffet, finalDateEcheance, req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Vente introuvable' });
     res.json(rows[0]);

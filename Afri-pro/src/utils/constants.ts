@@ -16,10 +16,10 @@ export const HTTP_STATUS = {
 
 // Utility functions
 export const fmt = (n: number | string | null | undefined): string => {
+  if (n === null || n === undefined) return '0';
   const value = typeof n === 'string' ? Number(n) : n;
-  return typeof value === 'number' && !Number.isNaN(value)
-    ? value.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
-    : '';
+  if (typeof value !== 'number' || Number.isNaN(value)) return '0';
+  return value.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 };
 
 export const fmtDate = (d: string): string =>

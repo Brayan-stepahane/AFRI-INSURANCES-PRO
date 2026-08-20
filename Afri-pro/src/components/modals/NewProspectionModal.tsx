@@ -17,9 +17,11 @@ interface ProspectionFormData {
   phone: string;
   clientType: string;
   activity: string;
+  email: string;
+  ville: string;
   prospectionDate: string;
   product: string;
-  potentialCA: string;
+  productCategory: string;
   status: string;
   probability: number;
   visitDate1: string;
@@ -36,12 +38,12 @@ interface ProspectionFormData {
   saleDate: string;
   saleType: string;
   policyNumber: string;
-  attestationNumber: string;
+  
   netPremiums: string;
   accessories: string;
   effectDate: string;
   expiryDate: string;
-  carRoseNumber: string;
+ 
 }
 
 interface NewProspectionModalProps {
@@ -72,19 +74,28 @@ const normalizeProbability = (value: number) => {
   return Math.min(Math.max(value / 100, 0.1), 1);
 };
 
-const PRODUCTS = [
+const PRODUCT_CATEGORIES = ['Vie', 'Non-vie'];
+const VIE_PRODUCTS = [
   'Afrilife étude', 'Afrilife retraite individuelle', 'Afrilife retraite plus',
   'Afrilife libre retraite', 'Afrilife Pension', 'Afrilife prévoyance individuelle',
   'Afrilife Prévoyance groupe', 'Afrilife retraite complémentaire',
-  'Afrilife Indemnité de fin de carrière', 'Assurance Santé Groupe',
-  'Assurance Maritime', 'Automobile', 'Flotte Automobile', 'Assurance Voyage',
-  'Caution de soumission', 'Individuelle Accident', 'Individuelle Accident Groupe',
-  'Multirisque Habitation', 'Responsabilité Civile chef_agence Entreprise',
-  'Transport Marchandise', 'Autre',
+  'Afrilife Indemnité de fin de carrière',
 ];
+const NON_VIE_PRODUCTS = [
+  'Assurance Santé Groupe', 'Assurance Maritime', 'Automobile', 'Flotte Automobile',
+  'Assurance Voyage', 'Caution de soumission', 'Individuelle Accident',
+  'Individuelle Accident Groupe', 'Multirisque Habitation',
+  'Responsabilité Civile chef_agence Entreprise', 'Transport Marchandise', 'Autre',
+];
+const PRODUCTS_BY_CATEGORY: Record<string, string[]> = {
+  Vie: VIE_PRODUCTS,
+  'Non-vie': NON_VIE_PRODUCTS,
+};
+const getCategoryFromProduct = (product: string) =>
+  VIE_PRODUCTS.includes(product) ? 'Vie' : 'Non-vie';
 
 const STATUSES = ['Premier contact', 'En discussion', 'Proposition envoyée', 'Négociation', 'Autre'];
-const SALE_TYPES = ['Nouvelle vente (NouVe)', 'Transfert', 'Augmentation', 'Autre'];
+const SALE_TYPES = ['Nouvelle vente (NouVe)', 'Renouvellement'];
 const RISKS = ['— Non coté —', 'Standard', 'Surcoté', 'Refusé'];
 
 // ==================== SELECT FIELD ====================
@@ -185,14 +196,16 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
   const [form, setForm] = useState<ProspectionFormData>({
     clientId: '', clientName: '', phone: '', clientType: 'Particulier',
     activity: 'chef_agence d\'entreprise',
+    email: '',
+    ville: '',
     prospectionDate: new Date().toISOString().split('T')[0],
-    product: 'Afrilife étude', potentialCA: '', status: 'Premier contact',
+    productCategory: 'Vie', product: 'Afrilife étude', status: 'Premier contact',
     probability: 50, visitDate1: '', nextFollowUp: '', visitDate2: '',
     visitDate3: '', previousInsurer: '', previousContract: '', observations: '',
     ratedRisk: '— Non coté —', quotationDate: '', quotationAmount: '',
     validationDate: '', saleDate: '', saleType: 'Nouvelle vente (NouVe)',
-    policyNumber: '', attestationNumber: '', netPremiums: '', accessories: '1000',
-    effectDate: '', expiryDate: '', carRoseNumber: '',
+    policyNumber: '', netPremiums: '', accessories: '1000',
+    effectDate: '', expiryDate: '', 
   });
 
   const [clientSearchResults, setClientSearchResults] = useState<Client[]>([]);
@@ -201,10 +214,17 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
   const [cotationId, setCotationId] = useState<number | null>(null);
   const [venteId, setVenteId] = useState<number | null>(null);
   const [isLoadingEditData, setIsLoadingEditData] = useState(false);
+  const [editError, setEditError] = useState<string>('');
   const [saveMessage, setSaveMessage] = useState<string>('');
   const [saveError, setSaveError] = useState<string>('');
   const [savedSteps, setSavedSteps] = useState<{ client?: boolean; prospection?: boolean; cotation?: boolean; vente?: boolean }>({});
   const [isSaving, setIsSaving] = useState(false);
+
+  React.useEffect(() => {
+    if (form.product && (form.ratedRisk === '— Non coté —' || form.ratedRisk === '')) {
+      setForm(prev => ({ ...prev, ratedRisk: prev.product }));
+    }
+  }, [form.product]);
 
   // ==================== CLIENT LOGIC (ANTI-DUPLICATE) ====================
   const getOrCreateClientId = async (): Promise<string> => {
@@ -256,32 +276,33 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
       telephone: form.phone?.trim() || '',
       activite: form.activity?.trim() || '',
       type_client: clientType,
-      email: '',
-      ville: '',
+      email: form.email?.trim() || '',
+      ville: form.ville?.trim() || '',
     };
 
     try {
       if (clientId.startsWith('CLI')) {
         try {
           const checkRes = await apiClient.get(API_ENDPOINTS.CLIENTS.LIST, {
-            params: { nom: payload.nom, limit: 5 }
+            params: { search: payload.nom, limit: 5 }
           });
           const duplicate = (checkRes.data || []).find((c: any) =>
             c.nom?.trim().toLowerCase() === payload.nom.toLowerCase()
           );
           if (duplicate) {
             setForm(prev => ({ ...prev, clientId: duplicate.id }));
+            await apiClient.put(`${API_ENDPOINTS.CLIENTS.UPDATE}/${duplicate.id}`, payload);
             return true;
           }
         } catch (e) { /* ignore */ }
 
-        const response = await apiClient.post(API_ENDPOINTS.CLIENTS.LIST, payload);
+        const response = await apiClient.post(API_ENDPOINTS.CLIENTS.CREATE, payload);
         if (response?.data?.id) {
           setForm(prev => ({ ...prev, clientId: response.data.id }));
           return true;
         }
       } else {
-        await apiClient.put(`${API_ENDPOINTS.CLIENTS.LIST}/${clientId}`, payload);
+        await apiClient.put(`${API_ENDPOINTS.CLIENTS.UPDATE}/${clientId}`, payload);
         return true;
       }
     } catch (error: any) {
@@ -306,6 +327,8 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
       phone: client.telephone || prev.phone,
       clientType,
       activity: client.activite || prev.activity,
+      email: client.email || prev.email,
+      ville: client.ville || prev.ville,
     }));
 
     setClientSearchResults([]);
@@ -332,8 +355,8 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
         clientId, clientName: form.clientName.trim(), phone: form.phone?.trim() || '',
         clientType, activity: form.activity?.trim() || '',
         prospectionDate: dateOrNull(form.prospectionDate),
-        product: form.product, potentialCA: numOrNull(form.potentialCA),
-        status: form.status, probability: normalizeProbability(form.probability),
+        product: form.product,
+        status: form.status, probability: form.probability,
         visitDate1: dateOrNull(form.visitDate1), nextFollowUp: dateOrNull(form.nextFollowUp),
         visitDate2: dateOrNull(form.visitDate2), visitDate3: dateOrNull(form.visitDate3),
         previousInsurer: form.previousInsurer || '', previousContract: dateOrNull(form.previousContract),
@@ -341,16 +364,16 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
         quotationDate: dateOrNull(form.quotationDate), quotationAmount: numOrNull(form.quotationAmount),
         validationDate: dateOrNull(form.validationDate), saleDate: dateOrNull(form.saleDate),
         saleType: form.saleType, policyNumber: form.policyNumber || '',
-        attestationNumber: form.attestationNumber || '', netPremiums: numOrNull(form.netPremiums),
+        netPremiums: numOrNull(form.netPremiums),
         accessories: numOrNull(form.accessories), effectDate: dateOrNull(form.effectDate),
-        expiryDate: dateOrNull(form.expiryDate), carRoseNumber: form.carRoseNumber || '',
+        expiryDate: dateOrNull(form.expiryDate),
       };
 
       let response: AxiosResponse<any>;
       if (prospectionId) {
         const updatePayload = {
           clientId, product: form.product, prospectionDate: dateOrNull(form.prospectionDate),
-          potentialCA: numOrNull(form.potentialCA), probability: normalizeProbability(form.probability),
+          probability: normalizeProbability(form.probability),
           status: form.status, visitDate1: dateOrNull(form.visitDate1),
           visitDate2: dateOrNull(form.visitDate2), visitDate3: dateOrNull(form.visitDate3),
           nextFollowUp: dateOrNull(form.nextFollowUp), observations: form.observations || '',
@@ -439,8 +462,6 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
         type_vente: mapSaleType(form.saleType),
         produit: form.product,
         numero_police: form.policyNumber || null,
-        numero_attestation: form.attestationNumber || null,
-        no_carte_rose: form.carRoseNumber || null,
         prime_nette: numOrNull(form.netPremiums),
         accessoires: numOrNull(form.accessories),
         date_effet: dateOrNull(form.effectDate),
@@ -563,7 +584,7 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
 
   const formatSaleTypeToLabel = (type: string) => {
     if (type === 'NouVe') return 'Nouvelle vente (NouVe)';
-    if (type === 'VenRec') return 'Transfert';
+    if (type === 'VenRec') return 'transfert';
     return 'Autre';
   };
 
@@ -577,10 +598,12 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
       phone: data.client_tel || '',
       clientType: data.type_client || 'Particulier',
       activity: data.activite || 'chef_agence d\'entreprise',
+      email: data.email || '',
+      ville: data.ville || '',
       prospectionDate: normalizeDate(data.date_prospection) || new Date().toISOString().split('T')[0],
       product: data.risque_prospecte || 'Afrilife étude',
-      potentialCA: data.potentiel_ca != null ? String(data.potentiel_ca) : '',
       status: data.statut || 'Premier contact',
+      productCategory: getCategoryFromProduct(data.risque_prospecte || 'Afrilife étude'),
       probability,
       visitDate1: normalizeDate(data.date_visite_1) || '',
       nextFollowUp: normalizeDate(data.date_relance) || '',
@@ -596,12 +619,10 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
       saleDate: normalizeDate(data.date_vente) || '',
       saleType: formatSaleTypeToLabel(data.type_vente || ''),
       policyNumber: data.no_police || '',
-      attestationNumber: data.no_attestation || '',
       netPremiums: data.prime_nette != null ? String(data.prime_nette) : '',
       accessories: data.accessoires != null ? String(data.accessoires) : '',
       effectDate: normalizeDate(data.date_effet) || '',
       expiryDate: normalizeDate(data.date_echeance) || '',
-      carRoseNumber: data.no_carte_rose || '',
     };
   };
 
@@ -613,14 +634,16 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
       setForm({
         clientId: '', clientName: '', phone: '', clientType: 'Particulier',
         activity: 'chef_agence d\'entreprise',
+        email: '',
+        ville: '',
         prospectionDate: new Date().toISOString().split('T')[0],
-        product: 'Afrilife étude', potentialCA: '', status: 'Premier contact',
+        productCategory: 'Vie', product: 'Afrilife étude', status: 'Premier contact',
         probability: 50, visitDate1: '', nextFollowUp: '', visitDate2: '',
         visitDate3: '', previousInsurer: '', previousContract: '', observations: '',
         ratedRisk: '— Non coté —', quotationDate: '', quotationAmount: '',
         validationDate: '', saleDate: '', saleType: 'Nouvelle vente (NouVe)',
-        policyNumber: '', attestationNumber: '', netPremiums: '', accessories: '',
-        effectDate: '', expiryDate: '', carRoseNumber: '',
+        policyNumber: '',netPremiums: '', accessories: '',
+        effectDate: '', expiryDate: '',
       });
       setProspectionId(null);
       setCotationId(null);
@@ -652,7 +675,8 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
         });
       } catch (error) {
         console.error('Failed to load prospection for edit:', error);
-        initNewForm();
+        setEditError('Impossible de charger les données complètes. Données partielles utilisées.');
+        if (editProspection) setForm(mapEditProspectionToForm(editProspection));
       } finally {
         setIsLoadingEditData(false);
       }
@@ -672,6 +696,142 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
 
   const upd = (field: keyof ProspectionFormData, value: any) =>
     setForm(prev => ({ ...prev, [field]: value }));
+
+  const [datePickerVisible, setDatePickerVisible] = useState(false);
+  const [datePickerField, setDatePickerField] = useState<keyof ProspectionFormData | null>(null);
+  const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+
+  const parseDateValue = (value: string | undefined): Date | null => {
+    if (!value) return null;
+    const normalized = normalizeDate(value);
+    const parts = normalized.split('-');
+    if (parts.length !== 3) return null;
+    const [year, month, day] = parts;
+    const date = new Date(Number(year), Number(month) - 1, Number(day));
+    return Number.isNaN(date.getTime()) ? null : date;
+  };
+
+  const formatDateDisplay = (date: Date) => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`;
+  };
+
+  const getMonthCalendar = (baseDate: Date) => {
+    const year = baseDate.getFullYear();
+    const month = baseDate.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const firstWeekDay = firstDay.getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const weeks: Date[][] = [];
+    let currentDay = 1 - firstWeekDay;
+
+    for (let weekIndex = 0; weekIndex < 6; weekIndex += 1) {
+      const week: Date[] = [];
+      for (let dayIndex = 0; dayIndex < 7; dayIndex += 1) {
+        week.push(new Date(year, month, currentDay));
+        currentDay += 1;
+      }
+      weeks.push(week);
+    }
+    return weeks;
+  };
+
+  const isSameDay = (a: Date, b: Date) =>
+    a.getDate() === b.getDate() && a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear();
+
+  const openDatePicker = (field: keyof ProspectionFormData, value: string) => {
+    const parsed = parseDateValue(value) || new Date();
+    setCalendarMonth(new Date(parsed.getFullYear(), parsed.getMonth(), 1));
+    setSelectedDate(parsed);
+    setDatePickerField(field);
+    setDatePickerVisible(true);
+  };
+
+  const closeDatePicker = () => {
+    setDatePickerVisible(false);
+    setDatePickerField(null);
+  };
+
+  const confirmDatePicker = () => {
+    if (datePickerField && selectedDate) {
+      upd(datePickerField, formatDateDisplay(selectedDate));
+    }
+    closeDatePicker();
+  };
+
+  const DateInput = ({ label, value, placeholder, field }: { label: string; value: string; placeholder: string; field: keyof ProspectionFormData }) => (
+    <View>
+      <Text style={styles.label}>{label}</Text>
+      <TouchableOpacity style={[styles.input, styles.dateInput]} onPress={() => openDatePicker(field, value)}>
+        <Text style={[styles.dateInputText, !value && styles.placeholderText]}>
+          {value || placeholder}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderDatePickerModal = () => {
+    const monthTitle = calendarMonth.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+    const weeks = getMonthCalendar(calendarMonth);
+    const weekDays = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+
+    return (
+      <Modal visible={datePickerVisible} transparent animationType="fade">
+        <View style={styles.calendarBackdrop}>
+          <TouchableOpacity style={styles.calendarBackdropTouch} onPress={closeDatePicker} />
+          <View style={styles.calendarModal}>
+            <View style={styles.calendarHeader}>
+              <TouchableOpacity onPress={() => setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}>
+                <Text style={styles.calendarNav}>‹</Text>
+              </TouchableOpacity>
+              <Text style={styles.calendarTitle}>{monthTitle}</Text>
+              <TouchableOpacity onPress={() => setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}>
+                <Text style={styles.calendarNav}>›</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.calendarWeekRow}>
+              {weekDays.map(day => (
+                <Text key={day} style={[styles.calendarWeekDay, styles.calendarWeekDayLabel]}>{day}</Text>
+              ))}
+            </View>
+            {weeks.map((week, weekIndex) => (
+              <View key={weekIndex} style={styles.calendarWeekRow}>
+                {week.map(day => {
+                  const isCurrentMonth = day.getMonth() === calendarMonth.getMonth();
+                  const isSelected = selectedDate ? isSameDay(day, selectedDate) : false;
+                  return (
+                    <TouchableOpacity
+                      key={day.toISOString()}
+                      style={[
+                        styles.calendarDay,
+                        !isCurrentMonth && styles.calendarDayInactive,
+                        isSelected && styles.calendarDaySelected,
+                      ]}
+                      onPress={() => setSelectedDate(day)}
+                      disabled={!isCurrentMonth}
+                    >
+                      <Text style={[styles.calendarDayText, isSelected && styles.calendarDayTextSelected, !isCurrentMonth && styles.calendarDayTextInactive]}>
+                        {day.getDate()}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ))}
+            <View style={styles.calendarActions}>
+              <TouchableOpacity onPress={closeDatePicker} style={styles.calendarActionButton}>
+                <Text style={styles.calendarActionText}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={confirmDatePicker} style={[styles.calendarActionButton, styles.calendarActionConfirm]} disabled={!selectedDate}>
+                <Text style={[styles.calendarActionText, styles.calendarActionConfirmText]}>Valider</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
 
   const handleSearchClient = () => {
     const query = form.clientName.trim();
@@ -769,6 +929,25 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
           onSelect={v => upd('activity', v)}
         />
       </View>
+
+      <Text style={styles.label}>Email</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Email"
+        placeholderTextColor={colors.gray400}
+        value={form.email}
+        onChangeText={v => upd('email', v)}
+        keyboardType="email-address"
+      />
+
+      <Text style={styles.label}>Ville</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Ville"
+        placeholderTextColor={colors.gray400}
+        value={form.ville}
+        onChangeText={v => upd('ville', v)}
+      />
     </ScrollView>
   );
 
@@ -776,44 +955,60 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
     <ScrollView style={styles.formScroll} contentContainerStyle={styles.formContent} keyboardShouldPersistTaps="handled">
       <Text style={styles.subtitle}>Détails de la prospection</Text>
 
-      <View style={styles.row}>
-        <View style={styles.half}>
-          <Text style={styles.label}>Produit / Risque visé *</Text>
-          <SelectField
-            value={form.product}
-            options={PRODUCTS}
-            isOpen={openDropdown === 'product'}
-            onToggle={() => toggle('product')}
-onSelect={v => {
-  upd('product', v);
-  upd('ratedRisk', v);
-}}
-          />
-        </View>
-        <View style={styles.half}>
-          <Text style={styles.label}>Statut *</Text>
-          <SelectField
-            value={form.status}
-            options={STATUSES}
-            isOpen={openDropdown === 'status'}
-            onToggle={() => toggle('status')}
-            onSelect={v => upd('status', v)}
-          />
-        </View>
-      </View>
+      {(() => {
+        const productOptions = PRODUCTS_BY_CATEGORY[form.productCategory] || VIE_PRODUCTS;
+        return (
+          <>
+            <View style={styles.row}>
+              <View style={styles.half}>
+                <Text style={styles.label}>Catégorie produit *</Text>
+                <SelectField
+                  value={form.productCategory}
+                  options={PRODUCT_CATEGORIES}
+                  isOpen={openDropdown === 'productCategory'}
+                  onToggle={() => toggle('productCategory')}
+                  onSelect={(v) => {
+                    const selectedCategory = v;
+                    const options = PRODUCTS_BY_CATEGORY[selectedCategory] || VIE_PRODUCTS;
+                    const selectedProduct = options.includes(form.product) ? form.product : options[0];
+                    upd('productCategory', selectedCategory);
+                    upd('product', selectedProduct);
+                    upd('ratedRisk', selectedProduct);
+                  }}
+                />
+              </View>
+              <View style={styles.half}>
+                <Text style={styles.label}>Statut *</Text>
+                <SelectField
+                  value={form.status}
+                  options={STATUSES}
+                  isOpen={openDropdown === 'status'}
+                  onToggle={() => toggle('status')}
+                  onSelect={v => upd('status', v)}
+                />
+              </View>
+            </View>
+
+            <View style={styles.row}>
+              <View style={styles.half}>
+                <Text style={styles.label}>Produit / Risque visé *</Text>
+                <SelectField
+                  value={form.product}
+                  options={productOptions}
+                  isOpen={openDropdown === 'product'}
+                  onToggle={() => toggle('product')}
+                  onSelect={v => {
+                    upd('product', v);
+                    upd('ratedRisk', v);
+                  }}
+                />
+              </View>
+            </View>
+          </>
+        );
+      })()}
 
       <View style={styles.row}>
-        <View style={styles.half}>
-          <Text style={styles.label}>Potentiel CA (FCFA)</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ex: 250000"
-            value={form.potentialCA}
-            onChangeText={v => upd('potentialCA', v.replace(/[^0-9]/g, ''))}
-            keyboardType="numeric"
-            placeholderTextColor={colors.gray400}
-          />
-        </View>
         <View style={styles.half}>
           <Text style={styles.label}>Chance de réalisation (%)</Text>
           <View style={styles.probabilityContainer}>
@@ -836,23 +1031,19 @@ onSelect={v => {
         </View>
       </View>
 
-      <Text style={styles.label}>Date visite 1</Text>
-      <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.visitDate1} onChangeText={v => upd('visitDate1', v)} placeholderTextColor={colors.gray400} />
+      <DateInput label="Date visite 1" value={form.visitDate1} placeholder="jj/mm/aaaa" field="visitDate1" />
 
       <View style={styles.row}>
         <View style={styles.half}>
-          <Text style={styles.label}>Prochaine relance</Text>
-          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.nextFollowUp} onChangeText={v => upd('nextFollowUp', v)} placeholderTextColor={colors.gray400} />
+          <DateInput label="Prochaine relance" value={form.nextFollowUp} placeholder="jj/mm/aaaa" field="nextFollowUp" />
           <Text style={styles.helperText}>Alerte automatique à cette date</Text>
         </View>
         <View style={styles.half}>
-          <Text style={styles.label}>Date visite 2</Text>
-          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.visitDate2} onChangeText={v => upd('visitDate2', v)} placeholderTextColor={colors.gray400} />
+          <DateInput label="Date visite 2" value={form.visitDate2} placeholder="jj/mm/aaaa" field="visitDate2" />
         </View>
       </View>
 
-      <Text style={styles.label}>Date visite 3</Text>
-      <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.visitDate3} onChangeText={v => upd('visitDate3', v)} placeholderTextColor={colors.gray400} />
+      <DateInput label="Date visite 3" value={form.visitDate3} placeholder="jj/mm/aaaa" field="visitDate3" />
 
       <View style={styles.row}>
         <View style={styles.half}>
@@ -860,8 +1051,7 @@ onSelect={v => {
           <TextInput style={styles.input} placeholder="Nom compagnie" value={form.previousInsurer} onChangeText={v => upd('previousInsurer', v)} placeholderTextColor={colors.gray400} />
         </View>
         <View style={styles.half}>
-          <Text style={styles.label}>Échéance ancien contrat</Text>
-          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.previousContract} onChangeText={v => upd('previousContract', v)} placeholderTextColor={colors.gray400} />
+          <DateInput label="Échéance ancien contrat" value={form.previousContract} placeholder="jj/mm/aaaa" field="previousContract" />
         </View>
       </View>
 
@@ -893,14 +1083,15 @@ onSelect={v => {
           <Text style={styles.label}>Risque coté</Text>
           <View style={sf.wrapper}>
             <View style={sf.trigger}>
-              <Text style={sf.triggerText} numberOfLines={1}>{form.ratedRisk || form.product}</Text>
+              <Text style={sf.triggerText} numberOfLines={1}>
+                {form.ratedRisk && form.ratedRisk !== '— Non coté —' ? form.ratedRisk : form.product}
+              </Text>
               <Text style={sf.caret}>●</Text>
             </View>
           </View>
         </View>
         <View style={styles.half}>
-          <Text style={styles.label}>Date de cotation</Text>
-          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.quotationDate} onChangeText={v => upd('quotationDate', v)} placeholderTextColor={colors.gray400} />
+          <DateInput label="Date de cotation" value={form.quotationDate} placeholder="jj/mm/aaaa" field="quotationDate" />
         </View>
       </View>
 
@@ -910,8 +1101,7 @@ onSelect={v => {
           <TextInput style={styles.input} placeholder="Ex: 105 000" value={form.quotationAmount} onChangeText={v => upd('quotationAmount', v)} placeholderTextColor={colors.gray400} />
         </View>
         <View style={styles.half}>
-          <Text style={styles.label}>Date de validation</Text>
-          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.validationDate} onChangeText={v => upd('validationDate', v)} placeholderTextColor={colors.gray400} />
+          <DateInput label="Date de validation" value={form.validationDate} placeholder="jj/mm/aaaa" field="validationDate" />
         </View>
       </View>
     </ScrollView>
@@ -929,8 +1119,7 @@ onSelect={v => {
 
       <View style={styles.row}>
         <View style={styles.half}>
-          <Text style={styles.label}>Date de vente</Text>
-          <TextInput style={styles.input} placeholder="dd/mm/yyyy" value={form.saleDate} onChangeText={v => upd('saleDate', v)} placeholderTextColor={colors.gray400} />
+          <DateInput label="Date de vente" value={form.saleDate} placeholder="dd/mm/yyyy" field="saleDate" />
         </View>
         <View style={styles.half}>
           <Text style={styles.label}>Type de vente</Text>
@@ -946,12 +1135,8 @@ onSelect={v => {
 
       <View style={styles.row}>
         <View style={styles.half}>
-          <Text style={styles.label}>N° Police EXCEL/ORASS</Text>
+          <Text style={styles.label}>N° Police</Text>
           <TextInput style={styles.input} placeholder="Numéro de police" value={form.policyNumber} onChangeText={v => upd('policyNumber', v)} placeholderTextColor={colors.gray400} />
-        </View>
-        <View style={styles.half}>
-          <Text style={styles.label}>N° Attestation</Text>
-          <TextInput style={styles.input} placeholder="Numéro attestation" value={form.attestationNumber} onChangeText={v => upd('attestationNumber', v)} placeholderTextColor={colors.gray400} />
         </View>
       </View>
 
@@ -968,17 +1153,12 @@ onSelect={v => {
 
       <View style={styles.row}>
         <View style={styles.half}>
-          <Text style={styles.label}>Date d'effet</Text>
-          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.effectDate} onChangeText={v => upd('effectDate', v)} placeholderTextColor={colors.gray400} />
+          <DateInput label="Date d'effet" value={form.effectDate} placeholder="jj/mm/aaaa" field="effectDate" />
         </View>
         <View style={styles.half}>
-          <Text style={styles.label}>Date d'échéance</Text>
-          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.expiryDate} onChangeText={v => upd('expiryDate', v)} placeholderTextColor={colors.gray400} />
+          <DateInput label="Date d'échéance" value={form.expiryDate} placeholder="jj/mm/aaaa" field="expiryDate" />
         </View>
       </View>
-
-      <Text style={styles.label}>N° Carte rose (automobile)</Text>
-      <TextInput style={styles.input} placeholder="Numéro carte rose" value={form.carRoseNumber} onChangeText={v => upd('carRoseNumber', v)} placeholderTextColor={colors.gray400} />
     </ScrollView>
   );
 
@@ -993,10 +1173,14 @@ onSelect={v => {
           </TouchableOpacity>
         </View>
 
+        {isLoadingEditData && <Text style={styles.loadingMsg}>Chargement des données d'édition...</Text>}
+        {editError && <Text style={styles.editError}>{editError}</Text>}
+
         {renderStepIndicator()}
 
         {saveMessage ? <Text style={styles.saveMessage}>{saveMessage}</Text> : null}
         {saveError ? <Text style={styles.saveError}>{saveError}</Text> : null}
+        {renderDatePickerModal()}
 
         <View style={styles.formArea}>
           {step === 1 && renderStep1()}
@@ -1067,6 +1251,26 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.gray100 },
   title: { fontSize: 18, fontWeight: '700', color: colors.violetDark },
   closeButton: { fontSize: 22, color: colors.gray400 },
+  calendarBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center' },
+  calendarBackdropTouch: { ...StyleSheet.absoluteFillObject },
+  calendarModal: { width: '90%', maxWidth: 360, backgroundColor: colors.white, borderRadius: radius.lg, overflow: 'hidden', padding: spacing.md },
+  calendarHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
+  calendarNav: { fontSize: 24, color: colors.violet, paddingHorizontal: spacing.sm },
+  calendarTitle: { fontSize: 16, fontWeight: '700', color: colors.gray800 },
+  calendarWeekRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.xs },
+  calendarWeekDay: { width: 36, textAlign: 'center', fontSize: 12, color: colors.gray400 },
+  calendarWeekDayLabel: { fontWeight: '700' },
+  calendarDay: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 18, marginBottom: spacing.xs },
+  calendarDayInactive: { opacity: 0.35 },
+  calendarDaySelected: { backgroundColor: colors.violet },
+  calendarDayText: { fontSize: 13, color: colors.gray800 },
+  calendarDayTextInactive: { color: colors.gray400 },
+  calendarDayTextSelected: { color: colors.white, fontWeight: '700' },
+  calendarActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm, marginTop: spacing.md },
+  calendarActionButton: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.sm },
+  calendarActionText: { fontSize: 14, color: colors.violet, fontWeight: '700' },
+  calendarActionConfirm: { backgroundColor: colors.violet },
+  calendarActionConfirmText: { color: colors.white },
   stepContainer: { flexDirection: 'row', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, gap: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.gray100 },
   stepBox: { flex: 1, paddingVertical: spacing.md, paddingHorizontal: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.gray200, backgroundColor: colors.white, alignItems: 'center' },
   stepBoxActive: { backgroundColor: colors.violet, borderColor: colors.violet },
@@ -1082,6 +1286,9 @@ const styles = StyleSheet.create({
   hint: { fontSize: 13, color: colors.gray400, marginBottom: spacing.lg },
   label: { fontSize: 13, fontWeight: '600', color: colors.gray800, marginBottom: spacing.sm, marginTop: spacing.md },
   input: { borderWidth: 1, borderColor: colors.gray200, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: 14, color: colors.gray800, backgroundColor: colors.white, minHeight: 40 },
+  dateInput: { justifyContent: 'center' },
+  dateInputText: { fontSize: 14, color: colors.gray800 },
+  placeholderText: { color: colors.gray400 },
   textarea: { minHeight: 80, paddingTop: spacing.sm, textAlignVertical: 'top' },
   helperText: { fontSize: 12, color: colors.gray400, marginTop: 4 },
   searchRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },
@@ -1117,6 +1324,8 @@ const styles = StyleSheet.create({
   nextButtonDisabled: { backgroundColor: colors.gray200 },
   submitButton: { backgroundColor: colors.success },
   nextButtonText: { fontSize: 14, fontWeight: '600', color: colors.white },
+  loadingMsg: { fontSize: 13, color: colors.gray600, paddingHorizontal: spacing.xl, paddingVertical: spacing.sm, textAlign: 'center' },
+  editError: { fontSize: 13, color: colors.danger, paddingHorizontal: spacing.xl, paddingVertical: spacing.sm, textAlign: 'center', backgroundColor: colors.dangerBg },
 });
 
 export default NewProspectionModal;

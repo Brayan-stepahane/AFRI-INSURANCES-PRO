@@ -28,7 +28,6 @@ export interface Prospection {
   clientId: string;
   commercial: string;
   produit: string;
-  potentielCA: number;
   chance: number;
   statut: StatutProspection;
   dateContact: string;
@@ -67,8 +66,6 @@ export interface Vente {
   dateVente: string;
   typeVente: TypeVente;
   noPolice: string;
-  noAttestation: string;
-  noCarteRose: string;
   primeNette: number;
   accessoires: number;
   dateEffet: string;
@@ -77,14 +74,24 @@ export interface Vente {
 
 export interface Objectif {
   mensuel: number;
+  mensuelVie: number;
+  mensuelNonVie: number;
   reporte: number;
+  reporteVie: number;
+  reporteNonVie: number;
 }
 
 export interface ObjectifEntry {
   commercial: string;
   mensuel: number;
+  mensuelVie: number;
+  mensuelNonVie: number;
   reporte: number;
+  reporteVie: number;
+  reporteNonVie: number;
   caRealise: number;
+  caVie: number;
+  caNonVie: number;
   total: number;
   pct: number;
   reste: number;

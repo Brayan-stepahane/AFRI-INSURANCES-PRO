@@ -13,12 +13,16 @@ export const API_ENDPOINTS = {
   USERS: {
     LIST: '/api/users',
     CREATE: '/api/users',
+    UPDATE: '/api/users/:id',
     TOGGLE: '/api/users/:id/toggle',
     RESET_PASSWORD: '/api/users/:id/reset-password',
   },
   DASHBOARD: {
     STATS: '/api/dashboard',
     CA_HISTORIQUE: '/api/dashboard/ca-historique',
+  },
+  OBJECTIFS: {
+    ALLOCATE: '/api/objectifs/allocate',
   },
   COTATIONS: {
     LIST: '/api/cotations',

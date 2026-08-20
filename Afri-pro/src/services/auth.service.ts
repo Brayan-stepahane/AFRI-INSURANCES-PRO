@@ -1,6 +1,6 @@
 import apiClient from './api/client';
 import { API_ENDPOINTS } from './api/endpoints';
-import { AuthResponse, LoginPayload, RegisterPayload, User, UserRole, CreateUserPayload } from '../types/auth.types';
+import { AuthResponse, LoginPayload, RegisterPayload, User, UserRole, CreateUserPayload, UpdateUserPayload } from '../types/auth.types';
 
 const normalizeRole = (role?: string): UserRole | undefined => {
   if (!role) return undefined;
@@ -11,8 +11,8 @@ const normalizeRole = (role?: string): UserRole | undefined => {
 export const authService = {
   login: async (payload: LoginPayload): Promise<AuthResponse> => {
     const response = await apiClient.post(API_ENDPOINTS.AUTH.LOGIN, {
-      identifiant: payload.identifiant,
-      password: payload.password,
+      identifiant: payload.identifiant.trim(),
+      password: payload.password.trim(),
     });
 
     const apiUser = response.data.user;
@@ -21,12 +21,12 @@ export const authService = {
       user: {
         id: apiUser.id,
         identifiant: apiUser.identifiant,
-        surname: apiUser.prenom || '',
+        surname: apiUser.prenom,
         email: apiUser.email ,
         name: apiUser.name || `${[apiUser.nom, apiUser.prenom].filter(Boolean).join(' ')}`.trim() || apiUser.identifiant || '',
         phone: apiUser.phone,
         role: normalizeRole(apiUser.role),
-        objectifMensuel: apiUser.objectif_mensuel ?? apiUser.objectifMensuel,
+        objectifMensuel: apiUser.objectif_mensuel,
         isDefaultPassword: apiUser.is_default_password,
         createdAt: apiUser.createdAt || new Date().toISOString(),
       },
@@ -60,7 +60,7 @@ export const authService = {
       surname: apiUser.prenom || '',
       phone: apiUser.phone,
       role: normalizeRole(apiUser.role),
-      objectifMensuel: apiUser.objectif_mensuel ?? apiUser.objectifMensuel,
+      objectifMensuel: apiUser.objectif_mensuel,
       createdAt: apiUser.createdAt || new Date().toISOString(),
     };
   },
@@ -92,16 +92,19 @@ export const userService = {
   },
 
   createUser: async (payload: CreateUserPayload): Promise<User> => {
+    const normalizedRole = payload.role === 'manager_adjoint' ? 'manager_adjoint' : payload.role;
     const body: any = {
       nom: payload.name,
       prenom: payload.surname,
-      identifiant: payload.name.trim().toLowerCase().replace(/\s+/g, ''),
-      email: payload.email || null,
+      identifiant: payload.surname ? payload.surname.trim().toLowerCase() : '',
       mot_de_passe: payload.password,
-      role: payload.role === 'manager_adjoint' ? 'manager_adjoint' : payload.role,
+      role: normalizedRole,
       phone: payload.phone || null,
-      objectif_mensuel: payload.objectifMensuel || 500000,
     };
+
+    if (normalizedRole !== 'admin') {
+      body.objectif_mensuel = payload.objectifMensuel || 500000;
+    }
 
     if (payload.parentId && payload.parentId > 0) {
       body.parentId = payload.parentId;
@@ -112,12 +115,49 @@ export const userService = {
     const apiUser = response.data;
     return {
       id: apiUser.id,
+      identifiant: apiUser.identifiant,
       email: apiUser.email || '',
       name: `${apiUser.nom || ''} ${apiUser.prenom || ''}`.trim(),
       surname: apiUser.prenom || '',
       phone: apiUser.phone,
       role: normalizeRole(apiUser.role),
       createdAt: new Date().toISOString(),
+    };
+  },
+
+  updateUser: async (userId: string, payload: UpdateUserPayload): Promise<User> => {
+    const normalizedRole = payload.role === 'manager_adjoint' ? 'manager_adjoint' : payload.role;
+    const body: any = {
+      nom: payload.name,
+      prenom: payload.surname,
+      role: normalizedRole,
+      phone: payload.phone || null,
+      equipe: payload.equipe || null,
+    };
+
+    if (normalizedRole !== 'admin') {
+      body.objectif_mensuel = payload.objectifMensuel;
+    }
+
+    if (payload.parentId !== undefined) {
+      body.parentId = payload.parentId;
+    }
+
+    const response = await apiClient.put(API_ENDPOINTS.USERS.UPDATE.replace(':id', userId), body);
+    const apiUser = response.data;
+    return {
+      id: apiUser.id.toString(),
+      identifiant: apiUser.identifiant,
+      email: apiUser.email || '',
+      name: `${apiUser.nom || ''} ${apiUser.prenom || ''}`.trim(),
+      surname: apiUser.prenom || '',
+      phone: apiUser.phone,
+      role: normalizeRole(apiUser.role),
+      createdAt: new Date().toISOString(),
+      equipe: apiUser.equipe,
+      objectifMensuel: apiUser.objectif_mensuel ?? apiUser.objectifMensuel,
+      parent_id: apiUser.parent_id,
+      active: apiUser.active,
     };
   },
 

@@ -61,7 +61,6 @@ export function useDashboardStats(refreshKey = 0): DashboardStats {
           clientId: p.client_id,
           commercial: p.commercial_nom || '',
           produit: p.risque_prospecte || '',
-          potentielCA: Number(p.potentiel_ca) || 0,
           chance: (Number(p.chance_realisation) || 0) * 100,
           statut: p.statut,
           dateContact: normalizeDateInput(p.date_prospection),
@@ -96,8 +95,6 @@ export function useDashboardStats(refreshKey = 0): DashboardStats {
           dateVente: normalizeDateInput(v.date_vente),
           typeVente: v.type_vente,
           noPolice: v.no_police || '',
-          noAttestation: v.no_attestation || '',
-          noCarteRose: v.no_carte_rose || '',
           primeNette: Number(v.prime_nette) || 0,
           accessoires: Number(v.accessoires) || 0,
           dateEffet: normalizeDateInput(v.date_effet),
@@ -160,8 +157,14 @@ export function useObjective(refreshKey = 0) {
   const { user, token } = useAuth();
   const [objective, setObjective] = useState({
     mensuel: 500000,
+    mensuelVie: 250000,
+    mensuelNonVie: 250000,
     reporte: 0,
+    reporteVie: 0,
+    reporteNonVie: 0,
     ca: 0,
+    caVie: 0,
+    caNonVie: 0,
     total: 500000,
     pct: 0,
     reste: 500000,
@@ -181,20 +184,34 @@ export function useObjective(refreshKey = 0) {
 
         const dashboardData = await api.get(API_ENDPOINTS.DASHBOARD.STATS, token);
 
-        // Get objective data from dashboard API
-        const objData = dashboardData.objectifs?.[0] || { objectif_mensuel: user?.objectifMensuel || 500000, reporte: 0, ca_realise: 0 };
+        // Get objective data for the current user from dashboard API
+        const objectives = dashboardData.objectifs || [];
+        const currentUserObjectif = objectives.find((obj: any) => String(obj.commercial_id) === String(user?.id));
+        const objData = currentUserObjectif || objectives[0] || { objectif_mensuel: user?.objectifMensuel || 500000, reporte: 0, ca_realise: 0 };
 
-        const mensuel = objData.objectif_mensuel || user?.objectifMensuel || 500000;
-        const reporte = objData.reporte || 0;
-        const ca = objData.ca_realise || 0;
+        const mensuel = Number(objData.objectif_mensuel || user?.objectifMensuel || 500000);
+        const mensuelVie = Number(objData.objectif_mensuel_vie || mensuel / 2);
+        const mensuelNonVie = Number(objData.objectif_mensuel_non_vie || mensuel / 2);
+        const reporte = Number(objData.reporte || 0);
+        const reporteVie = Number(objData.montant_reporte_vie || 0);
+        const reporteNonVie = Number(objData.montant_reporte_non_vie || 0);
+        const ca = Number(objData.ca_realise || 0);
+        const caVie = Number(objData.ca_vie || 0);
+        const caNonVie = Number(objData.ca_non_vie || 0);
         const total = mensuel + reporte;
         const pct = total > 0 ? Math.min(100, Math.round((ca / total) * 100)) : 0;
         const reste = Math.max(0, total - ca);
 
         setObjective({
           mensuel,
+          mensuelVie,
+          mensuelNonVie,
           reporte,
+          reporteVie,
+          reporteNonVie,
           ca,
+          caVie,
+          caNonVie,
           total,
           pct,
           reste,
@@ -246,8 +263,14 @@ export function useTeamObjectives(refreshKey = 0) {
             const mapped = {
               commercial: obj.commercial_nom,
               mensuel: Number(obj.objectif_mensuel || obj.montant_mensuel) || 0,
+              mensuelVie: Number(obj.objectif_mensuel_vie) || (Number(obj.objectif_mensuel || obj.montant_mensuel) || 0) / 2,
+              mensuelNonVie: Number(obj.objectif_mensuel_non_vie) || (Number(obj.objectif_mensuel || obj.montant_mensuel) || 0) / 2,
               reporte: Number(obj.reporte || obj.montant_reporte) || 0,
+              reporteVie: Number(obj.montant_reporte_vie) || 0,
+              reporteNonVie: Number(obj.montant_reporte_non_vie) || 0,
               ca: Number(obj.ca_realise) || 0,
+              caVie: Number(obj.ca_vie) || 0,
+              caNonVie: Number(obj.ca_non_vie) || 0,
               total: Number(obj.total_objectif) || (Number(obj.objectif_mensuel || obj.montant_mensuel) || 0) + (Number(obj.reporte || obj.montant_reporte) || 0),
               pct: Number(obj.pct_atteint) || 0,
               reste: Number(obj.montant_restant) || 0,

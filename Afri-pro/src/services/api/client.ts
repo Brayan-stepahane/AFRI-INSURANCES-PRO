@@ -40,28 +40,51 @@ const apiClient: AxiosInstance = axios.create({
 // Log baseURL for debugging
 console.log('🔌 API Client initialized with baseURL:', ENV.API_URL);
 
-// Add request interceptor to include auth token
+// Add request interceptor to include auth token + LOG ALL REQUESTS
 apiClient.interceptors.request.use(
   async (config) => {
+    console.log('🚀 API REQUEST:', config.method?.toUpperCase(), config.url, {
+      baseURL: ENV.API_URL,
+      headers: config.headers,
+      data: config.data ? '[HIDDEN DATA]' : null
+    });
+    
     try {
       const token = await getToken();
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
+        console.log('🔑 Token added');
+      } else {
+        console.log('⚠️ No token found');
       }
     } catch (error) {
-      console.error('Failed to add auth token to request:', error);
+      console.error('❌ Failed to add auth token:', error);
     }
     return config;
   },
-  (error) => Promise.reject(error),
+  (error) => {
+    console.error('❌ Request interceptor error:', error);
+    return Promise.reject(error);
+  },
 );
 
-// Add response interceptor for error handling
+// Add response interceptor for error handling + LOGGING
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log('✅ API RESPONSE:', response.status, response.config.url);
+    return response;
+  },
   async (error) => {
+    console.error('❌ API ERROR:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      url: error.config?.url,
+      data: error.response?.data,
+      message: error.message
+    });
+    
     if (error.response?.status === 401) {
-      // Handle unauthorized - clear token
+      console.log('🔓 401 - Clearing token');
       await removeToken();
     }
     return Promise.reject(error);

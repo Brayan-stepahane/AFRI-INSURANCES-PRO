@@ -7,16 +7,22 @@ const auth = require('../middleware/auth');
 // POST /api/auth/login
 router.post('/login', async (req, res) => {
   try {
-    const { identifiant, password } = req.body;
+    let { identifiant, password } = req.body;
 
     if (!identifiant || !password) {
       return res.status(400).json({ error: 'Identifiant et mot de passe requis' });
     }
 
-    // Get user from database
+    identifiant = identifiant.toString().trim();
+    password = password.toString().trim();
+    const normalizedIdentifier = identifiant.toLowerCase();
+
+    // Get user from database by username, case-insensitive
     const { rows } = await pool.query(
-      'SELECT id, nom, prenom, identifiant, mot_de_passe, role, equipe, objectif_mensuel, active, is_default_password FROM users WHERE identifiant = $1',
-      [identifiant]
+      `SELECT id, nom, prenom, identifiant, mot_de_passe, role, equipe, objectif_mensuel, active, is_default_password
+       FROM users
+       WHERE LOWER(TRIM(identifiant)) = $1`,
+      [normalizedIdentifier]
     );
 
     if (rows.length === 0) {
@@ -72,14 +78,26 @@ router.post('/login', async (req, res) => {
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
   try {
-    const { identifiant, password, nom, prenom, role = 'commercial', equipe, objectif_mensuel = 0 } = req.body;
+    const {
+      identifiant,
+      password,
+      nom,
+      prenom,
+      role = 'commercial',
+      equipe,
+      objectif_mensuel = 0,
+      email,
+    } = req.body;
 
     if (!identifiant || !password || !nom || !prenom) {
       return res.status(400).json({ error: 'Identifiant, mot de passe, nom et prénom requis' });
     }
 
     // Check if user already exists
-    const { rows: existing } = await pool.query('SELECT id FROM users WHERE identifiant = $1', [identifiant]);
+    const { rows: existing } = await pool.query(
+      'SELECT id FROM users WHERE identifiant = $1',
+      [identifiant]
+    );
     if (existing.length > 0) {
       return res.status(409).json({ error: 'Identifiant déjà utilisé' });
     }
@@ -87,10 +105,30 @@ router.post('/register', async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Insert user
+    // Email can be optional in requests, but DB should never receive NULL
+    const normalizedRole = role === 'manager_adjoint' ? 'manager_adjoint' : role;
+    const normalizedIdentifiant = identifiant.toString().trim().toLowerCase();
+    const finalEmail = email && email.toString().trim()
+      ? email.toString().trim().toLowerCase()
+      : `${normalizedIdentifiant}@local.test`;
+    const finalObjectif = normalizedRole === 'admin' ? null : objectif_mensuel || 0;
+
+    // Insert user (9 columns, 8 placeholders + active=true)
     const { rows } = await pool.query(
-      'INSERT INTO users (nom, prenom, identifiant, mot_de_passe, role, equipe, objectif_mensuel, active) VALUES ($1, $2, $3, $4, $5, $6, $7, true) RETURNING id, nom, prenom, identifiant, role, equipe',
-      [nom, prenom, identifiant, hashedPassword, role, equipe, objectif_mensuel]
+      `INSERT INTO users
+         (nom, prenom, identifiant, email, mot_de_passe, role, equipe, objectif_mensuel, active)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true)
+       RETURNING id, nom, prenom, identifiant, email, role, equipe`,
+      [
+        nom,
+        prenom,
+        normalizedIdentifiant,
+        finalEmail,
+        hashedPassword,
+        normalizedRole,
+        equipe,
+        finalObjectif,
+      ]
     );
 
     const user = rows[0];
@@ -116,6 +154,7 @@ router.post('/register', async (req, res) => {
         nom: user.nom,
         prenom: user.prenom,
         identifiant: user.identifiant,
+        email: user.email,
         role: user.role,
         equipe: user.equipe,
         objectif_mensuel: objectif_mensuel,
@@ -126,6 +165,7 @@ router.post('/register', async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
 
 // POST /api/auth/logout
 router.post('/logout', auth, (req, res) => {

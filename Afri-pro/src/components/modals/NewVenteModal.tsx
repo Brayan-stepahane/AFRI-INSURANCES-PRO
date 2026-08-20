@@ -17,8 +17,6 @@ interface VenteFormData {
   dateVente: string;
   typeVente: string;
   noPolice: string;
-  noAttestation: string;
-  noCarteRose: string;
   primeNette: string;
   accessories: string;
   dateEffet: string;
@@ -43,7 +41,7 @@ const PRODUCTS = [
   'Multirisque Habitation', 'Responsabilité Civile chef_agence Entreprise',
   'Transport Marchandise', 'Autre',
 ];
-const SALE_TYPES = ['Nouvelle vente (NouVe)', 'Transfert', 'Augmentation', 'Autre'];
+const SALE_TYPES = ['Nouvelle vente (NouVe)', 'Renouvellement'];
 
 function SelectField({
   value, options, isOpen, onToggle, onSelect,
@@ -133,8 +131,6 @@ export function NewVenteModal({ visible, onClose, onSubmit, editVente, fromCotat
     dateVente: new Date().toISOString().split('T')[0],
     typeVente: 'Nouvelle vente (NouVe)',
     noPolice: '',
-    noAttestation: '',
-    noCarteRose: '',
     primeNette: '',
     accessories: '',
     dateEffet: '',
@@ -156,8 +152,6 @@ export function NewVenteModal({ visible, onClose, onSubmit, editVente, fromCotat
         dateVente: new Date().toISOString().split('T')[0],
         typeVente: 'Nouvelle vente (NouVe)',
         noPolice: '',
-        noAttestation: '',
-        noCarteRose: '',
         primeNette: String(fromCotation.montant || 0),
         accessories: '1000',
         dateEffet: '',
@@ -171,10 +165,8 @@ export function NewVenteModal({ visible, onClose, onSubmit, editVente, fromCotat
       setForm({
         produit: editVente.produit || 'Afrilife étude',
         dateVente: normalizeDateInput(editVente.dateVente || new Date().toISOString()),
-        typeVente: editVente.typeVente === 'NouVe' ? 'Nouvelle vente (NouVe)' : 'Transfert',
-        noPolice: editVente.noPolice || '',
-        noAttestation: editVente.noAttestation || '',
-        noCarteRose: editVente.noCarteRose || '',
+        typeVente: editVente.typeVente === 'NouVe' ? 'Nouvelle vente (NouVe)' : 'Renouvellement',
+        noPolice: editVente.noPolice && editVente.noPolice !== 'null' ? editVente.noPolice : '',
         primeNette: String(editVente.primeNette || ''),
         accessories: String(editVente.accessoires || ''),
         dateEffet: normalizeDateInput(editVente.dateEffet || ''),
@@ -190,8 +182,6 @@ export function NewVenteModal({ visible, onClose, onSubmit, editVente, fromCotat
         dateVente: new Date().toISOString().split('T')[0],
         typeVente: 'Nouvelle vente (NouVe)',
         noPolice: '',
-        noAttestation: '',
-        noCarteRose: '',
         primeNette: '',
         accessories: '',
         dateEffet: '',
@@ -245,8 +235,6 @@ export function NewVenteModal({ visible, onClose, onSubmit, editVente, fromCotat
         date_vente: form.dateVente,
         type_vente: form.typeVente.includes('Nouvelle') ? 'NouVe' : 'VenRec',
         numero_police: form.noPolice || null,
-        numero_attestation: form.noAttestation || null,
-        no_carte_rose: form.noCarteRose || null,
         prime_nette: Number(form.primeNette) || 0,
         accessoires: Number(form.accessories) || 0,
         date_effet: form.dateEffet || null,
@@ -277,6 +265,10 @@ export function NewVenteModal({ visible, onClose, onSubmit, editVente, fromCotat
       setIsSaving(false);
     }
   };
+
+  const parseAmount = (value: string) => Number(String(value || '').replace(new RegExp('[^\\d.-]', 'g'), '')) || 0;
+  const calculatedCa = Math.max(0, parseAmount(form.primeNette) - parseAmount(form.accessories));
+  const formatAmount = (value: number) => value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 
   const selectedProspection = prospections.find(p => String(p.id) === prospectionId);
   const prospectionLabel = selectedProspection
@@ -381,28 +373,7 @@ export function NewVenteModal({ visible, onClose, onSubmit, editVente, fromCotat
             </View>
           </View>
 
-          <View style={styles.row}>
-            <View style={styles.half}>
-              <Text style={styles.label}>N° Attestation</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Numéro attestation"
-                value={form.noAttestation}
-                onChangeText={v => upd('noAttestation', v)}
-                placeholderTextColor={colors.gray400}
-              />
-            </View>
-            <View style={styles.half}>
-              <Text style={styles.label}>N° Carte rose</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Numéro carte rose"
-                value={form.noCarteRose}
-                onChangeText={v => upd('noCarteRose', v)}
-                placeholderTextColor={colors.gray400}
-              />
-            </View>
-          </View>
+
 
           <View style={styles.row}>
             <View style={styles.half}>
@@ -417,15 +388,26 @@ export function NewVenteModal({ visible, onClose, onSubmit, editVente, fromCotat
               />
             </View>
             <View style={styles.half}>
-              <Text style={styles.label}>Accessoires (FCFA)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Ex: 5 000"
-                value={form.accessories}
-                onChangeText={v => upd('accessories', v)}
-                placeholderTextColor={colors.gray400}
-                keyboardType="numeric"
-              />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.label}>Accessoires (FCFA)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Ex: 5 000"
+                  value={form.accessories}
+                  onChangeText={v => upd('accessories', v)}
+                  placeholderTextColor={colors.gray400}
+                  keyboardType="numeric"
+                />
+              </View>
+              <View style={{ flex: 1, marginTop: spacing.md }}>
+                <Text style={styles.label}>CA calculé (FCFA)</Text>
+                <TextInput
+                  style={[styles.input, styles.readonlyInput]}
+                  value={formatAmount(calculatedCa)}
+                  editable={false}
+                  placeholderTextColor={colors.gray400}
+                />
+              </View>
             </View>
           </View>
 
@@ -522,6 +504,7 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 16, fontWeight: '700', color: colors.violetDark, marginBottom: spacing.lg },
   label: { fontSize: 13, fontWeight: '600', color: colors.gray800, marginBottom: spacing.sm },
   input: { borderWidth: 1, borderColor: colors.gray200, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: 14, color: colors.gray800, backgroundColor: colors.white, minHeight: 40 },
+  readonlyInput: { backgroundColor: colors.gray100, color: colors.gray600 },
   row: { flexDirection: 'row', gap: spacing.md, marginVertical: spacing.md, zIndex: 1, overflow: 'visible' },
   half: { flex: 1 },
   saveMessage: { fontSize: 13, color: colors.violetDark, marginBottom: spacing.md },

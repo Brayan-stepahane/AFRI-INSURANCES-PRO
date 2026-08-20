@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS clients (
 CREATE TABLE IF NOT EXISTS produits (
   id SERIAL PRIMARY KEY,
   nom VARCHAR(100) UNIQUE NOT NULL,
+  categorie VARCHAR(20) CHECK (categorie IN ('vie', 'non_vie')),
   description TEXT,
   created_at TIMESTAMP DEFAULT NOW()
 );
@@ -89,12 +90,12 @@ CREATE TABLE IF NOT EXISTS prospections (
   date_vente DATE,
   type_vente VARCHAR(20) CHECK (type_vente IN ('NouVe', 'VenRec')),
   no_police VARCHAR(50),
-  no_attestation VARCHAR(50),
+ 
   prime_nette DECIMAL(12, 2),
   accessoires DECIMAL(12, 2),
   date_effet DATE,
   date_echeance DATE,
-  no_carte_rose VARCHAR(50),
+
   active BOOLEAN DEFAULT true,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW(),
@@ -115,7 +116,7 @@ CREATE TABLE IF NOT EXISTS cotations (
   date_cotation DATE,
   montant DECIMAL(12, 2),
   date_validation DATE,
-  statut VARCHAR(50) CHECK (statut IN ('En cours', 'Validée', 'Convertie en vente', 'Annulée')),
+  statut VARCHAR(50) NOT NULL DEFAULT 'En attente' CHECK (statut IN ('En attente', 'Validée', 'Refusée', 'Convertie en vente')),
   active BOOLEAN DEFAULT true,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW(),
@@ -139,11 +140,9 @@ CREATE TABLE IF NOT EXISTS ventes (
   produit VARCHAR(200),
   produit_id INT,
   no_police VARCHAR(50),
-  no_attestation VARCHAR(50),
   prime_nette DECIMAL(12, 2) DEFAULT 0,
   accessoires DECIMAL(12, 2) DEFAULT 0,
   ca DECIMAL(12, 2) GENERATED ALWAYS AS (prime_nette + accessoires) STORED,
-  no_carte_rose VARCHAR(50),
   date_effet DATE,
   date_echeance DATE,
   active BOOLEAN DEFAULT true,
@@ -165,7 +164,11 @@ CREATE TABLE IF NOT EXISTS objectifs (
   commercial_id INT NOT NULL,
   mois DATE NOT NULL,
   montant_mensuel DECIMAL(12, 2),
+  montant_mensuel_vie DECIMAL(12, 2) DEFAULT 0,
+  montant_mensuel_non_vie DECIMAL(12, 2) DEFAULT 0,
   montant_reporte DECIMAL(12, 2) DEFAULT 0,
+  montant_reporte_vie DECIMAL(12, 2) DEFAULT 0,
+  montant_reporte_non_vie DECIMAL(12, 2) DEFAULT 0,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW(),
   UNIQUE(commercial_id, mois),
@@ -189,6 +192,36 @@ JOIN users u ON v.commercial_id = u.id
 WHERE COALESCE(v.active::text, 'true') IN ('t','true','1')
 GROUP BY DATE_TRUNC('month', v.date_vente), v.commercial_id, u.nom;
 
+-- View: CA mensuel vie par commercial
+CREATE OR REPLACE VIEW v_ca_mensuel_vie AS
+SELECT
+  DATE_TRUNC('month', v.date_vente)::DATE AS mois,
+  v.commercial_id,
+  u.nom AS commercial_nom,
+  SUM(v.ca) AS ca_vie,
+  COUNT(*) AS nb_ventes_vie
+FROM ventes v
+JOIN users u ON v.commercial_id = u.id
+LEFT JOIN produits p ON v.produit_id = p.id
+WHERE COALESCE(v.active::text, 'true') IN ('t','true','1')
+  AND COALESCE(p.categorie, 'non_vie') = 'vie'
+GROUP BY DATE_TRUNC('month', v.date_vente), v.commercial_id, u.nom;
+
+-- View: CA mensuel non-vie par commercial
+CREATE OR REPLACE VIEW v_ca_mensuel_non_vie AS
+SELECT
+  DATE_TRUNC('month', v.date_vente)::DATE AS mois,
+  v.commercial_id,
+  u.nom AS commercial_nom,
+  SUM(v.ca) AS ca_non_vie,
+  COUNT(*) AS nb_ventes_non_vie
+FROM ventes v
+JOIN users u ON v.commercial_id = u.id
+LEFT JOIN produits p ON v.produit_id = p.id
+WHERE COALESCE(v.active::text, 'true') IN ('t','true','1')
+  AND COALESCE(p.categorie, 'non_vie') = 'non_vie'
+GROUP BY DATE_TRUNC('month', v.date_vente), v.commercial_id, u.nom;
+
 -- View: Objectifs réalisés
 CREATE OR REPLACE VIEW v_objectifs_realises AS
 SELECT
@@ -197,9 +230,15 @@ SELECT
   u.nom AS commercial_nom,
   COALESCE(o.mois, DATE_TRUNC('month', CURRENT_DATE)::DATE) AS mois,
   COALESCE(o.montant_mensuel, u.objectif_mensuel, 0) AS montant_mensuel,
+  COALESCE(o.montant_mensuel_vie, COALESCE(o.montant_mensuel, u.objectif_mensuel, 0) / 2, 0) AS montant_mensuel_vie,
+  COALESCE(o.montant_mensuel_non_vie, COALESCE(o.montant_mensuel, u.objectif_mensuel, 0) / 2, 0) AS montant_mensuel_non_vie,
   COALESCE(o.montant_reporte, 0) AS montant_reporte,
+  COALESCE(o.montant_reporte_vie, 0) AS montant_reporte_vie,
+  COALESCE(o.montant_reporte_non_vie, 0) AS montant_reporte_non_vie,
   COALESCE(o.montant_mensuel, u.objectif_mensuel, 0) + COALESCE(o.montant_reporte, 0) AS total_objectif,
   COALESCE(v.ca_realise, 0) AS ca_realise,
+  COALESCE(v_vie.ca_vie, 0) AS ca_vie,
+  COALESCE(v_non_vie.ca_non_vie, 0) AS ca_non_vie,
   GREATEST(0, COALESCE(o.montant_mensuel, u.objectif_mensuel, 0) + COALESCE(o.montant_reporte, 0) - COALESCE(v.ca_realise, 0)) AS montant_restant,
   CASE
     WHEN COALESCE(o.montant_mensuel, u.objectif_mensuel, 0) + COALESCE(o.montant_reporte, 0) = 0 THEN 0
@@ -211,8 +250,11 @@ LEFT JOIN (
   SELECT commercial_id, COALESCE(SUM(ca), 0) AS ca_realise
   FROM ventes
   WHERE DATE_TRUNC('month', date_vente) = DATE_TRUNC('month', CURRENT_DATE)
+    AND COALESCE(active::text, 'true') IN ('t','true','1')
   GROUP BY commercial_id
 ) v ON v.commercial_id = u.id
+LEFT JOIN v_ca_mensuel_vie v_vie ON v_vie.commercial_id = u.id AND v_vie.mois = DATE_TRUNC('month', CURRENT_DATE)::DATE
+LEFT JOIN v_ca_mensuel_non_vie v_non_vie ON v_non_vie.commercial_id = u.id AND v_non_vie.mois = DATE_TRUNC('month', CURRENT_DATE)::DATE
 WHERE u.role = 'commercial';
 
 -- View: Relances urgentes (prospections en retard)
