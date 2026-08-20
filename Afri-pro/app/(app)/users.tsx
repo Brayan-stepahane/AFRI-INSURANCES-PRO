@@ -4,10 +4,11 @@ import { useAuth } from '../../src/hooks/useAuth';
 import { useRouter } from 'expo-router';
 import { colors, spacing, radius } from '../../src/config/theme';
 import { userService } from '../../src/services/auth.service';
+import { objectifsService, ObjectiveAllocationRequest } from '../../src/services/objectifs.service';
 import { UserRole, User } from '../../src/types/auth.types';
 
 export default function UsersScreen() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const router = useRouter();
   const role = user?.role ?? 'unknown';
 
@@ -15,12 +16,11 @@ export default function UsersScreen() {
   const [formData, setFormData] = useState({
     name: '',
     surname: '',
-    email: '',
     role: 'commercial' as UserRole,
     phone: '',
-    password: '',
+    password: 'Pass1234',
     parentId: '',
-    objectif_mensuel: 5000000,  // Default 5M for commercial
+    objectif_mensuel: 10000000,  // Default 10M for commercial
   });
 
   const [message, setMessage] = useState<string>('');
@@ -33,14 +33,21 @@ export default function UsersScreen() {
   const [resetModalVisible, setResetModalVisible] = useState(false);
   const [resetUser, setResetUser] = useState<{id: string, name: string} | null>(null);
   const [editUserId, setEditUserId] = useState<string | null>(null);
+  const [allocationModalVisible, setAllocationModalVisible] = useState(false);
+  const [allocationManagerOpen, setAllocationManagerOpen] = useState(false);
+  const [allocationFormData, setAllocationFormData] = useState({
+    managerId: '',
+    totalVie: 5000000,
+    totalNonVie: 5000000,
+    mois: new Date().toISOString().slice(0, 7) + '-01', // Current month first day
+  });
   const [editFormData, setEditFormData] = useState({
     name: '',
     surname: '',
-    email: '',
     role: 'commercial' as UserRole,
     phone: '',
     parentId: '',
-    objectif_mensuel: 5000000,
+    objectif_mensuel: 10000000,
     equipe: '',
   });
 
@@ -84,6 +91,20 @@ export default function UsersScreen() {
     }
   };
 
+  const formatName = (user?: { name?: string | null; surname?: string | null }) => {
+    if (!user) return '';
+    const name = user.name?.trim() || '';
+    const surname = user.surname?.trim() || '';
+    if (!name) return surname;
+    if (!surname) return name;
+    const normalizedName = name.replace(/\s+/g, ' ').trim();
+    const normalizedSurname = surname.replace(/\s+/g, ' ').trim();
+    if (normalizedName.toLowerCase().endsWith(normalizedSurname.toLowerCase())) {
+      return normalizedName;
+    }
+    return `${normalizedName} ${normalizedSurname}`;
+  };
+
   useEffect(() => {
     const loadUsers = async () => {
       try {
@@ -122,11 +143,10 @@ export default function UsersScreen() {
     setEditFormData({
       name: user.name,
       surname: user.surname,
-      email: user.email || '',
       role: user.role || 'commercial',
       phone: user.phone || '',
       parentId: user.parent_id ? String(user.parent_id) : '',
-      objectif_mensuel: user.objectifMensuel ? Number(user.objectifMensuel) : 5000000,
+      objectif_mensuel: user.objectifMensuel ? Number(user.objectifMensuel) : 1000000,
       equipe: user.equipe || '',
     });
     setEditModalVisible(true);
@@ -139,7 +159,7 @@ export default function UsersScreen() {
     }
 
     if (!editFormData.name || !editFormData.surname) {
-      setError('Nom et prénom sont requis.');
+      setError('Nom de famille et prénom sont requis.');
       return;
     }
 
@@ -157,7 +177,6 @@ export default function UsersScreen() {
       const payload = {
         name: editFormData.name.trim(),
         surname: editFormData.surname.trim(),
-        email: editFormData.email.trim(),
         role: editFormData.role,
         phone: editFormData.phone.trim() || undefined,
         objectifMensuel: editFormData.objectif_mensuel,
@@ -200,10 +219,13 @@ export default function UsersScreen() {
     setError('');
     setMessage('');
 
-    if (!formData.name || !formData.surname || !formData.password) {
-      setError('Nom, prénom et mot de passe sont requis.');
+    if (!formData.name || !formData.surname) {
+      setError('Nom de famille et prénom sont requis.');
       return;
     }
+
+    // Set default password if not provided
+    const passwordToUse = formData.password || 'Pass1234';
 
     // Hierarchy validation (only for roles that need a parent)
     if (['commercial', 'manager_adjoint', 'manager'].includes(formData.role) && !formData.parentId) {
@@ -229,10 +251,9 @@ export default function UsersScreen() {
       const createData: any = {
         name: formData.name.trim(),
         surname: formData.surname.trim(),
-        email: formData.email.trim(),
         role: formData.role,
         phone: formData.phone.trim() || undefined,
-        password: formData.password,
+        password: passwordToUse,
         parentId: parentIdNum,
         objectifMensuel: formData.objectif_mensuel,
       };
@@ -252,17 +273,71 @@ export default function UsersScreen() {
       setFormData({
         name: '',
         surname: '',
-        email: '',
         role: 'commercial',
         phone: '',
-        password: '',
+        password: 'Pass1234',
         parentId: '',
-        objectif_mensuel: 5000000,
+        objectif_mensuel: 10000000,
       });
     } catch (err: any) {
       console.error('Create user error:', err);
       setError(err.message || 'Une erreur est survenue lors de la création de l\'utilisateur.');
     }
+  };
+
+  const handleAllocateObjectives = async () => {
+    setError('');
+    setMessage('');
+
+    if (!allocationFormData.managerId) {
+      setError('Veuillez sélectionner un manager.');
+      return;
+    }
+
+    if (allocationFormData.totalVie <= 0 || allocationFormData.totalNonVie <= 0) {
+      setError('Les montants VIE et NON-VIE doivent être supérieurs à 0.');
+      return;
+    }
+
+    if (!token) {
+      setError('Non authentifié. Veuillez vous reconnecter.');
+      return;
+    }
+
+    try {
+      const allocationData: ObjectiveAllocationRequest = {
+        managerId: parseInt(allocationFormData.managerId),
+        totalVie: allocationFormData.totalVie,
+        totalNonVie: allocationFormData.totalNonVie,
+        mois: allocationFormData.mois,
+      };
+
+      const result = await objectifsService.allocateObjectives(allocationData, token);
+
+      setMessage(`Objectifs alloués avec succès ! ${result.allocations.length} commerciaux affectés.`);
+      setAllocationModalVisible(false);
+
+      // Reset form
+      setAllocationFormData({
+        managerId: '',
+        totalVie: 5000000,
+        totalNonVie: 5000000,
+        mois: new Date().toISOString().slice(0, 7) + '-01',
+      });
+    } catch (err: any) {
+      console.error('Allocation error:', err);
+      setError(err.error || err.message || 'Erreur lors de l\'allocation des objectifs.');
+    }
+  };
+
+  const openAllocationModal = () => {
+    setAllocationFormData({
+      managerId: '',
+      totalVie: 5000000,
+      totalNonVie: 5000000,
+      mois: new Date().toISOString().slice(0, 7) + '-01',
+    });
+    setAllocationModalVisible(true);
   };
 
   const getParentLabel = () => {
@@ -311,15 +386,6 @@ export default function UsersScreen() {
           placeholder="Prénom"
           value={formData.surname}
           onChangeText={(t) => setFormData((prev) => ({ ...prev, surname: t }))}
-          placeholderTextColor={colors.gray400}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          value={formData.email}
-          onChangeText={(t) => setFormData((prev) => ({ ...prev, email: t }))}
-          keyboardType="email-address"
-          autoCapitalize="none"
           placeholderTextColor={colors.gray400}
         />
         <TextInput
@@ -382,7 +448,7 @@ export default function UsersScreen() {
             >
               <Text style={styles.inputText}>
                 {formData.parentId 
-                  ? users.find(u => String(u.id) === formData.parentId)?.name || 'Sélectionné'
+                  ? formatName(users.find(u => String(u.id) === formData.parentId)) || 'Sélectionné'
                   : possibleParents.length > 0 
                     ? `Sélectionnez ${getParentLabel().toLowerCase()}`
                     : `Aucun ${getParentLabel().toLowerCase()} disponible`
@@ -408,7 +474,7 @@ export default function UsersScreen() {
                       }}
                     >
                       <Text style={styles.dropdownItemText}>
-                        {parent.name} {parent.surname ? `(${parent.surname})` : ''} - {parent.role}
+                        {formatName(parent)} - {parent.role}
                       </Text>
                     </TouchableOpacity>
                   ))}
@@ -441,6 +507,12 @@ export default function UsersScreen() {
           
           <Text style={styles.createButtonText}>Créer l'utilisateur</Text>
         </TouchableOpacity>
+
+        {(role === 'admin' || role === 'manager' || role === 'chef_agence') && (
+          <TouchableOpacity style={[styles.createButton, { backgroundColor: colors.success }]} onPress={openAllocationModal} activeOpacity={0.85}>
+            <Text style={styles.createButtonText}>Allouer les objectifs</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <Text style={styles.subTitle}>Liste des utilisateurs</Text>
@@ -457,7 +529,7 @@ export default function UsersScreen() {
             <View key={u.id} style={styles.userRow}>
               <View style={styles.userInfo}>
                 <Text style={styles.userText}>
-                  {u.name} {u.surname ? `(${u.surname})` : ''}
+                  {formatName(u)}
                 </Text>
                 <Text style={styles.userMeta}>{u.role?.toUpperCase()} - {u.active ? 'Actif' : 'Inactif'}</Text>
               </View>
@@ -481,7 +553,7 @@ export default function UsersScreen() {
                     style={[styles.actionButton, styles.resetButton, {opacity: 1, minHeight: 32, paddingHorizontal: 12}]}
                     onPress={() => {
                       console.log('🔄 Reset MDP clicked for user:', u.id, u.name);
-                      handleResetPassword(u.id!, `${u.name} ${u.surname || ''}`.trim());
+                      handleResetPassword(u.id!, formatName(u));
                     }}
                   >
                     <Text style={styles.actionButtonText}>Reset MDP</Text>
@@ -506,7 +578,7 @@ export default function UsersScreen() {
             <Text style={styles.resetModalTitle}>Modifier l'utilisateur</Text>
             <TextInput
               style={styles.input}
-              placeholder="Nom"
+              placeholder="Nom de famille"
               value={editFormData.name}
               onChangeText={(t) => setEditFormData((prev) => ({ ...prev, name: t }))}
               placeholderTextColor={colors.gray400}
@@ -516,15 +588,6 @@ export default function UsersScreen() {
               placeholder="Prénom"
               value={editFormData.surname}
               onChangeText={(t) => setEditFormData((prev) => ({ ...prev, surname: t }))}
-              placeholderTextColor={colors.gray400}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Email"
-              value={editFormData.email}
-              onChangeText={(t) => setEditFormData((prev) => ({ ...prev, email: t }))}
-              keyboardType="email-address"
-              autoCapitalize="none"
               placeholderTextColor={colors.gray400}
             />
             <TextInput
@@ -571,7 +634,7 @@ export default function UsersScreen() {
                 >
                   <Text style={styles.inputText}>
                     {editFormData.parentId
-                      ? users.find(u => String(u.id) === editFormData.parentId)?.name || 'Sélectionné'
+                      ? formatName(users.find(u => String(u.id) === editFormData.parentId)) || 'Sélectionné'
                       : editPossibleParents.length > 0
                         ? `Sélectionnez ${getEditParentLabel().toLowerCase()}`
                         : `Aucun ${getEditParentLabel().toLowerCase()} disponible`
@@ -594,7 +657,7 @@ export default function UsersScreen() {
                           }}
                         >
                           <Text style={styles.dropdownItemText}>
-                            {parent.name} {parent.surname ? `(${parent.surname})` : ''} - {parent.role}
+                            {formatName(parent)} - {parent.role}
                           </Text>
                         </TouchableOpacity>
                       ))}
@@ -651,7 +714,7 @@ export default function UsersScreen() {
               Êtes-vous sûr de vouloir réinitialiser le mot de passe?
             </Text>
             <Text style={styles.resetModalWarning}>
-              Le nouveau mot de passe sera "Pass1234!".
+              Le nouveau mot de passe sera "Pass1234".
             </Text>
             <View style={styles.resetModalButtons}>
               <TouchableOpacity
@@ -665,6 +728,115 @@ export default function UsersScreen() {
                 onPress={confirmResetPassword}
               >
                 <Text style={styles.resetModalButtonText}>Réinitialiser</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Allocation Modal */}
+      <Modal visible={allocationModalVisible} transparent animationType="fade" onRequestClose={() => setAllocationModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Allouer les objectifs</Text>
+            <Text style={styles.modalText}>
+              Répartir les objectifs mensuels depuis un chef d'agence vers ses commerciaux.
+            </Text>
+
+            {/* Manager Selection */}
+            <Text style={styles.inputLabel}>Sélectionner un Manager</Text>
+            <TouchableOpacity
+              style={styles.dropdownTrigger}
+              onPress={() => setAllocationManagerOpen(!allocationManagerOpen)}
+            >
+              <Text style={styles.inputText}>
+                {allocationFormData.managerId
+                  ? users.find(u => u.id === allocationFormData.managerId)?.name || 'Utilisateur inconnu'
+                  : 'Sélectionner un manager'
+                }
+              </Text>
+              <Text style={styles.dropdownCaret}>{allocationManagerOpen ? '▲' : '▼'}</Text>
+            </TouchableOpacity>
+
+            {allocationManagerOpen && (
+              <View style={styles.dropdownBox}>
+                {users
+                  .filter(u => u.role === 'manager' && u.active)
+                  .map(manager => (
+                    <TouchableOpacity
+                      key={manager.id}
+                      style={styles.dropdownItem}
+                      onPress={() => {
+                        setAllocationFormData(prev => ({ ...prev, managerId: manager.id }));
+                        setAllocationManagerOpen(false);
+                      }}
+                    >
+                      <Text style={styles.dropdownItemText}>{manager.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+              </View>
+            )}
+
+            {/* VIE Amount */}
+            <Text style={styles.inputLabel}>Montant VIE (FCFA)</Text>
+            <TextInput
+              style={styles.input}
+              value={allocationFormData.totalVie > 0 ? allocationFormData.totalVie.toLocaleString() : ''}
+              onChangeText={(text) => {
+                const cleanValue = text.replace(/[^0-9]/g, '');
+                setAllocationFormData(prev => ({
+                  ...prev,
+                  totalVie: cleanValue ? parseFloat(cleanValue) || 0 : 0
+                }));
+              }}
+              keyboardType="numeric"
+              placeholder="Ex: 5000000"
+              placeholderTextColor={colors.gray400}
+            />
+
+            {/* NON-VIE Amount */}
+            <Text style={styles.inputLabel}>Montant NON-VIE (FCFA)</Text>
+            <TextInput
+              style={styles.input}
+              value={allocationFormData.totalNonVie > 0 ? allocationFormData.totalNonVie.toLocaleString() : ''}
+              onChangeText={(text) => {
+                const cleanValue = text.replace(/[^0-9]/g, '');
+                setAllocationFormData(prev => ({
+                  ...prev,
+                  totalNonVie: cleanValue ? parseFloat(cleanValue) || 0 : 0
+                }));
+              }}
+              keyboardType="numeric"
+              placeholder="Ex: 5000000"
+              placeholderTextColor={colors.gray400}
+            />
+
+            {/* Month Selection */}
+            <Text style={styles.inputLabel}>Mois</Text>
+            <TextInput
+              style={styles.input}
+              value={allocationFormData.mois}
+              onChangeText={(text) => setAllocationFormData(prev => ({ ...prev, mois: text }))}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor={colors.gray400}
+            />
+
+            <Text style={styles.modalText}>
+              Total: {(allocationFormData.totalVie + allocationFormData.totalNonVie).toLocaleString()} FCFA
+            </Text>
+
+            <View style={styles.resetModalButtons}>
+              <TouchableOpacity
+                style={[styles.resetModalButton, styles.cancelButton]}
+                onPress={() => setAllocationModalVisible(false)}
+              >
+                <Text style={styles.resetModalButtonText}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.resetModalButton, { backgroundColor: colors.success }]}
+                onPress={handleAllocateObjectives}
+              >
+                <Text style={styles.resetModalButtonText}>Allouer</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -689,6 +861,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm, 
     color: colors.gray800 
   },
+  inputText: { fontSize: 14, color: colors.gray800 },
   
   button: { marginTop: spacing.xs, backgroundColor: colors.violet, paddingVertical: spacing.sm, borderRadius: radius.sm, alignItems: 'center' },
   buttonText: { color: colors.white, fontWeight: '700' },
@@ -721,10 +894,13 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     minWidth: 220,
   },
-  inputText: { fontSize: 14, color: colors.gray800 },
+  inputLabel: { fontSize: 14, fontWeight: '600', color: colors.gray700, marginBottom: spacing.xs, marginTop: spacing.sm },
   dropdownCaret: { fontSize: 16, color: colors.gray400 },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', padding: spacing.xl },
+  modalContent: { backgroundColor: colors.white, borderRadius: radius.md, padding: spacing.xl, marginHorizontal: spacing.xl, maxWidth: 400, alignSelf: 'center' },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: colors.violetDark, marginBottom: spacing.sm },
+  modalText: { fontSize: 14, color: colors.gray600, marginBottom: spacing.md },
   dropdownBox: { backgroundColor: colors.white, borderRadius: radius.md, borderWidth: 1, borderColor: colors.gray200, overflow: 'hidden', minWidth: 220, maxWidth: 280, alignSelf: 'center' },
   dropdownItem: { paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.gray100 },
   dropdownItemText: { fontSize: 14, color: colors.gray800 },

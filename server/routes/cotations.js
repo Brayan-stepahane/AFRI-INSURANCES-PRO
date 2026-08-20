@@ -38,13 +38,13 @@ router.get('/', auth, async (req, res) => {
 
 // POST /api/cotations
 router.post('/', auth, async (req, res) => {
-  const { prospection_id, client_id, risque_cote, date_cotation, montant } = req.body;
+  const { prospection_id, client_id, risque_cote, date_cotation, montant, statut = 'En attente' } = req.body;
   const commercial_id = req.user.role === 'commercial' ? req.user.id : req.body.commercial_id;
   try {
     const { rows } = await pool.query(
-      `INSERT INTO cotations (prospection_id, client_id, commercial_id, risque_cote, date_cotation, montant)
-       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-      [prospection_id, client_id, commercial_id, risque_cote, date_cotation, montant]
+      `INSERT INTO cotations (prospection_id, client_id, commercial_id, risque_cote, date_cotation, montant, statut)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [prospection_id, client_id, commercial_id, risque_cote, date_cotation, montant, statut]
     );
     // Mettre à jour le statut de la prospection
     await pool.query(
@@ -77,10 +77,11 @@ router.put('/:id', auth, async (req, res) => {
       });
     }
 
+    const statutToUpdate = statut ?? currentStatus;
     const { rows } = await pool.query(
       `UPDATE cotations SET risque_cote=$1, date_cotation=$2, montant=$3, date_validation=$4, statut=$5, updated_at=NOW()
        WHERE id=$6 RETURNING *`,
-      [risque_cote, date_cotation, montant, date_validation, statut, req.params.id]
+      [risque_cote, date_cotation, montant, date_validation, statutToUpdate, req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Cotation introuvable' });
     res.json(rows[0]);

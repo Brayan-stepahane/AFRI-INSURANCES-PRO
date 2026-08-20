@@ -4,6 +4,7 @@ import {
   TouchableOpacity, Pressable, ScrollView, ActivityIndicator,
 } from 'react-native';
 import { useAuth } from '../../src/hooks/useAuth';
+import { useResponsive } from '../../src/hooks/useResponsive';
 import { useClients } from '../../src/hooks/useClients';
 import { colors, spacing, radius } from '../../src/config/theme';
 import { Client } from '../../src/types';
@@ -12,6 +13,7 @@ import { API_ENDPOINTS } from '../../src/services/api/endpoints';
 
 export default function ClientsScreen() {
   const { user } = useAuth();
+  const responsive = useResponsive();
   const { clients, loading, refetch } = useClients();
   const role = user?.role ?? 'commercial';
   const allowed = ['admin', 'chef_agence', 'commercial'];
@@ -93,6 +95,8 @@ export default function ClientsScreen() {
         <FlatList
           data={clients}
           keyExtractor={(item: Client) => item.id}
+          numColumns={responsive.columns > 1 ? responsive.columns : 1}
+          key={responsive.columns}
           renderItem={({ item }: { item: Client }) => (
             <View style={styles.clientCard}>
               <Text style={styles.clientName}>{item.nom}</Text>
@@ -105,6 +109,11 @@ export default function ClientsScreen() {
             </View>
           )}
           contentContainerStyle={styles.list}
+          columnWrapperStyle={
+            responsive.columns > 1
+              ? { gap: spacing.lg, justifyContent: 'space-between' }
+              : undefined
+          }
         />
       )}
 
@@ -193,7 +202,7 @@ const styles = StyleSheet.create({
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   emptyText: { fontSize: 14, color: colors.gray400 },
   list: { paddingBottom: spacing.xl },
-  clientCard: { backgroundColor: colors.white, borderRadius: radius.md, padding: spacing.lg, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.gray100 },
+  clientCard: { backgroundColor: colors.white, borderRadius: radius.md, padding: spacing.lg, flex: 1, minHeight: 180, borderWidth: 1, borderColor: colors.gray100 },
   clientName: { fontSize: 15, fontWeight: '700', color: colors.violetDark, marginBottom: 4 },
   clientMeta: { fontSize: 12, color: colors.gray600 },
   fab: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.orange, alignItems: 'center', justifyContent: 'center', elevation: 6, boxShadow: '0px 4px 10px rgba(232,82,26,0.4)' },

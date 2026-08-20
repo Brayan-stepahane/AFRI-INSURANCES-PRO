@@ -17,6 +17,7 @@ export const colors = {
   gray200: '#DDD6E8',
   gray400: '#9B8FB0',
   gray600: '#5C5270',
+  gray700: '#4A3F5C',
   gray800: '#2D1F3D',
 
   // Status colors

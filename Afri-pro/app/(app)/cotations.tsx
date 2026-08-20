@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/hooks/useAuth';
+import { useResponsive } from '../../src/hooks/useResponsive';
 import { useCotations } from '../../src/hooks/useCotations';
 import { useClients } from '../../src/hooks/useClients';
 import { fmt, fmtDate, STATUTS_COT, STORAGE_KEYS } from '../../src/utils/constants';
@@ -22,6 +23,7 @@ import { storageService } from '../../src/services/storage.service';
 export default function CotationsScreen() {
   const { user } = useAuth();
   const router = useRouter();
+  const responsive = useResponsive();
   const { cotations, loading, refetch } = useCotations();
   const { clients } = useClients();
   const [search, setSearch] = useState('');
@@ -339,7 +341,14 @@ export default function CotationsScreen() {
         data={list}
         keyExtractor={c => String(c.id)}
         renderItem={renderItem}
-        contentContainerStyle={{ padding: spacing.xl, paddingBottom: 100 }}
+        numColumns={responsive.columns > 1 ? responsive.columns : 1}
+        key={responsive.columns}
+        contentContainerStyle={{ padding: spacing.xl, paddingBottom: 100, gap: spacing.lg }}
+        columnWrapperStyle={
+          responsive.columns > 1
+            ? { gap: spacing.lg, justifyContent: 'space-between' }
+            : undefined
+        }
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); refetch(); setTimeout(() => setRefreshing(false), 600); }} />}
         ListEmptyComponent={<EmptyState icon="💼" title="Aucune cotation trouvée" sub="Les cotations apparaissent ici une fois saisies" />}
       />
@@ -375,40 +384,34 @@ const styles = StyleSheet.create({
   statsRow:       { flexDirection: 'row', padding: spacing.xl, backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.gray100 },
   searchBar:      { backgroundColor: colors.white, padding: spacing.xl, borderBottomWidth: 1, borderBottomColor: colors.gray100 },
   searchInput:    { backgroundColor: colors.gray50, borderRadius: radius.sm, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, color: colors.gray800 },
-
-  // ✅ FIXED: wrapper View owns the background, border, and visible overflow
   filterWrapper:  { backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.gray100 },
-
-  // ✅ FIXED: filterRow is now contentContainerStyle — only padding & layout, no clipping
   filterRow:      { paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, gap: spacing.md, flexDirection: 'row', alignItems: 'center' },
-
   chip:           { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, borderColor: colors.gray200 },
   chipActive:     { backgroundColor: colors.teal, borderColor: colors.teal },
   chipText:       { fontSize: 12, color: colors.gray600 },
   chipTextActive: { color: colors.white, fontWeight: '600' },
-
   alertBanner:    { backgroundColor: colors.warningBg, paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, borderBottomWidth: 1, borderBottomColor: '#e8c97a' },
   alertText:      { fontSize: 13, color: colors.warning, fontWeight: '600' },
-  card:           { backgroundColor: colors.white, borderRadius: radius.md, padding: spacing.xl, marginBottom: spacing.lg, elevation: 2, boxShadow: '0px 2px 6px rgba(0,0,0,0.05)' },
+  card:           { backgroundColor: colors.white, borderRadius: radius.md, padding: spacing.lg, flex: 1, minHeight: 260, elevation: 2, boxShadow: '0px 2px 6px rgba(0,0,0,0.05)' },
   cardPending:    { borderLeftWidth: 3, borderLeftColor: colors.warning },
-  cardHeader:     { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg },
+  cardHeader:     { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg, flexWrap: 'wrap', gap: spacing.md },
   noContainer:    { backgroundColor: colors.tealBg, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.sm },
   noCot:          { fontSize: 12, fontWeight: '700', color: colors.teal, fontVariant: ['tabular-nums'] },
-  clientNom:      { fontSize: 14, fontWeight: '600', color: colors.gray800, marginBottom: 3 },
-  detailsRow:     { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.gray100 },
-  detailItem:     { flex: 1 },
+  clientNom:      { fontSize: 14, fontWeight: '600', color: colors.gray800, marginBottom: 3, flex: 1, minWidth: 150 },
+  detailsRow:     { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.gray100, flexWrap: 'wrap', gap: spacing.md },
+  detailItem:     { flex: 1, minWidth: 100 },
   detailLabel:    { fontSize: 10, color: colors.gray400, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 3 },
   detailValue:    { fontSize: 13, fontWeight: '500', color: colors.gray800 },
   validationDate: { fontSize: 12, color: colors.success, marginBottom: spacing.md },
-  actions:        { flexDirection: 'row', gap: spacing.md, flexWrap: 'wrap', marginTop: spacing.md },
-  actionBtn:      { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.sm, borderWidth: 1 },
+  actions:        { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap', marginTop: spacing.md },
+  actionBtn:      { paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.sm, borderWidth: 1, flex: 1, minWidth: 90 },
   actionValidate: { backgroundColor: colors.tealBg, borderColor: colors.teal },
   actionRefuse:   { backgroundColor: colors.dangerBg, borderColor: '#f5c0c0' },
-  actionConvert:  { backgroundColor: colors.orange, borderColor: colors.orange, flex: 1 },
+  actionConvert:  { backgroundColor: colors.orange, borderColor: colors.orange },
   actionEdit:     { backgroundColor: colors.violetPale, borderColor: colors.violetLight },
   actionDelete:   { backgroundColor: colors.dangerBg, borderColor: '#f5c0c0' },
   actionView:     { backgroundColor: colors.violetPale, borderColor: colors.violetLight },
-  actionBtnText:  { fontSize: 12, fontWeight: '600', color: colors.teal },
+  actionBtnText:  { fontSize: 11, fontWeight: '600', color: colors.teal, textAlign: 'center' },
   fab:            { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.teal, alignItems: 'center', justifyContent: 'center', elevation: 6 },
   fabText:        { fontSize: 28, color: colors.white, fontWeight: '300', lineHeight: 32 },
 });

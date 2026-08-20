@@ -22,7 +22,7 @@ const adminOnly = (req, res, next) => {
 router.get('/', auth, managerOnly, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT u.id, u.nom, u.prenom, u.identifiant, u.email, u.role, u.equipe, u.objectif_mensuel, u.active, u.created_at,
+      `SELECT u.id, u.nom, u.prenom, u.identifiant,u.role, u.equipe, u.objectif_mensuel, u.active, u.created_at,
               u.parent_id,
               p.nom as parent_nom, p.prenom as parent_prenom, p.role as parent_role
        FROM users u
@@ -42,13 +42,13 @@ router.post('/', auth, managerOnly, async (req, res) => {
     nom,
     prenom,
     identifiant,
-    email,
     mot_de_passe,
     role,
     equipe,
     parentId,
     parent_id,
     objectif_mensuel,
+    email,
   } = req.body;
 
   const normalizedRole = role === 'manager_adjoint' ? 'manager_adjoint' : role;
@@ -57,10 +57,13 @@ router.post('/', auth, managerOnly, async (req, res) => {
     return res.status(400).json({ error: 'Nom, prénom, identifiant, mot de passe et rôle sont requis' });
   }
 
+  const finalEmail = email ? email.toString().trim().toLowerCase() : null;
+  const finalObjectif = normalizedRole === 'admin' ? null : objectif_mensuel || 0;
+
   // Validate objectif_mensuel for required roles
-  if (['commercial', 'manager_adjoint', 'manager', 'chef_agence'].includes(normalizedRole)) {
-    if (!objectif_mensuel || objectif_mensuel <= 5000000) {
-      return res.status(400).json({ error: 'Objectif mensuel requis et doit être supérieur à 5M FCFA' });
+  if (['manager', 'chef_agence'].includes(normalizedRole)) {
+    if (!objectif_mensuel) {
+      return res.status(400).json({ error: 'Objectif mensuel requis' });
     }
   }
 
@@ -113,11 +116,11 @@ router.post('/', auth, managerOnly, async (req, res) => {
         nom.trim(),
         prenom.trim(),
         identifiant.trim().toLowerCase(),
-        email && email.trim() ? email.trim().toLowerCase() : null,
+        finalEmail || (identifiant.trim().toLowerCase() + '@local.test'),
         hash,
         normalizedRole,
         equipe || null,
-        objectif_mensuel || 0,
+        finalObjectif,
         finalParentId,
       ]
     );
@@ -155,7 +158,6 @@ router.put('/:id', auth, managerOnly, async (req, res) => {
   const {
     nom,
     prenom,
-    email,
     role,
     equipe,
     parentId,
@@ -170,7 +172,7 @@ router.put('/:id', auth, managerOnly, async (req, res) => {
     return res.status(400).json({ error: 'Nom, prénom et rôle sont requis' });
   }
 
-  if (['commercial', 'manager_adjoint', 'manager', 'chef_agence'].includes(normalizedRole)) {
+  if (['manager', 'chef_agence'].includes(normalizedRole)) {
     if (!objectif_mensuel || objectif_mensuel <= 5000000) {
       return res.status(400).json({ error: 'Objectif mensuel requis et doit être supérieur à 5M FCFA' });
     }
@@ -179,6 +181,8 @@ router.put('/:id', auth, managerOnly, async (req, res) => {
   if (['commercial', 'manager_adjoint', 'manager'].includes(normalizedRole) && !finalParentId) {
     return res.status(400).json({ error: 'Parent requis pour ce rôle' });
   }
+
+  const finalObjectif = normalizedRole === 'admin' ? null : objectif_mensuel || 0;
 
   try {
     if (finalParentId) {
@@ -212,21 +216,21 @@ router.put('/:id', auth, managerOnly, async (req, res) => {
       `UPDATE users
        SET nom = $1,
            prenom = $2,
-           email = $3,
+           identifiant = $3,
            role = $4,
            equipe = $5,
            objectif_mensuel = $6,
            parent_id = $7,
            updated_at = NOW()
        WHERE id = $8
-       RETURNING id, nom, prenom, identifiant, email, role, equipe, objectif_mensuel, parent_id, active`,
+       RETURNING id, nom, prenom, identifiant, role, equipe, objectif_mensuel, parent_id, active`,
       [
         nom.trim(),
         prenom.trim(),
-        email && email.trim() ? email.trim().toLowerCase() : null,
+        prenom.trim().toLowerCase(),
         normalizedRole,
         equipe || null,
-        objectif_mensuel,
+        finalObjectif,
         finalParentId,
         Number(req.params.id),
       ]
@@ -292,7 +296,7 @@ router.put('/:id/change-password', auth, async (req, res) => {
       `UPDATE users
        SET mot_de_passe = $1, is_default_password = false, updated_at = NOW()
        WHERE id = $2
-       RETURNING id, nom, prenom, identifiant, email, role, is_default_password`,
+       RETURNING id, nom, prenom, identifiant, role, is_default_password`,
       [hashedPassword, userId]
     );
 
@@ -322,7 +326,7 @@ router.put('/:id/reset-password', auth, adminOnly, async (req, res) => {
     }
 
     // Generate a default password (you can change this to a random one if needed)
-    const defaultPassword = 'Pass1234!';
+    const defaultPassword = 'Pass1234';
     const hashedPassword = await bcrypt.hash(defaultPassword, 10);
 
     // Update password and set is_default_password to true
@@ -330,7 +334,7 @@ router.put('/:id/reset-password', auth, adminOnly, async (req, res) => {
       `UPDATE users
        SET mot_de_passe = $1, is_default_password = true, updated_at = NOW()
        WHERE id = $2
-       RETURNING id, nom, prenom, identifiant, email, role, is_default_password`,
+       RETURNING id, nom, prenom, identifiant, role, is_default_password`,
       [hashedPassword, userId]
     );
 

@@ -17,6 +17,7 @@ app.use('/api/cotations', require('./routes/cotations'));
 app.use('/api/prospections', require('./routes/prospections'));
 app.use('/api/ventes', require('./routes/ventes'));
 app.use('/api/dashboard', require('./routes/dashboard'));
+app.use('/api/objectifs', require('./routes/objectifs'));
 
 // Health check
 app.get('/api/health', (req, res) => {

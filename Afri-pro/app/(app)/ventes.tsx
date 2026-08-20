@@ -5,6 +5,7 @@ import {
   Platform,
 } from 'react-native';
 import { useAuth } from '../../src/hooks/useAuth';
+import { useResponsive } from '../../src/hooks/useResponsive';
 import { useVentes } from '../../src/hooks/useVentes';
 import { useClients } from '../../src/hooks/useClients';
 import { fmt, fmtDate } from '../../src/utils/constants';
@@ -18,6 +19,7 @@ import { API_ENDPOINTS } from '../../src/services/api/endpoints';
 
 export default function VentesScreen() {
   const { user }  = useAuth();
+  const responsive = useResponsive();
   const { ventes, refetch } = useVentes();
   const { clients } = useClients();
   const [search, setSearch]   = useState('');
@@ -254,7 +256,14 @@ export default function VentesScreen() {
         data={list}
         keyExtractor={v => String(v.id)}
         renderItem={renderItem}
-        contentContainerStyle={{ padding: spacing.xl, paddingBottom: 100 }}
+        numColumns={responsive.columns > 1 ? responsive.columns : 1}
+        key={responsive.columns}
+        contentContainerStyle={{ padding: spacing.xl, paddingBottom: 100, gap: spacing.lg }}
+        columnWrapperStyle={
+          responsive.columns > 1
+            ? { gap: spacing.lg, justifyContent: 'space-between' }
+            : undefined
+        }
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -295,26 +304,26 @@ const styles = StyleSheet.create({
   chipTextActive: { color: colors.white, fontWeight: '600' },
   card: {
     backgroundColor: colors.white, borderRadius: radius.md,
-    padding: spacing.xl, marginBottom: spacing.lg,
+    padding: spacing.lg, flex: 1, minHeight: 240,
     elevation: 2, boxShadow: '0px 2px 6px rgba(0,0,0,0.05)',
   },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
-  numBadge:   { backgroundColor: colors.gray100, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginRight: spacing.md },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md, gap: spacing.md },
+  numBadge:   { backgroundColor: colors.gray100, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   numText:    { fontSize: 11, color: colors.gray600, fontWeight: '600' },
   avatarWrap: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.successBg, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 14, fontWeight: '700', color: colors.success },
-  clientNom:  { fontSize: 14, fontWeight: '600', color: colors.gray800, marginBottom: 3 },
+  clientNom:  { fontSize: 14, fontWeight: '600', color: colors.gray800, marginBottom: 3, flex: 1 },
   produit:    { fontSize: 13, color: colors.gray600, marginBottom: spacing.lg, paddingLeft: 2 },
-  montantsRow:{ flexDirection: 'row', gap: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.gray100, marginBottom: spacing.md },
-  montantItem:{ flex: 1 },
+  montantsRow:{ flexDirection: 'row', gap: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.gray100, marginBottom: spacing.md, flexWrap: 'wrap' },
+  montantItem:{ flex: 1, minWidth: 100 },
   montantLabel:{ fontSize: 10, color: colors.gray400, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 3 },
   montantValue:{ fontSize: 12, fontWeight: '600', color: colors.violetDark },
   datesRow:   { gap: 4, marginTop: 4 },
   dateText:   { fontSize: 11, color: colors.gray400 },
   commercialText: { fontSize: 12, color: colors.gray400, marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.gray100 },
-  actions: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg, paddingTop: spacing.lg, borderTopWidth: 1, borderTopColor: colors.gray100 },
-  actionBtn: { flex: 1, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
+  actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg, paddingTop: spacing.lg, borderTopWidth: 1, borderTopColor: colors.gray100, flexWrap: 'wrap' },
+  actionBtn: { flex: 1, paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', minWidth: 80 },
   actionEdit: { backgroundColor: colors.violetPale, borderWidth: 1, borderColor: colors.violet },
   actionDelete: { backgroundColor: colors.dangerBg, borderWidth: 1, borderColor: colors.danger },
-  actionBtnText: { fontSize: 12, fontWeight: '600', color: colors.violet },
+  actionBtnText: { fontSize: 11, fontWeight: '600', color: colors.violet, textAlign: 'center' },
 });

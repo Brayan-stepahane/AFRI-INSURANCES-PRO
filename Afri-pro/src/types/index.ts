@@ -74,14 +74,24 @@ export interface Vente {
 
 export interface Objectif {
   mensuel: number;
+  mensuelVie: number;
+  mensuelNonVie: number;
   reporte: number;
+  reporteVie: number;
+  reporteNonVie: number;
 }
 
 export interface ObjectifEntry {
   commercial: string;
   mensuel: number;
+  mensuelVie: number;
+  mensuelNonVie: number;
   reporte: number;
+  reporteVie: number;
+  reporteNonVie: number;
   caRealise: number;
+  caVie: number;
+  caNonVie: number;
   total: number;
   pct: number;
   reste: number;

@@ -2,6 +2,7 @@
 import { ScrollView, View, Text, StyleSheet, TouchableOpacity, RefreshControl, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/hooks/useAuth';
+import { useResponsive } from '../../src/hooks/useResponsive';
 import { useDashboardStats, useObjective } from '../../src/hooks/useDashboardStats';
 import { useProspections } from '../../src/hooks/useProspections';
 import { useCotations } from '../../src/hooks/useCotations';
@@ -20,6 +21,7 @@ import { exportAllDataToCSV } from '../../src/utils/export';
 export default function DashboardScreen() {
   const router = useRouter();
   const { user, logout, changePassword, error: authError, isLoading: authLoading } = useAuth();
+  const responsive = useResponsive();
   const [reloadKey, setReloadKey] = React.useState(0);
   const stats = useDashboardStats(reloadKey);
   const objective = useObjective(reloadKey);
@@ -128,13 +130,86 @@ export default function DashboardScreen() {
       </View>
 
       <View style={styles.content}>
-        {isCommercial && <ObjectiveBox objective={objective} />}
+        {role !== 'admin' && <ObjectiveBox objective={objective} label={role !== 'commercial' ? 'OBJECTIF AGENCE' : undefined} />}
 
-        <View style={styles.metricsGrid}>
-          <View style={styles.metricCol}>
+        {(role === 'chef_agence' || role === 'manager' || role === 'manager_adjoint') && (
+          <View style={[
+            styles.metricsGrid,
+            {
+              flexDirection: responsive.isTablet ? 'column' : 'row',
+              flexWrap: responsive.isTablet ? 'nowrap' : 'wrap',
+            }
+          ]}>
+            <View style={[
+              styles.metricCol,
+              {
+                flex: responsive.columns === 1 ? 1 : responsive.columns / 2,
+                marginRight: responsive.columns > 1 ? spacing.sm / 2 : 0,
+              }
+            ]}>
+              <MetricCard
+                label="CA Vie équipe"
+                value={`${fmt(objective.caVie)} FCFA`}
+                subtext="Réalisé par l'équipe Vie"
+                valueColor={colors.success}
+              />
+            </View>
+            <View style={[
+              styles.metricCol,
+              {
+                flex: responsive.columns === 1 ? 1 : responsive.columns / 2,
+                marginLeft: responsive.columns > 1 ? spacing.sm / 2 : 0,
+              }
+            ]}>
+              <MetricCard
+                label="CA Non-Vie équipe"
+                value={`${fmt(objective.caNonVie)} FCFA`}
+                subtext="Réalisé par l'équipe Non-Vie"
+                valueColor={colors.violet}
+              />
+            </View>
+            <View style={[
+              styles.metricCol,
+              {
+                flex: responsive.columns === 1 ? 1 : responsive.columns / 2,
+                marginRight: responsive.columns > 1 ? spacing.sm / 2 : 0,
+              }
+            ]}>
+              <MetricCard
+                label="CA total équipe"
+                value={`${fmt(objective.ca)} FCFA`}
+                subtext="Vie + Non-Vie réalisés"
+                valueColor={colors.violetDark}
+              />
+            </View>
+            <View style={[
+              styles.metricCol,
+              {
+                flex: responsive.columns === 1 ? 1 : responsive.columns / 2,
+                marginLeft: responsive.columns > 1 ? spacing.sm / 2 : 0,
+              }
+            ]}>
+              <MetricCard
+                label="Objectif agence"
+                value={`${fmt(objective.total)} FCFA`}
+                subtext="Objectif + reporté"
+                valueColor={colors.orange}
+              />
+            </View>
+          </View>
+        )}
+
+        <View style={[
+          styles.metricsGrid,
+          {
+            flexDirection: responsive.columns > 2 ? 'row' : 'column',
+            gap: responsive.gap,
+          }
+        ]}>
+          <View style={[styles.metricCol, { flex: responsive.columns > 2 ? 1 : undefined }]}>
             <MetricCard label="Prospects actives" value={stats.activeProspects} subtext="en cours" valueColor={colors.violet} />
           </View>
-          <View style={styles.metricCol}>
+          <View style={[styles.metricCol, { flex: responsive.columns > 2 ? 1 : undefined }]}>
             <MetricCard
               label="Cotations"
               value={stats.quotations}
@@ -142,16 +217,22 @@ export default function DashboardScreen() {
               valueColor={colors.teal}
             />
           </View>
-          <View style={styles.metricCol}>
+          <View style={[styles.metricCol, { flex: responsive.columns > 2 ? 1 : undefined }]}>
             <MetricCard label="Ventes" value={stats.completedSales} subtext="contrats" valueColor={colors.orange} />
           </View>
-          <View style={styles.metricCol}>
+          <View style={[styles.metricCol, { flex: responsive.columns > 2 ? 1 : undefined }]}>
             <MetricCard label="CA total" value={`${fmt(Math.round(stats.totalRevenue / 1000))}K`} subtext="FCFA" valueColor={colors.violetDark} />
           </View>
         </View>
 
-        <View style={styles.twoColumnSection}>
-          <View style={styles.leftColumn}>
+        <View style={[
+          styles.twoColumnSection,
+          {
+            flexDirection: responsive.isTablet ? 'column' : 'row',
+            gap: responsive.gap,
+          }
+        ]}>
+          <View style={[styles.leftColumn, responsive.isTablet && { width: '100%' }]}>
             <Pipeline
               steps={[
                 { label: 'Prospection', count: stats.pipelineData.prospects, status: 'done' },
@@ -160,7 +241,7 @@ export default function DashboardScreen() {
               ]}
             />
           </View>
-          <View style={styles.rightColumn}>
+          <View style={[styles.rightColumn, responsive.isTablet && { width: '100%' }]}>
             <UrgentFollowUps prospects={stats.urgentFollowUps} />
           </View>
         </View>
@@ -189,7 +270,17 @@ const styles = StyleSheet.create({
   loadingText: { marginTop: spacing.md, fontSize: 16, color: colors.gray600 },
   errorText: { fontSize: 18, fontWeight: '600', color: colors.danger, textAlign: 'center' },
   errorSubtext: { fontSize: 14, color: colors.gray600, textAlign: 'center', marginTop: spacing.sm },
-  topBar: { backgroundColor: colors.white, paddingHorizontal: spacing.xl, paddingTop: spacing.lg, paddingBottom: spacing.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.gray200 },
+  topBar: {
+    backgroundColor: colors.white,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray200
+  },
   pageTitle: { fontSize: 18, fontWeight: '700', color: colors.violetDark },
   pageSubtitle: { fontSize: 13, color: colors.gray400, marginTop: 2 },
   topBarActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
@@ -198,10 +289,22 @@ const styles = StyleSheet.create({
   exportBtn: { paddingHorizontal: spacing.md, paddingVertical: 10, borderRadius: 10, backgroundColor: colors.success, alignItems: 'center', justifyContent: 'center' },
   exportBtnText: { fontSize: 12, fontWeight: '700', color: colors.white },
   topButton: { paddingHorizontal: spacing.md, paddingVertical: 4, minHeight: 32 },
-  content: { padding: spacing.xl },
-  metricsGrid: { flexDirection: 'row', marginBottom: spacing.xl, gap: spacing.sm },
-  metricCol: { flex: 1 },
-  twoColumnSection: { flexDirection: 'row', gap: spacing.lg },
+  content: { padding: spacing.xl, gap: spacing.lg },
+  metricsGrid: {
+    flexDirection: 'row',
+    marginBottom: spacing.xl,
+    gap: spacing.sm,
+    flexWrap: 'wrap',
+  },
+  metricCol: {
+    flex: 1,
+    minWidth: 150,
+  },
+  twoColumnSection: {
+    flexDirection: 'row',
+    gap: spacing.lg,
+    minHeight: 300,
+  },
   leftColumn: { flex: 1 },
   rightColumn: { flex: 1 },
 });

@@ -21,6 +21,9 @@ export const API_ENDPOINTS = {
     STATS: '/api/dashboard',
     CA_HISTORIQUE: '/api/dashboard/ca-historique',
   },
+  OBJECTIFS: {
+    ALLOCATE: '/api/objectifs/allocate',
+  },
   COTATIONS: {
     LIST: '/api/cotations',
     CREATE: '/api/cotations',

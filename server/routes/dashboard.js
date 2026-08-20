@@ -47,7 +47,11 @@ commercial_objectives AS (
   SELECT
     u.id,
     COALESCE(o.montant_mensuel, u.objectif_mensuel, 0) AS objectif_mensuel,
-    COALESCE(o.montant_reporte, 0) AS montant_reporte
+    COALESCE(o.montant_mensuel_vie, COALESCE(o.montant_mensuel, u.objectif_mensuel, 0) / 2, 0) AS objectif_mensuel_vie,
+    COALESCE(o.montant_mensuel_non_vie, COALESCE(o.montant_mensuel, u.objectif_mensuel, 0) / 2, 0) AS objectif_mensuel_non_vie,
+    COALESCE(o.montant_reporte, 0) AS montant_reporte,
+    COALESCE(o.montant_reporte_vie, 0) AS montant_reporte_vie,
+    COALESCE(o.montant_reporte_non_vie, 0) AS montant_reporte_non_vie
   FROM users u
   LEFT JOIN objectifs o ON o.commercial_id = u.id AND TO_CHAR(o.mois,'YYYY-MM') = TO_CHAR($1::date,'YYYY-MM')
   WHERE u.role = 'commercial' AND u.active = true
@@ -59,12 +63,28 @@ user_objectives AS (
     uh.role,
     CASE
       WHEN uh.role = 'commercial' THEN co.objectif_mensuel
-      ELSE COALESCE((SELECT SUM(co2.objectif_mensuel) FROM commercial_objectives co2 WHERE co2.id IN (SELECT id FROM descendants WHERE root_id = uh.id)), 0)
+      ELSE COALESCE(NULLIF(uh.objectif_mensuel, 0), (SELECT SUM(co2.objectif_mensuel) FROM commercial_objectives co2 WHERE co2.id IN (SELECT id FROM descendants WHERE root_id = uh.id)), 0)
     END AS objectif_mensuel,
+    CASE
+      WHEN uh.role = 'commercial' THEN co.objectif_mensuel_vie
+      ELSE COALESCE(NULLIF(uh.objectif_mensuel, 0) / 2, (SELECT SUM(co2.objectif_mensuel_vie) FROM commercial_objectives co2 WHERE co2.id IN (SELECT id FROM descendants WHERE root_id = uh.id)), 0)
+    END AS objectif_mensuel_vie,
+    CASE
+      WHEN uh.role = 'commercial' THEN co.objectif_mensuel_non_vie
+      ELSE COALESCE(NULLIF(uh.objectif_mensuel, 0) / 2, (SELECT SUM(co2.objectif_mensuel_non_vie) FROM commercial_objectives co2 WHERE co2.id IN (SELECT id FROM descendants WHERE root_id = uh.id)), 0)
+    END AS objectif_mensuel_non_vie,
     CASE
       WHEN uh.role = 'commercial' THEN co.montant_reporte
       ELSE COALESCE((SELECT SUM(co2.montant_reporte) FROM commercial_objectives co2 WHERE co2.id IN (SELECT id FROM descendants WHERE root_id = uh.id)), 0)
-    END AS montant_reporte
+    END AS montant_reporte,
+    CASE
+      WHEN uh.role = 'commercial' THEN co.montant_reporte_vie
+      ELSE COALESCE((SELECT SUM(co2.montant_reporte_vie) FROM commercial_objectives co2 WHERE co2.id IN (SELECT id FROM descendants WHERE root_id = uh.id)), 0)
+    END AS montant_reporte_vie,
+    CASE
+      WHEN uh.role = 'commercial' THEN co.montant_reporte_non_vie
+      ELSE COALESCE((SELECT SUM(co2.montant_reporte_non_vie) FROM commercial_objectives co2 WHERE co2.id IN (SELECT id FROM descendants WHERE root_id = uh.id)), 0)
+    END AS montant_reporte_non_vie
   FROM user_hierarchy uh
   LEFT JOIN commercial_objectives co ON co.id = uh.id
   WHERE uh.role IN ('commercial', 'manager_adjoint', 'manager', 'chef_agence')
@@ -78,6 +98,28 @@ user_ca AS (
     AND COALESCE(active::text, 'true') IN ('t','true','1')
   GROUP BY commercial_id
 ),
+user_ca_vie AS (
+  SELECT
+    v.commercial_id,
+    COALESCE(SUM(v.ca), 0) AS ca_vie
+  FROM ventes v
+  LEFT JOIN produits p ON v.produit_id = p.id
+  WHERE DATE_TRUNC('month', v.date_vente) = DATE_TRUNC('month', $1::date)
+    AND COALESCE(v.active::text, 'true') IN ('t','true','1')
+    AND COALESCE(p.categorie, 'non_vie') = 'vie'
+  GROUP BY v.commercial_id
+),
+user_ca_non_vie AS (
+  SELECT
+    v.commercial_id,
+    COALESCE(SUM(v.ca), 0) AS ca_non_vie
+  FROM ventes v
+  LEFT JOIN produits p ON v.produit_id = p.id
+  WHERE DATE_TRUNC('month', v.date_vente) = DATE_TRUNC('month', $1::date)
+    AND COALESCE(v.active::text, 'true') IN ('t','true','1')
+    AND COALESCE(p.categorie, 'non_vie') = 'non_vie'
+  GROUP BY v.commercial_id
+),
 hierarchical_ca AS (
   SELECT
     d.root_id AS user_id,
@@ -85,22 +127,46 @@ hierarchical_ca AS (
   FROM descendants d
   LEFT JOIN user_ca uc ON uc.commercial_id = d.id
   GROUP BY d.root_id
+),
+hierarchical_ca_vie AS (
+  SELECT
+    d.root_id AS user_id,
+    COALESCE(SUM(uc.ca_vie), 0) AS ca_vie
+  FROM descendants d
+  LEFT JOIN user_ca_vie uc ON uc.commercial_id = d.id
+  GROUP BY d.root_id
+),
+hierarchical_ca_non_vie AS (
+  SELECT
+    d.root_id AS user_id,
+    COALESCE(SUM(uc.ca_non_vie), 0) AS ca_non_vie
+  FROM descendants d
+  LEFT JOIN user_ca_non_vie uc ON uc.commercial_id = d.id
+  GROUP BY d.root_id
 )
 SELECT
   uo.id AS commercial_id,
   uo.nom AS commercial_nom,
   $1::date AS mois,
   uo.objectif_mensuel,
+  uo.objectif_mensuel_vie,
+  uo.objectif_mensuel_non_vie,
   uo.montant_reporte AS reporte,
+  uo.montant_reporte_vie,
+  uo.montant_reporte_non_vie,
   uo.objectif_mensuel + uo.montant_reporte AS total_objectif,
   COALESCE(hc.ca_realise, 0) AS ca_realise,
+  COALESCE(hc_vie.ca_vie, 0) AS ca_vie,
+  COALESCE(hc_non_vie.ca_non_vie, 0) AS ca_non_vie,
   GREATEST(0, uo.objectif_mensuel + uo.montant_reporte - COALESCE(hc.ca_realise, 0)) AS montant_restant,
   CASE
     WHEN uo.objectif_mensuel + uo.montant_reporte = 0 THEN 0
     ELSE LEAST(100, ROUND(COALESCE(hc.ca_realise, 0) / (uo.objectif_mensuel + uo.montant_reporte) * 100, 1))
   END AS pct_atteint
 FROM user_objectives uo
-LEFT JOIN hierarchical_ca hc ON hc.user_id = uo.id`;
+LEFT JOIN hierarchical_ca hc ON hc.user_id = uo.id
+LEFT JOIN hierarchical_ca_vie hc_vie ON hc_vie.user_id = uo.id
+LEFT JOIN hierarchical_ca_non_vie hc_non_vie ON hc_non_vie.user_id = uo.id`;
 
     if (user.role === 'commercial') {
       objParams.push(user.id);
@@ -164,15 +230,37 @@ LEFT JOIN hierarchical_ca hc ON hc.user_id = uo.id`;
 
       const userData = userRows[0];
       if (userData) {
-        const { rows: caRows } = await pool.query(
-          `SELECT COALESCE(SUM(ca), 0) AS ca_realise
-           FROM ventes
-           WHERE commercial_id = $1
-             AND DATE_TRUNC('month', date_vente) = DATE_TRUNC('month', CURRENT_DATE)`,
-          [user.id]
-        );
+        const [caRows, caVieRows, caNonVieRows] = await Promise.all([
+          pool.query(
+            `SELECT COALESCE(SUM(ca), 0) AS ca_realise
+             FROM ventes
+             WHERE commercial_id = $1
+               AND DATE_TRUNC('month', date_vente) = DATE_TRUNC('month', CURRENT_DATE)`,
+            [user.id]
+          ),
+          pool.query(
+            `SELECT COALESCE(SUM(v.ca), 0) AS ca_vie
+             FROM ventes v
+             LEFT JOIN produits p ON v.produit_id = p.id
+             WHERE v.commercial_id = $1
+               AND DATE_TRUNC('month', v.date_vente) = DATE_TRUNC('month', CURRENT_DATE)
+               AND COALESCE(p.categorie, 'non_vie') = 'vie'`,
+            [user.id]
+          ),
+          pool.query(
+            `SELECT COALESCE(SUM(v.ca), 0) AS ca_non_vie
+             FROM ventes v
+             LEFT JOIN produits p ON v.produit_id = p.id
+             WHERE v.commercial_id = $1
+               AND DATE_TRUNC('month', v.date_vente) = DATE_TRUNC('month', CURRENT_DATE)
+               AND COALESCE(p.categorie, 'non_vie') = 'non_vie'`,
+            [user.id]
+          ),
+        ]);
 
-        const caRealise = Number(caRows[0]?.ca_realise || 0);
+        const caRealise = Number(caRows.rows[0]?.ca_realise || 0);
+        const caVie = Number(caVieRows.rows[0]?.ca_vie || 0);
+        const caNonVie = Number(caNonVieRows.rows[0]?.ca_non_vie || 0);
         const montantMensuel = Number(userData.objectif_mensuel || 0);
         const totalObjectif = montantMensuel;
         const montantRestant = Math.max(0, totalObjectif - caRealise);
@@ -185,10 +273,16 @@ LEFT JOIN hierarchical_ca hc ON hc.user_id = uo.id`;
           commercial_id: user.id,
           commercial_nom: userData.nom,
           mois: `${moisActuel}-01`,
-          montant_mensuel: montantMensuel,
-          montant_reporte: 0,
+          objectif_mensuel: montantMensuel,
+          objectif_mensuel_vie: montantMensuel / 2,
+          objectif_mensuel_non_vie: montantMensuel / 2,
+          reporte: 0,
+          montant_reporte_vie: 0,
+          montant_reporte_non_vie: 0,
           total_objectif: totalObjectif,
           ca_realise: caRealise,
+          ca_vie: caVie,
+          ca_non_vie: caNonVie,
           montant_restant: montantRestant,
           pct_atteint: pctAtteint,
         }];

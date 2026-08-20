@@ -3,43 +3,26 @@ import {
   View, Text, ScrollView, StyleSheet, RefreshControl,
 } from 'react-native';
 import { useAuth } from '../../src/hooks/useAuth';
-import { useObjective, useTeamObjectives } from '../../src/hooks/useDashboardStats';
-import { useVentes } from '../../src/hooks/useVentes';
-import { useProspections } from '../../src/hooks/useProspections';
+import { useResponsive } from '../../src/hooks/useResponsive';
+import { useTeamObjectives } from '../../src/hooks/useDashboardStats';
 import { colors, spacing, radius } from '../../src/config/theme';
 import { ProgressBar } from '../../src/components/common/Button';
 import { Header } from '../../src/components/common/Header';
-import { fmt, fmtDate } from '../../src/utils/constants';
+import { fmt } from '../../src/utils/constants';
 
 export default function ObjectifsScreen() {
   const { user } = useAuth();
+  const responsive = useResponsive();
   const [refreshing, setRefreshing] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const role = user?.role ?? 'commercial';
-  const isCommercial = role === 'commercial';
-  const objective    = useObjective(refreshKey);
-  const teamObj      = useTeamObjectives(refreshKey);
-  const { ventes } = useVentes();
-  const { prospections } = useProspections();
+  const teamObj = useTeamObjectives(refreshKey);
 
   const onRefresh = () => {
     setRefreshing(true);
     setRefreshKey(prev => prev + 1);
     setTimeout(() => setRefreshing(false), 600);
   };
-
-  // For commercial: contracts this month
-  const name = user?.name ?? '';
-  const now  = new Date();
-  const myVentesMois = ventes.filter(v => {
-    if (v.commercial !== name) return false;
-    if (!v.dateVente) return false;
-    const d = new Date(v.dateVente);
-    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-  });
-  const myProspactives = prospections.filter(
-    p => p.commercial === name && !['Contrat conclu', 'Perdu'].includes(p.statut)
-  );
 
   return (
     <ScrollView
@@ -49,92 +32,16 @@ export default function ObjectifsScreen() {
     >
       <Header title="Objectifs" subtitle={new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })} />
 
-      <View style={styles.content}>
-        {isCommercial ? (
-          <>
-            {/* ── Personal objective box ── */}
-            <View style={styles.objBox}>
-              <Text style={styles.objLabel}>MON OBJECTIF — {new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }).toUpperCase()}</Text>
-              <Text style={styles.objValue}>
-                <Text style={{ color: colors.orange }}>{fmt(objective.ca)}</Text>
-                {' '}FCFA
-              </Text>
-              <Text style={styles.objSub}>sur {fmt(objective.total)} FCFA à réaliser</Text>
+      <View style={[styles.content, { paddingHorizontal: responsive.padding }]}>
+        {/* ── Team objectives ── */}
+        <View style={styles.infoBox}>
+          <Text style={styles.infoText}>
+            📌  Les objectifs non atteints en fin de mois sont <Text style={{ fontWeight: '700' }}>automatiquement reportés</Text> sur le mois suivant et s'ajoutent au nouvel objectif.
+          </Text>
+        </View>
 
-              <View style={styles.progressWrap}>
-                <View style={styles.progressLabelRow}>
-                  <Text style={styles.progressLabel}>Progression</Text>
-                  <Text style={styles.progressPct}>{objective.pct}%</Text>
-                </View>
-                <View style={{ height: 12, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 99, overflow: 'hidden' }}>
-                  <View style={{ width: `${objective.pct}%`, height: '100%', backgroundColor: colors.orange, borderRadius: 99 }} />
-                </View>
-              </View>
-
-              <View style={styles.reportBox}>
-                <Text style={styles.reportText}>
-                  {objective.reporte > 0
-                    ? `⚠️  ${fmt(objective.reporte)} FCFA reportés du mois précédent + ${fmt(objective.mensuel)} FCFA = ${fmt(objective.total)} FCFA au total.`
-                    : `Objectif mensuel : ${fmt(objective.mensuel)} FCFA.`
-                  }
-                  {objective.reste > 0
-                    ? `  Il reste ${fmt(objective.reste)} FCFA à réaliser.`
-                    : '  🎉 Objectif atteint !'
-                  }
-                </Text>
-              </View>
-            </View>
-
-            {/* ── Two columns ── */}
-            <View style={styles.twoCol}>
-              {/* Ventes ce mois */}
-              <View style={[styles.card, { flex: 1, marginRight: spacing.md }]}>
-                <Text style={styles.cardTitle}>✅ Ventes ce mois</Text>
-                {myVentesMois.length === 0
-                  ? <Text style={styles.emptyText}>Aucune vente ce mois</Text>
-                  : myVentesMois.map(v => (
-                    <View key={v.id} style={styles.listRow}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.listNom} numberOfLines={1}>{(v.produit || 'Produit').split(' ').slice(0, 2).join(' ')}</Text>
-                        <Text style={styles.listSub}>{fmtDate(v.dateVente)}</Text>
-                      </View>
-                      <Text style={styles.listValue}>{fmt(v.primeNette)}</Text>
-                    </View>
-                  ))
-                }
-              </View>
-
-              {/* Prospects à conclure */}
-              <View style={[styles.card, { flex: 1 }]}>
-                <Text style={styles.cardTitle}>🔄 À conclure</Text>
-                {myProspactives.length === 0
-                  ? <Text style={styles.emptyText}>Tous conclus ! 🎉</Text>
-                  : myProspactives.map(p => (
-                    <View key={p.id} style={styles.listRow}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.listNom} numberOfLines={1}>{(p.produit || 'Produit').split(' ').slice(0, 2).join(' ')}</Text>
-                        <Text style={styles.listSub}>{p.dateRelance ? new Date(p.dateRelance).toLocaleDateString('fr-FR') : 'Sans relance'}</Text>
-                      </View>
-                      <View style={[styles.miniStatut, { backgroundColor: p.statut === 'Cotation envoyée' ? colors.violetPale : colors.warningBg }]}>
-                        <Text style={{ fontSize: 9, color: p.statut === 'Cotation envoyée' ? colors.violet : colors.warning }}>{p.statut.split(' ')[0]}</Text>
-                      </View>
-                    </View>
-                  ))
-                }
-              </View>
-            </View>
-          </>
-        ) : (
-          <>
-            {/* ── Team objectives ── */}
-            <View style={styles.infoBox}>
-              <Text style={styles.infoText}>
-                📌  Les objectifs non atteints en fin de mois sont <Text style={{ fontWeight: '700' }}>automatiquement reportés</Text> sur le mois suivant et s'ajoutent au nouvel objectif.
-              </Text>
-            </View>
-
-            {teamObj.map(o => (
-              <View key={o.commercial + o.mensuel} style={styles.teamCard}>
+          {teamObj.map(o => (
+                <View key={o.commercial + o.mensuel} style={styles.teamCard}>
                 <View style={styles.teamHeader}>
                   <View style={styles.teamAvatar}>
                     <Text style={styles.teamAvatarText}>{o.commercial.slice(0, 2)}</Text>
@@ -152,6 +59,34 @@ export default function ObjectifsScreen() {
                   <ProgressBar value={o.pct} />
                 </View>
 
+                {/* Vie and Non-Vie breakdown */}
+                <View style={{ flexDirection: 'row', marginTop: spacing.md, gap: spacing.md }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.miniTitle}>Vie</Text>
+                    <Text style={styles.miniValue}>{fmt(o.caVie)} / {fmt(o.mensuelVie + o.reporteVie)} FCFA</Text>
+                    <View style={{ height: 6, backgroundColor: 'rgba(0,0,0,0.1)', borderRadius: 3, overflow: 'hidden', marginTop: 4 }}>
+                      <View style={{
+                        width: `${o.mensuelVie + o.reporteVie > 0 ? Math.min(100, (o.caVie / (o.mensuelVie + o.reporteVie)) * 100) : 0}%`,
+                        height: '100%',
+                        backgroundColor: colors.success,
+                        borderRadius: 3
+                      }} />
+                    </View>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.miniTitle}>Non-Vie</Text>
+                    <Text style={styles.miniValue}>{fmt(o.caNonVie)} / {fmt(o.mensuelNonVie + o.reporteNonVie)} FCFA</Text>
+                    <View style={{ height: 6, backgroundColor: 'rgba(0,0,0,0.1)', borderRadius: 3, overflow: 'hidden', marginTop: 4 }}>
+                      <View style={{
+                        width: `${o.mensuelNonVie + o.reporteNonVie > 0 ? Math.min(100, (o.caNonVie / (o.mensuelNonVie + o.reporteNonVie)) * 100) : 0}%`,
+                        height: '100%',
+                        backgroundColor: colors.violet,
+                        borderRadius: 3
+                      }} />
+                    </View>
+                  </View>
+                </View>
+
                 <View style={styles.teamDetails}>
                   <Text style={styles.teamDetailText}>Objectif : {fmt(o.mensuel)} FCFA</Text>
                   {o.reporte > 0 && (
@@ -165,8 +100,6 @@ export default function ObjectifsScreen() {
                 </View>
               </View>
             ))}
-          </>
-        )}
       </View>
     </ScrollView>
   );
@@ -205,4 +138,8 @@ const styles = StyleSheet.create({
   teamPct: { fontSize: 18, fontWeight: '800' },
   teamDetails: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg, marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.gray100 },
   teamDetailText: { fontSize: 12, color: colors.gray600 },
+  miniTitle: { fontSize: 11, color: colors.gray600, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
+  miniValue: { fontSize: 12, color: colors.gray800, fontWeight: '600' },
+  errorBox: { backgroundColor: colors.dangerBg, borderRadius: radius.sm, padding: spacing.lg, marginBottom: spacing.xl, borderLeftWidth: 3, borderLeftColor: colors.danger },
+  errorText: { fontSize: 13, color: colors.danger, lineHeight: 19 },
 });

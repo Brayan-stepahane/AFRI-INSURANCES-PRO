@@ -40,12 +40,19 @@ interface ObjProps {
     reporte: number;
     pct: number;
     reste: number;
+    caVie?: number;
+    caNonVie?: number;
+    mensuelVie?: number;
+    mensuelNonVie?: number;
+    reporteVie?: number;
+    reporteNonVie?: number;
     loading?: boolean;
     error?: string | null;
   };
+  label?: string;
 }
 
-export function ObjectiveBox({ objective }: ObjProps) {
+export function ObjectiveBox({ objective, label }: ObjProps) {
   const {
     ca,
     total,
@@ -53,6 +60,12 @@ export function ObjectiveBox({ objective }: ObjProps) {
     reporte,
     pct,
     reste,
+    caVie = 0,
+    caNonVie = 0,
+    mensuelVie = mensuel / 2,
+    mensuelNonVie = mensuel / 2,
+    reporteVie = 0,
+    reporteNonVie = 0,
   } = objective;
 
   const now = new Date();
@@ -60,46 +73,86 @@ export function ObjectiveBox({ objective }: ObjProps) {
   const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   const monthEnd = `${lastDayOfMonth} ${now.toLocaleDateString('fr-FR', { month: 'long' }).toLowerCase()}`;
 
+  const totalVie = mensuelVie + reporteVie;
+  const totalNonVie = mensuelNonVie + reporteNonVie;
+  const pctVie = totalVie > 0 ? Math.min(100, Math.round((caVie / totalVie) * 100)) : 0;
+  const pctNonVie = totalNonVie > 0 ? Math.min(100, Math.round((caNonVie / totalNonVie) * 100)) : 0;
+
   return (
-    <View style={objStyles.container}>
-      {/* Top row: Label and Progress percentage */}
-      <View style={objStyles.topRow}>
-        <Text style={objStyles.label}>OBJECTIF {monthName}</Text>
-        <View style={objStyles.progressPct}>
-          <Text style={objStyles.progressPctText}>Avancement</Text>
-          <Text style={objStyles.pctValue}>{pct}%</Text>
+    <View>
+      <View style={objStyles.container}>
+        {/* Top row: Label and Progress percentage */}
+        <View style={objStyles.topRow}>
+          <Text style={objStyles.label}>{label || `OBJECTIF ${monthName}`}</Text>
+          <View style={objStyles.progressPct}>
+            <Text style={objStyles.progressPctText}>Avancement</Text>
+            <Text style={objStyles.pctValue}>{pct}%</Text>
+          </View>
+        </View>
+
+        {/* Monetary objective display row */}
+        <View style={objStyles.contractRow}>
+          <View style={objStyles.contractDisplay}>
+            <Text style={objStyles.contractIcon}>{fmt(ca)} FCFA</Text>
+            <Text style={objStyles.contractCount}>/ {fmt(total)} FCFA</Text>
+          </View>
+          <Text style={objStyles.subtext}>Chiffre d'affaires réalisé</Text>
+        </View>
+
+        {/* Progress bar */}
+        <View style={objStyles.progressBarContainer}>
+          <ProgressBar value={pct} color={pct >= 100 ? colors.success : colors.orange} />
+        </View>
+
+        {/* Details text box - monetary objective content */}
+        <View style={objStyles.detailsBox}>
+          <Text style={objStyles.detailsText}>
+            💼  <Text style={objStyles.textRed}>{fmt(reporte)} FCFA</Text> reportés du mois précédent + <Text style={objStyles.textRed}>{fmt(mensuel)} FCFA</Text> ce mois = <Text style={objStyles.textRed}>{fmt(total)} FCFA</Text>.
+          </Text>
+          <Text style={objStyles.detailsText}>
+            Il vous reste <Text style={objStyles.textRed}>{fmt(reste)} FCFA</Text> à réaliser d'ici le <Text style={objStyles.textRed}>{monthEnd}</Text>.
+          </Text>
         </View>
       </View>
 
-      {/* Monetary objective display row */}
-      <View style={objStyles.contractRow}>
-        <View style={objStyles.contractDisplay}>
-          <Text style={objStyles.contractIcon}>{fmt(ca)} FCFA</Text>
-          <Text style={objStyles.contractCount}>/ {fmt(total)} FCFA</Text>
+      {/* Vie and Non-Vie Breakdown */}
+      <View style={objStyles.twoColContainer}>
+        {/* Vie */}
+        <View style={objStyles.vieContainer}>
+          <View style={objStyles.vieTopRow}>
+            <Text style={objStyles.vieLabel}>ASSURANCE VIE</Text>
+            <Text style={objStyles.viePct}>{pctVie}%</Text>
+          </View>
+          <View style={objStyles.vieValue}>
+            <Text style={objStyles.vieAmount}>{fmt(caVie)} FCFA</Text>
+            <Text style={objStyles.vieTarget}>/ {fmt(totalVie)} FCFA</Text>
+          </View>
+          <View style={objStyles.vieProgressBar}>
+            <View style={[objStyles.vieProgressFill, { width: `${pctVie}%`, backgroundColor: colors.success }]} />
+          </View>
         </View>
-        <Text style={objStyles.subtext}>Chiffre d'affaires réalisé</Text>
-      </View>
 
-      {/* Progress bar */}
-      <View style={objStyles.progressBarContainer}>
-        <ProgressBar value={pct} color={pct >= 100 ? colors.success : colors.orange} />
-      </View>
-
-      {/* Details text box - monetary objective content */}
-      <View style={objStyles.detailsBox}>
-        <Text style={objStyles.detailsText}>
-          💼  <Text style={objStyles.textRed}>{fmt(reporte)} FCFA</Text> reportés du mois précédent + <Text style={objStyles.textRed}>{fmt(mensuel)} FCFA</Text> ce mois = <Text style={objStyles.textRed}>{fmt(total)} FCFA</Text>.
-        </Text>
-        <Text style={objStyles.detailsText}>
-          Il vous reste <Text style={objStyles.textRed}>{fmt(reste)} FCFA</Text> à réaliser d'ici le <Text style={objStyles.textRed}>{monthEnd}</Text>.
-        </Text>
+        {/* Non-Vie */}
+        <View style={objStyles.nonVieContainer}>
+          <View style={objStyles.nonVieTopRow}>
+            <Text style={objStyles.nonVieLabel}>ASSURANCE NON-VIE</Text>
+            <Text style={objStyles.nonViePct}>{pctNonVie}%</Text>
+          </View>
+          <View style={objStyles.nonVieValue}>
+            <Text style={objStyles.nonVieAmount}>{fmt(caNonVie)} FCFA</Text>
+            <Text style={objStyles.nonVieTarget}>/ {fmt(totalNonVie)} FCFA</Text>
+          </View>
+          <View style={objStyles.nonVieProgressBar}>
+            <View style={[objStyles.nonVieProgressFill, { width: `${pctNonVie}%`, backgroundColor: colors.violet }]} />
+          </View>
+        </View>
       </View>
     </View>
   );
 }
 
 const objStyles = StyleSheet.create({
-  container: { backgroundColor: colors.violetDark, borderRadius: radius.lg, padding: spacing.xxxl, marginBottom: spacing.xl },
+  container: { backgroundColor: colors.violetDark, borderRadius: radius.lg, padding: spacing.xxxl, marginBottom: spacing.lg },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.xl },
   label: { fontSize: 10, color: 'rgba(255,255,255,0.55)', letterSpacing: 1, textTransform: 'uppercase', fontWeight: '600' },
   progressPct: { alignItems: 'flex-end' },
@@ -115,6 +168,25 @@ const objStyles = StyleSheet.create({
   detailsText: { fontSize: 12, lineHeight: 18, color: 'rgba(255,255,255,0.85)' },
   textRed: { color: colors.orange, fontWeight: '700' },
   textNormal: { color: 'rgba(255,255,255,0.85)' },
+  twoColContainer: { flexDirection: 'row', gap: spacing.lg, marginBottom: spacing.xl },
+  vieContainer: { flex: 1, backgroundColor: colors.violetDark, borderRadius: radius.lg, padding: spacing.xl },
+  vieTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md },
+  vieLabel: { fontSize: 9, color: 'rgba(255,255,255,0.55)', letterSpacing: 1, textTransform: 'uppercase', fontWeight: '600' },
+  viePct: { fontSize: 14, fontWeight: '800', color: colors.orange },
+  vieValue: { flexDirection: 'row', alignItems: 'baseline', gap: 2, marginBottom: spacing.md },
+  vieAmount: { fontSize: 18, color: colors.orange, fontWeight: '800' },
+  vieTarget: { fontSize: 14, fontWeight: '800', color: colors.white },
+  vieProgressBar: { height: 6, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 3, overflow: 'hidden' },
+  vieProgressFill: { height: '100%', borderRadius: 3 },
+  nonVieContainer: { flex: 1, backgroundColor: colors.violetDark, borderRadius: radius.lg, padding: spacing.xl },
+  nonVieTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md },
+  nonVieLabel: { fontSize: 9, color: 'rgba(255,255,255,0.55)', letterSpacing: 1, textTransform: 'uppercase', fontWeight: '600' },
+  nonViePct: { fontSize: 14, fontWeight: '800', color: colors.orange },
+  nonVieValue: { flexDirection: 'row', alignItems: 'baseline', gap: 2, marginBottom: spacing.md },
+  nonVieAmount: { fontSize: 18, color: colors.orange, fontWeight: '800' },
+  nonVieTarget: { fontSize: 14, fontWeight: '800', color: colors.white },
+  nonVieProgressBar: { height: 6, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 3, overflow: 'hidden' },
+  nonVieProgressFill: { height: '100%', borderRadius: 3 },
 });
 
 // ─── PIPELINE ─────────────────────────────────────────────────────────────────

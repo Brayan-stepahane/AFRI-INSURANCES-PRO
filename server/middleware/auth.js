@@ -8,7 +8,8 @@ module.exports = (req, res, next) => {
   if (!token) return res.status(401).json({ error: 'Format invalide' });
 
   try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET);
+    const secret = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+    req.user = jwt.verify(token, secret);
     next();
   } catch {
     res.status(401).json({ error: 'Token invalide ou expiré' });

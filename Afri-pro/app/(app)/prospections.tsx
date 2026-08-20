@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/hooks/useAuth';
+import { useResponsive } from '../../src/hooks/useResponsive';
 import { useProspections } from '../../src/hooks/useProspections';
 import { useClients } from '../../src/hooks/useClients';
 import { fmt, fmtDate, isOverdue, STATUTS_PROSP } from '../../src/utils/constants';
@@ -29,6 +30,7 @@ import { API_ENDPOINTS } from '../../src/services/api/endpoints';
 export default function ProspectionsScreen() {
   const { user } = useAuth();
   const router = useRouter();
+  const responsive = useResponsive();
   const { prospections, loading, refetch } = useProspections();
   const { clients } = useClients();
 
@@ -274,7 +276,18 @@ export default function ProspectionsScreen() {
         data={list}
         keyExtractor={(p, index) => `${p.id}-${index}`}
         renderItem={renderItem}
-        contentContainerStyle={{ padding: spacing.xl, paddingBottom: 100 }}
+        numColumns={responsive.columns > 1 ? responsive.columns : 1}
+        key={responsive.columns}
+        contentContainerStyle={{
+          padding: spacing.xl,
+          paddingBottom: 100,
+          gap: spacing.lg,
+        }}
+        columnWrapperStyle={
+          responsive.columns > 1
+            ? { gap: spacing.lg, justifyContent: 'space-between' }
+            : undefined
+        }
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -381,8 +394,9 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.white,
     borderRadius: radius.md,
-    padding: spacing.xl,
-    marginBottom: spacing.lg,
+    padding: spacing.lg,
+    flex: 1,
+    minHeight: 280,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -398,7 +412,7 @@ const styles = StyleSheet.create({
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.lg,
+    gap: spacing.md,
     marginBottom: spacing.md,
   },
   avatar: {
@@ -419,6 +433,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.gray800,
     marginBottom: 3,
+    flex: 1,
   },
 
   produit: {
@@ -450,15 +465,17 @@ const styles = StyleSheet.create({
 
   actions: {
     flexDirection: 'row',
-    gap: spacing.md,
+    gap: spacing.sm,
     flexWrap: 'wrap',
     marginTop: spacing.md,
   },
   actionBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: radius.sm,
     borderWidth: 1,
+    flex: 1,
+    minWidth: 100,
   },
   actionEdit: {
     backgroundColor: colors.violetPale,
@@ -469,9 +486,10 @@ const styles = StyleSheet.create({
     borderColor: '#f5c0c0',
   },
   actionBtnText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: colors.violet,
+    textAlign: 'center',
   },
 
   fab: {

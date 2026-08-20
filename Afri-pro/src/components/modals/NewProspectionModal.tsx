@@ -284,13 +284,14 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
       if (clientId.startsWith('CLI')) {
         try {
           const checkRes = await apiClient.get(API_ENDPOINTS.CLIENTS.LIST, {
-            params: { nom: payload.nom, limit: 5 }
+            params: { search: payload.nom, limit: 5 }
           });
           const duplicate = (checkRes.data || []).find((c: any) =>
             c.nom?.trim().toLowerCase() === payload.nom.toLowerCase()
           );
           if (duplicate) {
             setForm(prev => ({ ...prev, clientId: duplicate.id }));
+            await apiClient.put(`${API_ENDPOINTS.CLIENTS.UPDATE}/${duplicate.id}`, payload);
             return true;
           }
         } catch (e) { /* ignore */ }
@@ -355,7 +356,7 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
         clientType, activity: form.activity?.trim() || '',
         prospectionDate: dateOrNull(form.prospectionDate),
         product: form.product,
-        status: form.status, probability: normalizeProbability(form.probability),
+        status: form.status, probability: form.probability,
         visitDate1: dateOrNull(form.visitDate1), nextFollowUp: dateOrNull(form.nextFollowUp),
         visitDate2: dateOrNull(form.visitDate2), visitDate3: dateOrNull(form.visitDate3),
         previousInsurer: form.previousInsurer || '', previousContract: dateOrNull(form.previousContract),
@@ -696,6 +697,142 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
   const upd = (field: keyof ProspectionFormData, value: any) =>
     setForm(prev => ({ ...prev, [field]: value }));
 
+  const [datePickerVisible, setDatePickerVisible] = useState(false);
+  const [datePickerField, setDatePickerField] = useState<keyof ProspectionFormData | null>(null);
+  const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+
+  const parseDateValue = (value: string | undefined): Date | null => {
+    if (!value) return null;
+    const normalized = normalizeDate(value);
+    const parts = normalized.split('-');
+    if (parts.length !== 3) return null;
+    const [year, month, day] = parts;
+    const date = new Date(Number(year), Number(month) - 1, Number(day));
+    return Number.isNaN(date.getTime()) ? null : date;
+  };
+
+  const formatDateDisplay = (date: Date) => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`;
+  };
+
+  const getMonthCalendar = (baseDate: Date) => {
+    const year = baseDate.getFullYear();
+    const month = baseDate.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const firstWeekDay = firstDay.getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const weeks: Date[][] = [];
+    let currentDay = 1 - firstWeekDay;
+
+    for (let weekIndex = 0; weekIndex < 6; weekIndex += 1) {
+      const week: Date[] = [];
+      for (let dayIndex = 0; dayIndex < 7; dayIndex += 1) {
+        week.push(new Date(year, month, currentDay));
+        currentDay += 1;
+      }
+      weeks.push(week);
+    }
+    return weeks;
+  };
+
+  const isSameDay = (a: Date, b: Date) =>
+    a.getDate() === b.getDate() && a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear();
+
+  const openDatePicker = (field: keyof ProspectionFormData, value: string) => {
+    const parsed = parseDateValue(value) || new Date();
+    setCalendarMonth(new Date(parsed.getFullYear(), parsed.getMonth(), 1));
+    setSelectedDate(parsed);
+    setDatePickerField(field);
+    setDatePickerVisible(true);
+  };
+
+  const closeDatePicker = () => {
+    setDatePickerVisible(false);
+    setDatePickerField(null);
+  };
+
+  const confirmDatePicker = () => {
+    if (datePickerField && selectedDate) {
+      upd(datePickerField, formatDateDisplay(selectedDate));
+    }
+    closeDatePicker();
+  };
+
+  const DateInput = ({ label, value, placeholder, field }: { label: string; value: string; placeholder: string; field: keyof ProspectionFormData }) => (
+    <View>
+      <Text style={styles.label}>{label}</Text>
+      <TouchableOpacity style={[styles.input, styles.dateInput]} onPress={() => openDatePicker(field, value)}>
+        <Text style={[styles.dateInputText, !value && styles.placeholderText]}>
+          {value || placeholder}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderDatePickerModal = () => {
+    const monthTitle = calendarMonth.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+    const weeks = getMonthCalendar(calendarMonth);
+    const weekDays = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+
+    return (
+      <Modal visible={datePickerVisible} transparent animationType="fade">
+        <View style={styles.calendarBackdrop}>
+          <TouchableOpacity style={styles.calendarBackdropTouch} onPress={closeDatePicker} />
+          <View style={styles.calendarModal}>
+            <View style={styles.calendarHeader}>
+              <TouchableOpacity onPress={() => setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}>
+                <Text style={styles.calendarNav}>‹</Text>
+              </TouchableOpacity>
+              <Text style={styles.calendarTitle}>{monthTitle}</Text>
+              <TouchableOpacity onPress={() => setCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}>
+                <Text style={styles.calendarNav}>›</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.calendarWeekRow}>
+              {weekDays.map(day => (
+                <Text key={day} style={[styles.calendarWeekDay, styles.calendarWeekDayLabel]}>{day}</Text>
+              ))}
+            </View>
+            {weeks.map((week, weekIndex) => (
+              <View key={weekIndex} style={styles.calendarWeekRow}>
+                {week.map(day => {
+                  const isCurrentMonth = day.getMonth() === calendarMonth.getMonth();
+                  const isSelected = selectedDate ? isSameDay(day, selectedDate) : false;
+                  return (
+                    <TouchableOpacity
+                      key={day.toISOString()}
+                      style={[
+                        styles.calendarDay,
+                        !isCurrentMonth && styles.calendarDayInactive,
+                        isSelected && styles.calendarDaySelected,
+                      ]}
+                      onPress={() => setSelectedDate(day)}
+                      disabled={!isCurrentMonth}
+                    >
+                      <Text style={[styles.calendarDayText, isSelected && styles.calendarDayTextSelected, !isCurrentMonth && styles.calendarDayTextInactive]}>
+                        {day.getDate()}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ))}
+            <View style={styles.calendarActions}>
+              <TouchableOpacity onPress={closeDatePicker} style={styles.calendarActionButton}>
+                <Text style={styles.calendarActionText}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={confirmDatePicker} style={[styles.calendarActionButton, styles.calendarActionConfirm]} disabled={!selectedDate}>
+                <Text style={[styles.calendarActionText, styles.calendarActionConfirmText]}>Valider</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
   const handleSearchClient = () => {
     const query = form.clientName.trim();
     if (!query) {
@@ -894,23 +1031,19 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
         </View>
       </View>
 
-      <Text style={styles.label}>Date visite 1</Text>
-      <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.visitDate1} onChangeText={v => upd('visitDate1', v)} placeholderTextColor={colors.gray400} />
+      <DateInput label="Date visite 1" value={form.visitDate1} placeholder="jj/mm/aaaa" field="visitDate1" />
 
       <View style={styles.row}>
         <View style={styles.half}>
-          <Text style={styles.label}>Prochaine relance</Text>
-          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.nextFollowUp} onChangeText={v => upd('nextFollowUp', v)} placeholderTextColor={colors.gray400} />
+          <DateInput label="Prochaine relance" value={form.nextFollowUp} placeholder="jj/mm/aaaa" field="nextFollowUp" />
           <Text style={styles.helperText}>Alerte automatique à cette date</Text>
         </View>
         <View style={styles.half}>
-          <Text style={styles.label}>Date visite 2</Text>
-          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.visitDate2} onChangeText={v => upd('visitDate2', v)} placeholderTextColor={colors.gray400} />
+          <DateInput label="Date visite 2" value={form.visitDate2} placeholder="jj/mm/aaaa" field="visitDate2" />
         </View>
       </View>
 
-      <Text style={styles.label}>Date visite 3</Text>
-      <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.visitDate3} onChangeText={v => upd('visitDate3', v)} placeholderTextColor={colors.gray400} />
+      <DateInput label="Date visite 3" value={form.visitDate3} placeholder="jj/mm/aaaa" field="visitDate3" />
 
       <View style={styles.row}>
         <View style={styles.half}>
@@ -918,8 +1051,7 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
           <TextInput style={styles.input} placeholder="Nom compagnie" value={form.previousInsurer} onChangeText={v => upd('previousInsurer', v)} placeholderTextColor={colors.gray400} />
         </View>
         <View style={styles.half}>
-          <Text style={styles.label}>Échéance ancien contrat</Text>
-          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.previousContract} onChangeText={v => upd('previousContract', v)} placeholderTextColor={colors.gray400} />
+          <DateInput label="Échéance ancien contrat" value={form.previousContract} placeholder="jj/mm/aaaa" field="previousContract" />
         </View>
       </View>
 
@@ -959,8 +1091,7 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
           </View>
         </View>
         <View style={styles.half}>
-          <Text style={styles.label}>Date de cotation</Text>
-          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.quotationDate} onChangeText={v => upd('quotationDate', v)} placeholderTextColor={colors.gray400} />
+          <DateInput label="Date de cotation" value={form.quotationDate} placeholder="jj/mm/aaaa" field="quotationDate" />
         </View>
       </View>
 
@@ -970,8 +1101,7 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
           <TextInput style={styles.input} placeholder="Ex: 105 000" value={form.quotationAmount} onChangeText={v => upd('quotationAmount', v)} placeholderTextColor={colors.gray400} />
         </View>
         <View style={styles.half}>
-          <Text style={styles.label}>Date de validation</Text>
-          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.validationDate} onChangeText={v => upd('validationDate', v)} placeholderTextColor={colors.gray400} />
+          <DateInput label="Date de validation" value={form.validationDate} placeholder="jj/mm/aaaa" field="validationDate" />
         </View>
       </View>
     </ScrollView>
@@ -989,8 +1119,7 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
 
       <View style={styles.row}>
         <View style={styles.half}>
-          <Text style={styles.label}>Date de vente</Text>
-          <TextInput style={styles.input} placeholder="dd/mm/yyyy" value={form.saleDate} onChangeText={v => upd('saleDate', v)} placeholderTextColor={colors.gray400} />
+          <DateInput label="Date de vente" value={form.saleDate} placeholder="dd/mm/yyyy" field="saleDate" />
         </View>
         <View style={styles.half}>
           <Text style={styles.label}>Type de vente</Text>
@@ -1024,12 +1153,10 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
 
       <View style={styles.row}>
         <View style={styles.half}>
-          <Text style={styles.label}>Date d'effet</Text>
-          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.effectDate} onChangeText={v => upd('effectDate', v)} placeholderTextColor={colors.gray400} />
+          <DateInput label="Date d'effet" value={form.effectDate} placeholder="jj/mm/aaaa" field="effectDate" />
         </View>
         <View style={styles.half}>
-          <Text style={styles.label}>Date d'échéance</Text>
-          <TextInput style={styles.input} placeholder="jj/mm/aaaa" value={form.expiryDate} onChangeText={v => upd('expiryDate', v)} placeholderTextColor={colors.gray400} />
+          <DateInput label="Date d'échéance" value={form.expiryDate} placeholder="jj/mm/aaaa" field="expiryDate" />
         </View>
       </View>
     </ScrollView>
@@ -1053,6 +1180,7 @@ export function NewProspectionModal({ visible, onClose, onSubmit, editProspectio
 
         {saveMessage ? <Text style={styles.saveMessage}>{saveMessage}</Text> : null}
         {saveError ? <Text style={styles.saveError}>{saveError}</Text> : null}
+        {renderDatePickerModal()}
 
         <View style={styles.formArea}>
           {step === 1 && renderStep1()}
@@ -1123,6 +1251,26 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.gray100 },
   title: { fontSize: 18, fontWeight: '700', color: colors.violetDark },
   closeButton: { fontSize: 22, color: colors.gray400 },
+  calendarBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center' },
+  calendarBackdropTouch: { ...StyleSheet.absoluteFillObject },
+  calendarModal: { width: '90%', maxWidth: 360, backgroundColor: colors.white, borderRadius: radius.lg, overflow: 'hidden', padding: spacing.md },
+  calendarHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
+  calendarNav: { fontSize: 24, color: colors.violet, paddingHorizontal: spacing.sm },
+  calendarTitle: { fontSize: 16, fontWeight: '700', color: colors.gray800 },
+  calendarWeekRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.xs },
+  calendarWeekDay: { width: 36, textAlign: 'center', fontSize: 12, color: colors.gray400 },
+  calendarWeekDayLabel: { fontWeight: '700' },
+  calendarDay: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 18, marginBottom: spacing.xs },
+  calendarDayInactive: { opacity: 0.35 },
+  calendarDaySelected: { backgroundColor: colors.violet },
+  calendarDayText: { fontSize: 13, color: colors.gray800 },
+  calendarDayTextInactive: { color: colors.gray400 },
+  calendarDayTextSelected: { color: colors.white, fontWeight: '700' },
+  calendarActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm, marginTop: spacing.md },
+  calendarActionButton: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.sm },
+  calendarActionText: { fontSize: 14, color: colors.violet, fontWeight: '700' },
+  calendarActionConfirm: { backgroundColor: colors.violet },
+  calendarActionConfirmText: { color: colors.white },
   stepContainer: { flexDirection: 'row', paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, gap: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.gray100 },
   stepBox: { flex: 1, paddingVertical: spacing.md, paddingHorizontal: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.gray200, backgroundColor: colors.white, alignItems: 'center' },
   stepBoxActive: { backgroundColor: colors.violet, borderColor: colors.violet },
@@ -1138,6 +1286,9 @@ const styles = StyleSheet.create({
   hint: { fontSize: 13, color: colors.gray400, marginBottom: spacing.lg },
   label: { fontSize: 13, fontWeight: '600', color: colors.gray800, marginBottom: spacing.sm, marginTop: spacing.md },
   input: { borderWidth: 1, borderColor: colors.gray200, borderRadius: radius.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: 14, color: colors.gray800, backgroundColor: colors.white, minHeight: 40 },
+  dateInput: { justifyContent: 'center' },
+  dateInputText: { fontSize: 14, color: colors.gray800 },
+  placeholderText: { color: colors.gray400 },
   textarea: { minHeight: 80, paddingTop: spacing.sm, textAlignVertical: 'top' },
   helperText: { fontSize: 12, color: colors.gray400, marginTop: 4 },
   searchRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },

@@ -108,6 +108,7 @@ router.get('/:id', auth, async (req, res) => {
     const { rows } = await pool.query(
       `SELECT
          p.*, c.id AS client_id, c.nom AS client_nom, c.telephone AS client_tel,
+         c.email AS email, c.ville AS ville,
          c.type_client, c.activite AS client_activite,
          u.id AS commercial_id, u.nom AS commercial_nom, u.equipe,
          u.parent_id AS commercial_parent_id,
@@ -189,6 +190,10 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ error: `Type de client invalide. Valeurs autorisées: ${validClientTypes.join(', ')}` });
     }
 
+    const rawProbability = Number(probability) || 0;
+    const effectiveProbability = rawProbability <= 1 ? rawProbability : rawProbability / 100;
+    const normalizedProbability = Math.max(0.1, Math.min(1.0, Math.round(effectiveProbability * 10) / 10));
+
     // Call the insert_new_prospection function
     const { rows } = await pool.query(
       `SELECT insert_new_prospection(
@@ -199,7 +204,7 @@ router.post('/', auth, async (req, res) => {
       ) AS prospection_id`,
       [
         clientName, phone, clientType, activity,
-        commercial_id, prospectionDate, product, null, status, probability,
+        commercial_id, prospectionDate, product, null, status, normalizedProbability,
         visitDate1, visitDate2, visitDate3, nextFollowUp,
         previousInsurer, previousContract, observations,
         ratedRisk, quotationDate, quotationAmount, validationDate,
