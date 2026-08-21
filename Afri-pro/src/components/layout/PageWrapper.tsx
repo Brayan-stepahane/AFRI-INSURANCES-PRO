@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl } from 'react-native';
-import { useRouter } from 'expo-router';
 import { colors, spacing, radius } from '../../config/theme';
+import { Footer } from './Footer';
 
 interface PageWrapperProps {
   title: string;
@@ -58,6 +58,8 @@ export function PageWrapper({
       <View style={styles.content}>
         {children}
       </View>
+
+      <Footer />
     </ScrollView>
   );
 }

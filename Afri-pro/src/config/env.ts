@@ -1,24 +1,21 @@
 import { Platform } from 'react-native';
-import Constants from 'expo-constants';
-
 export const ENV = {
   API_URL: (() => {
-    // Priority 1: .env EXPO_PUBLIC_API_URL (Metro bundling)
-    // Priority 2: app.json extra.apiUrl  
-    // Priority 3: Platform fallback
-    
-    if (process.env.EXPO_PUBLIC_API_URL) {
-      console.log('Using EXPO_PUBLIC_API_URL:', process.env.EXPO_PUBLIC_API_URL);
-      return process.env.EXPO_PUBLIC_API_URL;
+    const configuredApiUrl = process.env.EXPO_PUBLIC_API_URL;
+
+    if (configuredApiUrl) {
+      console.log('Using EXPO_PUBLIC_API_URL:', configuredApiUrl);
+      return configuredApiUrl;
     }
 
     if (Platform.OS === 'web') {
       console.log('🌐 Web: localhost:3000');
       return 'http://localhost:3000';
     }
-    
-    console.log('📱 Device: 172.20.10.2:3000 (edit env.ts if IP changes)');
-    return 'http://172.20.10.2:3000';
+
+    const deviceApiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.0.90:3000';
+    console.log('📱 Device:', deviceApiUrl);
+    return deviceApiUrl;
   })(),
   
   APP_ENV: 'development',
