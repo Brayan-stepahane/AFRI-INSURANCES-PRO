@@ -7,6 +7,11 @@ export const ENV = {
     // Priority 2: app.json extra.apiUrl  
     // Priority 3: Platform fallback
     
+    if (process.env.EXPO_PUBLIC_API_URL) {
+      console.log('Using EXPO_PUBLIC_API_URL:', process.env.EXPO_PUBLIC_API_URL);
+      return process.env.EXPO_PUBLIC_API_URL;
+    }
+
     if (Platform.OS === 'web') {
       console.log('🌐 Web: localhost:3000');
       return 'http://localhost:3000';
