@@ -5,7 +5,7 @@ const bcrypt = require('bcryptjs');
 
 // Middleware : réservé aux managers et admins
 const managerOnly = (req, res, next) => {
-  const allowed = ['manager', 'chef_agence', 'admin', 'manager_adjoint', 'manager_adjoint'];
+  const allowed = ['manager', 'chef_agence', 'admin', 'manager_adjoint', 'chef_equipe'];
   if (!allowed.includes(req.user.role))
     return res.status(403).json({ error: 'Accès refusé' });
   next();
@@ -51,7 +51,7 @@ router.post('/', auth, managerOnly, async (req, res) => {
     email,
   } = req.body;
 
-  const normalizedRole = role === 'manager_adjoint' ? 'manager_adjoint' : role;
+  const normalizedRole = (role === 'manager_adjoint' || role === 'chef_equipe') ? role : role;
 
   if (!nom || !prenom || !identifiant || !mot_de_passe || !normalizedRole) {
     return res.status(400).json({ error: 'Nom, prénom, identifiant, mot de passe et rôle sont requis' });
@@ -72,8 +72,8 @@ router.post('/', auth, managerOnly, async (req, res) => {
   if (normalizedRole === 'commercial' && !finalParentId) {
     return res.status(400).json({ error: 'parentId requis pour commercial' });
   }
-  if (normalizedRole === 'manager_adjoint' && !finalParentId) {
-    return res.status(400).json({ error: 'parentId requis pour manager_adjoint' });
+  if ((normalizedRole === 'manager_adjoint' || normalizedRole === 'chef_equipe') && !finalParentId) {
+    return res.status(400).json({ error: `parentId requis pour ${normalizedRole}` });
   }
 
   try {
@@ -92,8 +92,12 @@ router.post('/', auth, managerOnly, async (req, res) => {
       const parentRole = parentRows[0].role;
 
       if (normalizedRole === 'commercial') {
-        if (!['manager_adjoint', 'manager', 'chef_agence'].includes(parentRole)) {
-          return res.status(400).json({ error: 'Le parent d\'un commercial doit être manager_adjoint, manager ou chef_agence' });
+        if (!['chef_equipe'].includes(parentRole)) {
+          return res.status(400).json({ error: 'Le parent d\'un commercial doit être un chef_equipe' });
+        }
+      } else if (normalizedRole === 'chef_equipe') {
+        if (!['manager_adjoint'].includes(parentRole)) {
+          return res.status(400).json({ error: 'Le parent d\'un chef_equipe doit être un manager_adjoint' });
         }
       } else if (normalizedRole === 'manager_adjoint') {
         if (!['manager', 'chef_agence', 'admin'].includes(parentRole)) {
@@ -165,7 +169,7 @@ router.put('/:id', auth, managerOnly, async (req, res) => {
     objectif_mensuel,
   } = req.body;
 
-  const normalizedRole = role === 'manager_adjoint' ? 'manager_adjoint' : role;
+  const normalizedRole = (role === 'manager_adjoint' || role === 'chef_equipe') ? role : role;
   const finalParentId = parentId ? Number(parentId) : parent_id ? Number(parent_id) : null;
 
   if (!nom || !prenom || !normalizedRole) {
@@ -178,7 +182,7 @@ router.put('/:id', auth, managerOnly, async (req, res) => {
     }
   }
 
-  if (['commercial', 'manager_adjoint', 'manager'].includes(normalizedRole) && !finalParentId) {
+  if (['commercial', 'manager_adjoint', 'chef_equipe', 'manager'].includes(normalizedRole) && !finalParentId) {
     return res.status(400).json({ error: 'Parent requis pour ce rôle' });
   }
 
@@ -198,8 +202,12 @@ router.put('/:id', auth, managerOnly, async (req, res) => {
       const parentRole = parentRows[0].role;
 
       if (normalizedRole === 'commercial') {
-        if (!['manager_adjoint', 'manager', 'chef_agence'].includes(parentRole)) {
-          return res.status(400).json({ error: 'Le parent d\'un commercial doit être manager_adjoint, manager ou chef_agence' });
+        if (!['chef_equipe'].includes(parentRole)) {
+          return res.status(400).json({ error: 'Le parent d\'un commercial doit être un chef_equipe' });
+        }
+      } else if (normalizedRole === 'chef_equipe') {
+        if (!['manager_adjoint'].includes(parentRole)) {
+          return res.status(400).json({ error: 'Le parent d\'un chef_equipe doit être un manager_adjoint' });
         }
       } else if (normalizedRole === 'manager_adjoint') {
         if (!['manager', 'chef_agence', 'admin'].includes(parentRole)) {

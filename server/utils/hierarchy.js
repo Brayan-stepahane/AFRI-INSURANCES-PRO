@@ -4,6 +4,10 @@ function isManagerAdjointRole(role) {
   return role === 'manager_adjoint';
 }
 
+function isChefEquipeRole(role) {
+  return role === 'chef_equipe';
+}
+
 function buildHierarchySubquery(paramIndex = 1) {
   return `
     WITH RECURSIVE descendants AS (
@@ -23,6 +27,7 @@ function buildHierarchyFilter(alias = 'u', paramIndex = 1) {
 
 module.exports = {
   isManagerAdjointRole,
+  isChefEquipeRole,
   buildHierarchyFilter,
   buildHierarchySubquery,
 };
