@@ -34,6 +34,7 @@ export default function LoginScreen() {
 
       const roleRoute: Record<string, string> = {
         commercial: '/dashboard?role=commercial',
+        chef_equipe: '/dashboard?role=chef_equipe',
         manager_adjoint: '/dashboard?role=manager_adjoint',
         manager: '/dashboard?role=manager',
         chef_agence: '/dashboard?role=chef_agence',

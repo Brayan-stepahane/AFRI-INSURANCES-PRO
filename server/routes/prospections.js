@@ -50,7 +50,7 @@ router.get('/', auth, async (req, res) => {
       if (user.role === 'commercial') {
         params.push(user.id);
         query += ` AND p.commercial_id = $${params.length}`;
-      } else if (isManagerAdjointRole(user.role)) {
+      } else if (isManagerAdjointRole(user.role) || user.role === 'chef_equipe') {
         // Voit les prospections des commerciaux sous lui (direct reports via parent_id)
         params.push(user.id);
         query += ` AND u.parent_id = $${params.length}`;

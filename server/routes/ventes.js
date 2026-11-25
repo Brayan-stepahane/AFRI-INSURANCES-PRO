@@ -29,7 +29,7 @@ router.get('/', auth, async (req, res) => {
       if (req.user.role === 'commercial') {
         params.push(req.user.id);
         query += ` AND v.commercial_id = $${params.length}`;
-      } else if (isManagerAdjointRole(req.user.role)) {
+      } else if (isManagerAdjointRole(req.user.role) || req.user.role === 'chef_equipe') {
         params.push(req.user.id);
         query += ` AND u.parent_id = $${params.length}`;
       } else if (req.user.role === 'manager' || req.user.role === 'chef_agence') {

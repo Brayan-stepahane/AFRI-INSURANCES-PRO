@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS users (
   identifiant VARCHAR(50) UNIQUE NOT NULL,
   email VARCHAR(100),
   mot_de_passe VARCHAR(255) NOT NULL,
-  role VARCHAR(50) CHECK (role IN ('admin', 'chef_agence', 'manager', 'manager_adjoint', 'commercial')),
+  role VARCHAR(50) CHECK (role IN ('admin', 'chef_agence', 'manager', 'manager_adjoint', 'chef_equipe', 'commercial')),
   equipe VARCHAR(100),
   objectif_mensuel DECIMAL(12, 2) DEFAULT 0,
   active BOOLEAN DEFAULT true,

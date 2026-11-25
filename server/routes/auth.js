@@ -106,7 +106,7 @@ router.post('/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Email can be optional in requests, but DB should never receive NULL
-    const normalizedRole = role === 'manager_adjoint' ? 'manager_adjoint' : role;
+    const normalizedRole = (role === 'manager_adjoint' || role === 'chef_equipe') ? role : role;
     const normalizedIdentifiant = identifiant.toString().trim().toLowerCase();
     const finalEmail = email && email.toString().trim()
       ? email.toString().trim().toLowerCase()

@@ -5,6 +5,7 @@ import { AuthResponse, LoginPayload, RegisterPayload, User, UserRole, CreateUser
 const normalizeRole = (role?: string): UserRole | undefined => {
   if (!role) return undefined;
   if (role === 'manager_adjoint') return 'manager_adjoint';
+  if (role === 'chef_equipe') return 'chef_equipe';
   return role as UserRole;
 };
 
@@ -92,7 +93,7 @@ export const userService = {
   },
 
   createUser: async (payload: CreateUserPayload): Promise<User> => {
-    const normalizedRole = payload.role === 'manager_adjoint' ? 'manager_adjoint' : payload.role;
+    const normalizedRole = (payload.role === 'manager_adjoint' || payload.role === 'chef_equipe') ? payload.role : payload.role;
     const body: any = {
       nom: payload.name,
       prenom: payload.surname,
@@ -126,7 +127,7 @@ export const userService = {
   },
 
   updateUser: async (userId: string, payload: UpdateUserPayload): Promise<User> => {
-    const normalizedRole = payload.role === 'manager_adjoint' ? 'manager_adjoint' : payload.role;
+    const normalizedRole = (payload.role === 'manager_adjoint' || payload.role === 'chef_equipe') ? payload.role : payload.role;
     const body: any = {
       nom: payload.name,
       prenom: payload.surname,

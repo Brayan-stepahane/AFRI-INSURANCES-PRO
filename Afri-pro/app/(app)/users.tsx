@@ -51,17 +51,20 @@ export default function UsersScreen() {
     equipe: '',
   });
 
-  const ROLE_OPTIONS: UserRole[] = ['commercial', 'manager_adjoint', 'manager', 'chef_agence', 'admin'];
+  const ROLE_OPTIONS: UserRole[] = ['commercial', 'chef_equipe', 'manager_adjoint', 'manager', 'chef_agence', 'admin'];
 
   // Filter possible parents based on selected role
   const isManagerAdjointRole = (role?: string) => role === 'manager_adjoint';
+  const isChefEquipeRole = (role?: string) => role === 'chef_equipe';
 
   const possibleParents = useMemo(() => {
     switch (formData.role) {
       case 'commercial':
+        return users.filter(u => isChefEquipeRole(u.role));
+      case 'chef_equipe':
         return users.filter(u => isManagerAdjointRole(u.role));
       case 'manager_adjoint':
-        return users.filter(u => u.role === 'manager');
+        return users.filter(u => u.role === 'manager' || u.role === 'chef_agence');
       case 'manager':
         return users.filter(u => u.role === 'chef_agence');
       default:
@@ -72,9 +75,11 @@ export default function UsersScreen() {
   const editPossibleParents = useMemo(() => {
     switch (editFormData.role) {
       case 'commercial':
+        return users.filter(u => isChefEquipeRole(u.role));
+      case 'chef_equipe':
         return users.filter(u => isManagerAdjointRole(u.role));
       case 'manager_adjoint':
-        return users.filter(u => u.role === 'manager');
+        return users.filter(u => u.role === 'manager' || u.role === 'chef_agence');
       case 'manager':
         return users.filter(u => u.role === 'chef_agence');
       default:
@@ -84,7 +89,8 @@ export default function UsersScreen() {
 
   const getEditParentLabel = () => {
     switch (editFormData.role) {
-      case 'commercial': return 'Manager Adjoint';
+      case 'commercial': return 'Chef équipe';
+      case 'chef_equipe': return 'Manager Adjoint';
       case 'manager_adjoint': return 'Manager';
       case 'manager': return 'chef_agence d\'Agence';
       default: return '';
@@ -163,12 +169,12 @@ export default function UsersScreen() {
       return;
     }
 
-    if (['commercial', 'manager_adjoint', 'manager', 'chef_agence'].includes(editFormData.role) && editFormData.objectif_mensuel <= 5000000) {
+    if (['commercial', 'chef_equipe', 'manager_adjoint', 'manager', 'chef_agence'].includes(editFormData.role) && editFormData.objectif_mensuel <= 5000000) {
       setError('Objectif mensuel doit être supérieur à 5M FCFA.');
       return;
     }
 
-    if (['commercial', 'manager_adjoint', 'manager'].includes(editFormData.role) && !editFormData.parentId) {
+    if (['commercial', 'chef_equipe', 'manager_adjoint', 'manager'].includes(editFormData.role) && !editFormData.parentId) {
       setError(`Veuillez sélectionner ${getEditParentLabel().toLowerCase()}.`);
       return;
     }
@@ -228,10 +234,11 @@ export default function UsersScreen() {
     const passwordToUse = formData.password || 'Pass1234';
 
     // Hierarchy validation (only for roles that need a parent)
-    if (['commercial', 'manager_adjoint', 'manager'].includes(formData.role) && !formData.parentId) {
+    if (['commercial', 'chef_equipe', 'manager_adjoint', 'manager'].includes(formData.role) && !formData.parentId) {
       let required = '';
-      if (formData.role === 'commercial') required = 'un manager adjoint';
-      else if (formData.role === 'manager_adjoint') required = 'un manager';
+      if (formData.role === 'commercial') required = 'un chef d\'équipe';
+      else if (formData.role === 'chef_equipe') required = 'un manager adjoint';
+      else if (formData.role === 'manager_adjoint') required = 'un manager ou un chef_agence';
       else if (formData.role === 'manager') required = 'un chef_agence d\'agence';
       
       setError(`Veuillez sélectionner ${required}.`);
@@ -243,7 +250,7 @@ export default function UsersScreen() {
       const parentIdNum = formData.parentId && formData.parentId !== '' ? Number(formData.parentId) : null;
       
       // Verify parentId is valid for roles that require it
-      if (['commercial', 'manager_adjoint', 'manager'].includes(formData.role) && !parentIdNum) {
+      if (['commercial', 'chef_equipe', 'manager_adjoint', 'manager'].includes(formData.role) && !parentIdNum) {
         setError('Parent ID invalide. Veuillez sélectionner un parent valide.');
         return;
       }
@@ -259,7 +266,7 @@ export default function UsersScreen() {
       };
 
       // Validation
-      if (['commercial', 'manager_adjoint', 'manager', 'chef_agence'].includes(formData.role) && formData.objectif_mensuel <= 5000000) {
+      if (['commercial', 'chef_equipe', 'manager_adjoint', 'manager', 'chef_agence'].includes(formData.role) && formData.objectif_mensuel <= 5000000) {
         setError('Objectif mensuel doit être supérieur à 5M FCFA.');
         return;
       }
@@ -342,7 +349,8 @@ export default function UsersScreen() {
 
   const getParentLabel = () => {
     switch (formData.role) {
-      case 'commercial': return 'Manager Adjoint';
+      case 'commercial': return 'Chef équipe';
+      case 'chef_equipe': return 'Manager Adjoint';
       case 'manager_adjoint': return 'Manager';
       case 'manager': return 'chef_agence d\'Agence';
       default: return '';
@@ -436,7 +444,7 @@ export default function UsersScreen() {
         </Modal>
 
         {/* Parent Selector - only for roles that need hierarchy */}
-        {['commercial', 'manager_adjoint', 'manager'].includes(formData.role) && (
+        {['commercial', 'chef_equipe', 'manager_adjoint', 'manager'].includes(formData.role) && (
           <>
             <Text style={styles.parentLabel}>{getParentLabel()}</Text>
             
@@ -485,7 +493,7 @@ export default function UsersScreen() {
         )}
 
 
-{['commercial', 'manager_adjoint', 'manager', 'chef_agence'].includes(formData.role) && (
+{['commercial', 'chef_equipe', 'manager_adjoint', 'manager', 'chef_agence'].includes(formData.role) && (
         <>
         <Text style={styles.subTitle}>Objectif mensuel (FCFA)</Text>
             <TextInput
@@ -623,7 +631,7 @@ export default function UsersScreen() {
                 </View>
               </TouchableOpacity>
             </Modal>
-            {['commercial', 'manager_adjoint', 'manager'].includes(editFormData.role) && (
+            {['commercial', 'chef_equipe', 'manager_adjoint', 'manager'].includes(editFormData.role) && (
               <>
                 <Text style={styles.parentLabel}>{getEditParentLabel()}</Text>
                 <TouchableOpacity
@@ -666,7 +674,7 @@ export default function UsersScreen() {
                 </Modal>
               </>
             )}
-            {['commercial', 'manager_adjoint', 'manager', 'chef_agence'].includes(editFormData.role) && (
+            {['commercial', 'chef_equipe', 'manager_adjoint', 'manager', 'chef_agence'].includes(editFormData.role) && (
               <>
                 <Text style={styles.subTitle}>Objectif mensuel (FCFA)</Text>
                 <TextInput

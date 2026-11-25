@@ -30,11 +30,12 @@ export function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
 
-type UserRole = 'commercial' | 'manager_adjoint' | 'manager' | 'chef_agence' | 'admin';
+type UserRole = 'commercial' | 'chef_equipe' | 'manager_adjoint' | 'manager' | 'chef_agence' | 'admin';
   const role = (user?.role || 'commercial') as UserRole;
 
   const ROLE_LABELS: Record<UserRole, string> = {
     commercial: 'Commercial',
+    chef_equipe: 'Chef d\'équipe',
     manager_adjoint: 'Manager adjoint',
     manager: 'Manager',
     chef_agence: 'Chef d agence',
@@ -48,6 +49,14 @@ type UserRole = 'commercial' | 'manager_adjoint' | 'manager' | 'chef_agence' | '
       { label: 'Mes cotations', icon: '💼', route: '/cotations' },
       { label: 'Mes ventes', icon: '✅', route: '/ventes' },
       { label: 'Notifications', icon: '🔔', route: '/notifications' },
+    ],
+    chef_equipe: [
+      { label: 'Tableau de bord', icon: '🏠', route: '/dashboard' },
+      { label: 'Prospections équipe', icon: '📋', route: '/prospections' },
+      { label: 'Cotations équipe', icon: '💼', route: '/cotations' },
+      { label: 'Ventes équipe', icon: '✅', route: '/ventes' },
+      { label: 'Objectifs', icon: '🎯', route: '/objectifs' },
+      { label: 'Mon équipe', icon: '👥', route: '/equipe' },
     ],
     manager_adjoint: [
       { label: 'Tableau de bord', icon: '🏠', route: '/dashboard' },

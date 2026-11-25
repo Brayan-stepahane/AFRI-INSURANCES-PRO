@@ -18,7 +18,7 @@ router.get('/', auth, async (req, res) => {
       if (user.role === 'commercial') {
         caParams.push(user.id);
         caQuery += ` AND commercial_id = $2`;
-      } else if (user.role === 'manager' || user.role === 'chef_agence' || user.role === 'manager_adjoint') {
+      } else if (user.role === 'manager' || user.role === 'chef_agence' || user.role === 'manager_adjoint' || user.role === 'chef_equipe') {
         caParams.push(user.id);
         caQuery += ` AND commercial_id IN (${buildHierarchySubquery(caParams.length)})`;
       }
@@ -33,7 +33,7 @@ router.get('/', auth, async (req, res) => {
 WITH RECURSIVE user_hierarchy AS (
   SELECT id, parent_id, role, objectif_mensuel, nom
   FROM users
-  WHERE active = true AND role IN ('commercial', 'manager_adjoint', 'manager', 'chef_agence')
+  WHERE active = true AND role IN ('commercial', 'chef_equipe', 'manager_adjoint', 'manager', 'chef_agence')
 ),
 descendants AS (
   SELECT id, id as root_id
@@ -87,7 +87,7 @@ user_objectives AS (
     END AS montant_reporte_non_vie
   FROM user_hierarchy uh
   LEFT JOIN commercial_objectives co ON co.id = uh.id
-  WHERE uh.role IN ('commercial', 'manager_adjoint', 'manager', 'chef_agence')
+  WHERE uh.role IN ('commercial', 'chef_equipe', 'manager_adjoint', 'manager', 'chef_agence')
 ),
 user_ca AS (
   SELECT
@@ -191,7 +191,7 @@ LEFT JOIN hierarchical_ca_non_vie hc_non_vie ON hc_non_vie.user_id = uo.id`;
       if (user.role === 'commercial') {
         prospParams.push(user.id);
         prospQuery += ` AND commercial_id = $1`;
-      } else if (user.role === 'manager' || user.role === 'chef_agence' || user.role === 'manager_adjoint') {
+      } else if (user.role === 'manager' || user.role === 'chef_agence' || user.role === 'manager_adjoint' || user.role === 'chef_equipe') {
         prospParams.push(user.id);
         prospQuery += ` AND commercial_id IN (${buildHierarchySubquery(prospParams.length)})`;
       }
@@ -206,7 +206,7 @@ LEFT JOIN hierarchical_ca_non_vie hc_non_vie ON hc_non_vie.user_id = uo.id`;
       if (user.role === 'commercial') {
         relanceParams.push(user.id);
         relanceQuery += ` AND commercial_id = $1`;
-      } else if (user.role === 'manager' || user.role === 'chef_agence' || user.role === 'manager_adjoint') {
+      } else if (user.role === 'manager' || user.role === 'chef_agence' || user.role === 'manager_adjoint' || user.role === 'chef_equipe') {
         relanceParams.push(user.id);
         relanceQuery += ` AND commercial_id IN (${buildHierarchySubquery(relanceParams.length)})`;
       }
@@ -319,7 +319,7 @@ router.get('/ca-historique', auth, async (req, res) => {
       if (req.user.role === 'commercial') {
         params.push(req.user.id);
         query += ` AND commercial_id = $1`;
-      } else if (req.user.role === 'manager' || req.user.role === 'chef_agence' || req.user.role === 'manager_adjoint') {
+      } else if (req.user.role === 'manager' || req.user.role === 'chef_agence' || req.user.role === 'manager_adjoint' || req.user.role === 'chef_equipe') {
         params.push(req.user.id);
         query += ` AND commercial_id IN (${buildHierarchySubquery(params.length)})`;
       }
